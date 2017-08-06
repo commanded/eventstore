@@ -48,8 +48,8 @@ CREATE TABLE events
     stream_id bigint NOT NULL REFERENCES streams (stream_id),
     stream_version bigint NOT NULL,
     event_type text NOT NULL,
-    correlation_id text,
-    causation_id text,
+    correlation_id uuid,
+    causation_id uuid,
     data bytea NOT NULL,
     metadata bytea NULL,
     created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
