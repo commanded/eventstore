@@ -1,4 +1,4 @@
-defmodule EventStore.DBAdapters.Ecto.Repo.Migrations.Subscriptions do
+defmodule EventStore.StorageAdapters.Ecto.Repo.Migrations.Subscriptions do
   use Ecto.Migration
 
   def change do
