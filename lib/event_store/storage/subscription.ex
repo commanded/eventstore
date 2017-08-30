@@ -1,4 +1,11 @@
 defmodule EventStore.Storage.Subscription do
+
+  @callback subscription_subscribe(conn :: any, stream_uuid :: binary, subscription_name :: binary, start_from_event_id :: integer, start_from_stream_version :: integer) :: {:ok, Subscription.t} | {:error, :subscription_already_exists} | {:error, any}
+  @callback subscription_ack(conn :: any, stream_uuid :: binary, subscription_name :: binary, last_seen_event_id :: integer, last_seen_stream_version :: integer) :: :ok | {:error, any}
+  @callback subscription_query(conn :: any, stream_uuid :: binary, subscription_name :: binary) :: {:ok, Subscription.t} | {:error, :subscription_not_found}
+  @callback subscription_unsubscribe(conn :: any, stream_uuid :: binary, subscription_name :: binary) :: :ok | {:error, any}
+  @callback subscription_all(conn :: any) :: {:ok, []} | {:ok, [Subscription.t]}
+
   @moduledoc """
   Support persistent subscriptions to an event stream
   """
@@ -30,22 +37,22 @@ defmodule EventStore.Storage.Subscription do
   List all known subscriptions
   """
   def subscriptions(conn) do
-    storage_adapter().all(conn)
+    storage_adapter().subscription_all(conn)
   end
 
   def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from_event_id, start_from_stream_version) do
-    case storage_adapter().query(conn, stream_uuid, subscription_name) do
+    case storage_adapter().subscription_query(conn, stream_uuid, subscription_name) do
       {:ok, subscription} -> {:ok, subscription}
-      {:error, :subscription_not_found} -> storage_adapter().subscribe(conn, stream_uuid, subscription_name, start_from_event_id, start_from_stream_version)
+      {:error, :subscription_not_found} -> storage_adapter().subscription_subscribe(conn, stream_uuid, subscription_name, start_from_event_id, start_from_stream_version)
     end
   end
 
   def ack_last_seen_event(conn, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version) do
-    storage_adapter().ack(conn, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version)
+    storage_adapter().subscription_ack(conn, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version)
   end
 
   def unsubscribe_from_stream(conn, stream_uuid, subscription_name) do
-    storage_adapter().unsubscribe(conn, stream_uuid, subscription_name)
+    storage_adapter().subscription_unsubscribe(conn, stream_uuid, subscription_name)
   end
 
   defmodule Adapter do
