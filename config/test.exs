@@ -17,4 +17,4 @@ config :eventstore, EventStore.Storage,
   pool_overflow: 0
 
 config :eventstore,
-  storage_adapter: EventStore.StorageAdapters.Ecto
+  storage_adapter: EventStore.StorageAdapters.Postgrex
