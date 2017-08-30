@@ -15,3 +15,6 @@ config :eventstore, EventStore.Storage,
   hostname: "localhost",
   pool_size: 1,
   pool_overflow: 0
+
+config :eventstore,
+  storage_adapter: EventStore.StorageAdapters.Ecto
