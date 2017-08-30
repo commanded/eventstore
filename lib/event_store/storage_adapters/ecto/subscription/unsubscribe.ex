@@ -1,4 +1,4 @@
-defmodule EventStore.StorageAdapters.Ecto.Subscription.Unsubscribe do
+defmodule EventStore.StorageAdapters.Postgrex.Subscription.Unsubscribe do
   require Logger
 
   alias EventStore.Sql.Statements

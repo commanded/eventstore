@@ -1,4 +1,4 @@
-defmodule EventStore.StorageAdapters.Ecto.Subscription.All do
+defmodule EventStore.StorageAdapters.Postgrex.Subscription.All do
   alias EventStore.Sql.Statements
   alias EventStore.Storage.Subscription
 

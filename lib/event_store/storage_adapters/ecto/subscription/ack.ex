@@ -1,4 +1,4 @@
-defmodule EventStore.StorageAdapters.Ecto.Subscription.Ack do
+defmodule EventStore.StorageAdapters.Postgrex.Subscription.Ack do
 
   require Logger
 
