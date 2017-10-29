@@ -6,8 +6,8 @@ defmodule EventStore.EventFactory do
   end
 
   def create_events(number_of_events, initial_event_number \\ 1) when number_of_events > 0 do
-    correlation_id = UUID.uuid4
-    causation_id = UUID.uuid4
+    correlation_id = UUID.uuid4()
+    causation_id = UUID.uuid4()
 
     1..number_of_events
     |> Enum.map(fn number ->

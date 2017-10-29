@@ -1,5 +1,15 @@
 # Changelog
 
+## Next release (v0.13.0)
+
+### Enhancements
+
+- Use `uuid` data type for event `correlation_id` and `causation_id` ([#57](https://github.com/slashdotdash/eventstore/pull/57)).
+
+### Upgrading
+
+Run the schema migration [v0.13.0.sql](scripts/upgrades/v0.13.0.sql) script against your event store database.
+
 ## v0.12.0
 
 ### Enhancements
