@@ -18,8 +18,8 @@ defmodule EventStore do
 
   """
 
-  @type start_from :: :origin | :current | non_neg_integer()
   @type expected_version :: :any_version | :no_stream | :stream_exists | non_neg_integer()
+  @type start_from :: :origin | :current | non_neg_integer()
 
   alias EventStore.Snapshots.{SnapshotData,Snapshotter}
   alias EventStore.{EventData,RecordedEvent,Subscriptions}
@@ -59,16 +59,16 @@ defmodule EventStore do
       expected version was `:stream_exists`.
 
   """
-  @spec append_to_stream(String.t, expected_version, list(EventData.t)) :: :ok |
+  @spec append_to_stream(String.t, expected_version, list(EventData.t), timeout()) :: :ok |
     {:error, :wrong_expected_version} |
     {:error, :stream_exists} |
     {:error, :stream_does_not_exist} |
     {:error, reason :: term}
-  def append_to_stream(stream_uuid, expected_version, events)
-  def append_to_stream(@all_stream, _expected_version, _events), do: {:error, :cannot_append_to_all_stream}
-  def append_to_stream(stream_uuid, expected_version, events) do
+  def append_to_stream(stream_uuid, expected_version, events, timeout \\ 5_000)
+  def append_to_stream(@all_stream, _expected_version, _events, _timeout), do: {:error, :cannot_append_to_all_stream}
+  def append_to_stream(stream_uuid, expected_version, events, timeout) do
     with {:ok, _stream} <- EventStore.Streams.Supervisor.open_stream(stream_uuid) do
-      Stream.append_to_stream(stream_uuid, expected_version, events)
+      Stream.append_to_stream(stream_uuid, expected_version, events, timeout)
     else
       reply -> reply
     end

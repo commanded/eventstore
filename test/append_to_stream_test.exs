@@ -72,6 +72,17 @@ defmodule EventStore.AppendToStreamTest do
     end
   end
 
+  @tag :slow
+  @tag timeout: 180_000
+  test "should append many events to a stream" do
+    stream_uuid = UUID.uuid4
+    events = EventFactory.create_events(8_001)
+
+    assert :ok = EventStore.append_to_stream(stream_uuid, 0, events, :infinity)
+
+    assert 1..8_001 |> Enum.to_list() == EventStore.stream_all_forward() |> Stream.map(&(&1.event_id)) |> Enum.to_list()
+  end
+
   defp append_events_to_stream(_context) do
     stream_uuid = UUID.uuid4
     events = EventFactory.create_events(3)
