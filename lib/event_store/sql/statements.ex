@@ -104,8 +104,8 @@ CREATE TABLE events
     stream_id bigint NOT NULL REFERENCES streams (stream_id),
     stream_version bigint NOT NULL,
     event_type text NOT NULL,
-    correlation_id uuid,
-    causation_id uuid,
+    correlation_id uuid NULL,
+    causation_id uuid NULL,
     data bytea NOT NULL,
     metadata bytea NULL,
     created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
@@ -205,8 +205,8 @@ RETURNING stream_id;
           Integer.to_string(index + 1), "::bigint, $",  # index
           Integer.to_string(index + 2), "::bigint, $",  # stream_id
           Integer.to_string(index + 3), "::bigint, $",  # stream_version
-          Integer.to_string(index + 4), ", $",          # correlation_id
-          Integer.to_string(index + 5), ", $",          # causation_id
+          Integer.to_string(index + 4), "::uuid, $",    # correlation_id
+          Integer.to_string(index + 5), "::uuid, $",    # causation_id
           Integer.to_string(index + 6), ", $",          # event_type
           Integer.to_string(index + 7), "::bytea, $",   # data
           Integer.to_string(index + 8), "::bytea, $",   # metadata
