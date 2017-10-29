@@ -6,8 +6,6 @@ defmodule EventStore.Streams.Stream do
   use GenServer
   use EventStore.Registration
 
-  require Logger
-
   alias EventStore.{EventData,RecordedEvent,Storage,Subscriptions,Writer}
   alias EventStore.Streams.Stream
 
@@ -36,8 +34,9 @@ defmodule EventStore.Streams.Stream do
 
   Returns `:ok` on success.
   """
-  def append_to_stream(stream_uuid, expected_version, events) do
-    GenServer.call(via_name(stream_uuid), {:append_to_stream, expected_version, events})
+  def append_to_stream(stream_uuid, expected_version, events, timeout \\ 5_000)
+  def append_to_stream(stream_uuid, expected_version, events, timeout) do
+    GenServer.call(via_name(stream_uuid), {:append_to_stream, expected_version, events}, timeout)
   end
 
   def read_stream_forward(stream_uuid, start_version, count) do

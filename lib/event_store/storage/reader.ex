@@ -36,12 +36,12 @@ defmodule EventStore.Storage.Reader do
   end
 
   defp failed_to_read(stream_id, reason) do
-    _ = Logger.warn(fn -> "failed to read events from stream id #{stream_id} due to #{inspect reason}" end)
+    _ = Logger.warn(fn -> "Failed to read events from stream id #{stream_id} due to #{inspect reason}" end)
     {:error, reason}
   end
 
   defp failed_to_read_all_stream(reason) do
-    _ = Logger.warn(fn -> "failed to read events from all streams due to #{inspect reason}" end)
+    _ = Logger.warn(fn -> "Failed to read events from all streams due to #{inspect reason}" end)
     {:error, reason}
   end
 
@@ -98,7 +98,7 @@ defmodule EventStore.Storage.Reader do
     end
 
     defp handle_response({:error, %Postgrex.Error{postgres: %{message: reason}}}) do
-      _ = Logger.warn(fn -> "failed to read events from stream due to: #{inspect reason}" end)
+      _ = Logger.warn(fn -> "Failed to read events from stream due to: #{inspect reason}" end)
       {:error, reason}
     end
   end

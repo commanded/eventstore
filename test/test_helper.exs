@@ -1,4 +1,4 @@
-ExUnit.start(exclude: [:distributed])
+ExUnit.start(exclude: [:distributed, :slow])
 
 Mix.Task.run("event_store.create", ~w(--quiet))
 

@@ -6,8 +6,6 @@ defmodule EventStore.Storage do
   This is for increased concurrency and performance, but with an upper limit on concurrent access.
   """
 
-  require Logger
-
   alias EventStore.Snapshots.SnapshotData
   alias EventStore.Storage
   alias EventStore.Storage.{Appender,Reader,Snapshot,Stream,Subscription}

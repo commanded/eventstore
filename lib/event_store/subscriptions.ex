@@ -37,7 +37,7 @@ defmodule EventStore.Subscriptions do
   end
 
   defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    _ = Logger.debug(fn -> "creating subscription process on stream #{inspect stream_uuid} named: #{inspect subscription_name}" end)
+    _ = Logger.debug(fn -> "Creating subscription process on stream #{inspect stream_uuid} named: #{inspect subscription_name}" end)
 
     case EventStore.Subscriptions.Supervisor.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
       {:ok, subscription} -> {:ok, subscription}

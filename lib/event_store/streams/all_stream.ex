@@ -3,8 +3,6 @@ defmodule EventStore.Streams.AllStream do
   A logical stream containing events appended to all streams
   """
 
-  require Logger
-
   alias EventStore.{RecordedEvent,Storage}
   alias EventStore.Subscriptions
 
