@@ -14,7 +14,6 @@ defmodule Mix.Tasks.EventStore.Migrate do
 
   use Mix.Task
 
-  alias EventStore.Storage
   alias EventStore.Storage.Database
 
   @shortdoc "Migrate an existing EventStore database"

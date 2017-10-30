@@ -4,7 +4,9 @@
 
 ### Enhancements
 
+- Use a UUID field for the `event_id` column, rename existing field to `event_number` ([#75](https://github.com/slashdotdash/eventstore/issues/75)).
 - Use `uuid` data type for event `correlation_id` and `causation_id` ([#57](https://github.com/slashdotdash/eventstore/pull/57)).
+- Mix task to migrate an existing EventStore database (`mix event_store.migrate`).
 
 ### Bug fixes
 
@@ -12,7 +14,7 @@
 
 ### Upgrading
 
-Run the schema migration [v0.13.0.sql](scripts/upgrades/v0.13.0.sql) script against your event store database.
+Upgrade your existing EventStore database by running: `mix event_store.migrate`
 
 ## v0.12.1
 
@@ -40,7 +42,7 @@ Run the schema migration [v0.13.0.sql](scripts/upgrades/v0.13.0.sql) script agai
 
 ### Upgrading
 
-Run the schema migration [v0.11.0.sql](scripts/upgrades/v0.11.0.sql) script against your event store database.
+Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) script against your event store database.
 
 ## v0.10.1
 
@@ -54,7 +56,7 @@ Run the schema migration [v0.11.0.sql](scripts/upgrades/v0.11.0.sql) script agai
 
 - Writer per event stream ([#55](https://github.com/slashdotdash/eventstore/issues/55)).
 
-  You **must** run the schema migration [v0.10.0.sql](scripts/upgrades/v0.10.0.sql) script against your event store database.
+  You **must** run the schema migration [v0.10.0.sql](priv/event_store/migrations/v0.10.0.sql) script against your event store database.
 
 - Use [DBConnection](https://hexdocs.pm/db_connection/DBConnection.html)'s built in support for connection pools (using poolboy).
 
@@ -64,7 +66,7 @@ Run the schema migration [v0.11.0.sql](scripts/upgrades/v0.11.0.sql) script agai
 
 - Adds `causation_id` alongside `correlation_id` for events ([#48](https://github.com/slashdotdash/eventstore/pull/48)).
 
-  To migrate an existing event store database execute [v0.9.0.sql](scripts/upgrades/v0.9.0.sql) script.
+  To migrate an existing event store database execute [v0.9.0.sql](priv/event_store/migrations/v0.9.0.sql) script.
 
 - Allow single stream, and all streams, subscriptions to provide a mapper function that maps every received event before sending to the subscriber.
 
