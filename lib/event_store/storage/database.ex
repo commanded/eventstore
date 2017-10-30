@@ -27,6 +27,17 @@ defmodule EventStore.Storage.Database do
     end
   end
 
+  def migrate(config, migration) do
+    database = Keyword.fetch!(config, :database)
+
+    {output, status} = run_with_psql(config, migration)
+
+    cond do
+      status == 0                       -> :ok
+      true                              -> {:error, output}
+    end
+  end
+
   defp run_with_psql(config, sql_command) do
     unless System.find_executable("psql") do
       raise "could not find executable `psql` in path, " <>

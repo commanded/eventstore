@@ -89,7 +89,7 @@ EventStore using PostgreSQL for persistence.
 
   defp package do
     [
-      files: ["lib", "guides", "mix.exs", "README*", "LICENSE*"],
+      files: ["lib", "priv", "guides", "mix.exs", "README*", "LICENSE*"],
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/slashdotdash/eventstore",
