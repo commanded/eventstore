@@ -56,13 +56,13 @@ defmodule EventStore.Storage.StreamPersistenceTest do
     {:ok, nil, 0} = Stream.stream_info(conn, stream_uuid)
   end
 
-  defp create_stream_with_events(conn, stream_uuid, number_of_events, initial_event_id \\ 1) do
+  defp create_stream_with_events(conn, stream_uuid, number_of_events, initial_event_number \\ 1) do
     {:ok, stream_id} = Stream.create_stream(conn, stream_uuid)
 
-    recorded_events = EventFactory.create_recorded_events(number_of_events, stream_uuid, initial_event_id)
-    expected_event_ids = Enum.map(recorded_events, fn event -> event.event_id end)
+    recorded_events = EventFactory.create_recorded_events(number_of_events, stream_uuid, initial_event_number)
+    expected_event_numbers = Enum.map(recorded_events, fn event -> event.event_number end)
 
-    {:ok, ^expected_event_ids} = Appender.append(conn, stream_id, recorded_events)
+    {:ok, ^expected_event_numbers} = Appender.append(conn, stream_id, recorded_events)
 
     {:ok, stream_id}
   end

@@ -6,20 +6,20 @@ defmodule EventStore.Subscriptions.StreamSubscriptionProvider do
   @type event :: EventStore.RecordedEvent.t
   @type subscription :: EventStore.Storage.Subscription.t
   @type stream_uuid :: String.t
-  @type ack :: {event_id :: non_neg_integer(), stream_version :: non_neg_integer()}
+  @type ack :: {event_number :: non_neg_integer(), stream_version :: non_neg_integer()}
   @type subscription_name :: String.t
   @type last_seen :: non_neg_integer()
   @type read_batch_size :: non_neg_integer()
 
   @doc """
-  Get the last seen `event_id` or `stream_version` from the acknowledgement
+  Get the last seen `event_number` or `stream_version` from the acknowledgement
   """
   @callback extract_ack(ack) :: non_neg_integer()
 
   @doc """
-  Get the `event_id` or `stream_version` from the given event
+  Get the `event_number` or `stream_version` from the given event
   """
-  @callback event_id(event) :: non_neg_integer()
+  @callback event_number(event) :: non_neg_integer()
 
   @doc """
   Get the last ack'd event for the given subscription
@@ -34,5 +34,6 @@ defmodule EventStore.Subscriptions.StreamSubscriptionProvider do
   @doc """
   Acknowledge receipt of the last seen event for the stream and subscription
   """
-  @callback ack_last_seen_event(stream_uuid, subscription_name, last_seen) :: :ok | {:error, reason :: any()}
+  @callback ack_last_seen_event(stream_uuid, subscription_name, last_seen) :: :ok
+    | {:error, reason :: any()}
 end

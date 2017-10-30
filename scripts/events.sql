@@ -1,5 +1,6 @@
 select
 	event_id,
+  event_number,
 	stream_id,
 	stream_version,
 	event_type,
@@ -9,4 +10,4 @@ select
 	convert_from(metadata, current_setting('server_encoding')) as metadata,
 	created_at
 from events
-order by event_id;
+order by event_number;

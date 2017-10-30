@@ -115,29 +115,29 @@ defmodule EventStore do
   @doc """
   Reads the requested number of events from all streams, in the order in which they were originally written.
 
-    - `start_event_id` optionally, the id of the first event to read.
+    - `start_event_number` optionally, the number of the first event to read.
       Defaults to the beginning of the stream if not set.
 
     - `count` optionally, the maximum number of events to read.
     If not set it will be limited to returning 1,000 events from all streams.
   """
   @spec read_all_streams_forward(non_neg_integer, non_neg_integer) :: {:ok, list(RecordedEvent.t)} | {:error, reason :: term}
-  def read_all_streams_forward(start_event_id \\ 0, count \\ 1_000) do
-    AllStream.read_stream_forward(start_event_id, count)
+  def read_all_streams_forward(start_event_number \\ 0, count \\ 1_000) do
+    AllStream.read_stream_forward(start_event_number, count)
   end
 
   @doc """
   Streams events from all streams, in the order in which they were originally written.
 
-    - `start_event_id` optionally, the id of the first event to read.
+    - `start_event_number` optionally, the number of the first event to read.
       Defaults to the beginning of the stream if not set.
 
     - `read_batch_size` optionally, the number of events to read at a time from storage.
       Defaults to reading 1,000 events per batch.
   """
   @spec stream_all_forward(non_neg_integer, non_neg_integer) :: Enumerable.t
-  def stream_all_forward(start_event_id \\ 0, read_batch_size \\ 1_000) do
-    AllStream.stream_forward(start_event_id, read_batch_size)
+  def stream_all_forward(start_event_number \\ 0, read_batch_size \\ 1_000) do
+    AllStream.stream_forward(start_event_number, read_batch_size)
   end
 
   @doc """
@@ -198,9 +198,9 @@ defmodule EventStore do
   @doc """
   Acknowledge receipt of the given events received from a single stream, or all streams, subscription.
   """
-  @spec ack(pid, RecordedEvent.t | list(RecordedEvent.t) | non_neg_integer) :: :ok | {:error, reason :: term}
-  def ack(subscription, events) do
-    Subscription.ack(subscription, events)
+  @spec ack(pid, RecordedEvent.t | list(RecordedEvent.t) | non_neg_integer()) :: :ok | {:error, reason :: term}
+  def ack(subscription, ack) do
+    Subscription.ack(subscription, ack)
   end
 
   @doc """

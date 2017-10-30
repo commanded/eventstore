@@ -12,7 +12,7 @@ By default subscriptions are created from the single stream, or all stream, orig
 
 - `:origin` - subscribe to events from the start of the stream (identical to using 0). This is the current behaviour and will remain the default.
 - `:current` - subscribe to events from the current version.
-- `stream_version` or `event_id` (integer) - specify an exact stream version to subscribe from for a single stream subscription. You provide an event id for an all stream subscription.
+- `stream_version` or `event_number` (integer) - specify an exact stream version to subscribe from for a single stream subscription. You provide an event id for an all stream subscription.
 
 ## Ack received events
 
@@ -77,7 +77,7 @@ The supported options are:
 
   - `:origin` - Start receiving events from the beginning of the stream or all streams.
   - `:current` - Subscribe to newly appended events only, skipping already persisted events.
-  - `event_id` or `stream_version` - Provide the event id (all streams) of stream version (single stream) to begin receiving events from.
+  - `event_number` or `stream_version` - Provide the event id (all streams) of stream version (single stream) to begin receiving events from.
 
 Example all stream subscription that will receive events appended after the subscription has been created:
 
@@ -92,14 +92,14 @@ You can provide an event mapping function that runs in the subscription process,
 Subscribe to all streams and provide a `mapper` function that sends only the event data:
 
 ```elixir
-{:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), mapper: fn %EventStore.RecordedEvent{data: data} -> {event_id, data} end)
+{:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), mapper: fn %EventStore.RecordedEvent{event_number: event_number: data: data} -> {event_number, data} end)
 
 receive do
-  {:events, events} ->
-    # ... process events & ack receipt using last `event_id`
-    {event_id, _data} = List.last(events)
+  {:events, mapped_events} ->
+    # ... process events & ack receipt using last `event_number`
+    {event_number, _data} = List.last(mapped_events)
 
-    EventStore.ack(subscription, event_id)
+    EventStore.ack(subscription, event_number)
 end
 ```
 

@@ -69,11 +69,11 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
     verify_subscription(subscription, nil, 1)
   end
 
-  defp verify_subscription(subscription, last_seen_event_id \\ nil, last_seen_stream_version \\ nil) do
+  defp verify_subscription(subscription, last_seen_event_number \\ nil, last_seen_stream_version \\ nil) do
     assert subscription.subscription_id > 0
     assert subscription.stream_uuid == @all_stream
     assert subscription.subscription_name == @subscription_name
-    assert subscription.last_seen_event_id == last_seen_event_id
+    assert subscription.last_seen_event_number == last_seen_event_number
     assert subscription.last_seen_stream_version == last_seen_stream_version
     assert subscription.created_at != nil
   end

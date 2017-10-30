@@ -14,6 +14,7 @@ defmodule EventStore.Sql.Statements do
       create_events_table(),
       prevent_event_update(),
       prevent_event_delete(),
+      create_event_number_index(),
       create_event_stream_id_index(),
       create_event_stream_id_and_version_index(),
       create_subscriptions_table(),
@@ -53,14 +54,14 @@ RESTART IDENTITY;
 """
 CREATE TABLE event_counter
 (
-    event_id bigint PRIMARY KEY NOT NULL
+    event_number bigint PRIMARY KEY NOT NULL
 );
 """
   end
 
   defp seed_event_counter do
 """
-INSERT INTO event_counter (event_id) VALUES (0);
+INSERT INTO event_counter (event_number) VALUES (0);
 """
   end
 
@@ -100,7 +101,8 @@ CREATE UNIQUE INDEX ix_streams_stream_uuid ON streams (stream_uuid);
 """
 CREATE TABLE events
 (
-    event_id bigint PRIMARY KEY NOT NULL,
+    event_id uuid PRIMARY KEY NOT NULL,
+    event_number bigint NOT NULL,
     stream_id bigint NOT NULL REFERENCES streams (stream_id),
     stream_version bigint NOT NULL,
     event_type text NOT NULL,
@@ -127,6 +129,12 @@ CREATE RULE no_delete_events AS ON DELETE TO events DO INSTEAD NOTHING;
 """
   end
 
+  defp create_event_number_index do
+"""
+CREATE UNIQUE INDEX ix_events_event_number ON events (event_number);
+"""
+  end
+
   defp create_event_stream_id_index do
 """
 CREATE INDEX ix_events_stream_id ON events (stream_id);
@@ -146,7 +154,7 @@ CREATE TABLE subscriptions
     subscription_id bigserial PRIMARY KEY NOT NULL,
     stream_uuid text NOT NULL,
     subscription_name text NOT NULL,
-    last_seen_event_id bigint NULL,
+    last_seen_event_number bigint NULL,
     last_seen_stream_version bigint NULL,
     created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
 );
@@ -199,18 +207,19 @@ RETURNING stream_id;
     params =
       1..number_of_events
       |> Enum.map(fn event_number ->
-        index = (event_number - 1) * 9 + 3
+        index = (event_number - 1) * 10 + 3
         event_params = [
           "($",
-          Integer.to_string(index + 1), "::bigint, $",  # index
-          Integer.to_string(index + 2), "::bigint, $",  # stream_id
-          Integer.to_string(index + 3), "::bigint, $",  # stream_version
-          Integer.to_string(index + 4), "::uuid, $",    # correlation_id
-          Integer.to_string(index + 5), "::uuid, $",    # causation_id
-          Integer.to_string(index + 6), ", $",          # event_type
-          Integer.to_string(index + 7), "::bytea, $",   # data
-          Integer.to_string(index + 8), "::bytea, $",   # metadata
-          Integer.to_string(index + 9), "::timestamp)"  # created_at
+          Integer.to_string(index + 1), "::bigint, $",   # index
+          Integer.to_string(index + 2), "::uuid, $",     # event_id
+          Integer.to_string(index + 3), "::bigint, $",   # stream_id
+          Integer.to_string(index + 4), "::bigint, $",   # stream_version
+          Integer.to_string(index + 5), "::uuid, $",     # correlation_id
+          Integer.to_string(index + 6), "::uuid, $",     # causation_id
+          Integer.to_string(index + 7), ", $",           # event_type
+          Integer.to_string(index + 8), "::bytea, $",    # data
+          Integer.to_string(index + 9), "::bytea, $",    # metadata
+          Integer.to_string(index + 10), "::timestamp)"  # created_at
         ]
 
         case event_number do
@@ -229,19 +238,20 @@ RETURNING stream_id;
         ),
         event_counter AS (
           UPDATE event_counter
-          SET event_id = event_id + $1::bigint
-          RETURNING event_id - $1::bigint as event_id
+          SET event_number = event_number + $1::bigint
+          RETURNING event_number - $1::bigint as event_number
         ),
-        event_data (index, stream_id, stream_version, correlation_id, causation_id, event_type, data, metadata, created_at) AS (
+        event_data (index, event_id, stream_id, stream_version, correlation_id, causation_id, event_type, data, metadata, created_at) AS (
           VALUES
       """,
       params,
       """
         )
       INSERT INTO events
-        (event_id, stream_id, stream_version, correlation_id, causation_id, event_type, data, metadata, created_at)
+        (event_id, event_number, stream_id, stream_version, correlation_id, causation_id, event_type, data, metadata, created_at)
       SELECT
-        event_counter.event_id + event_data.index,
+        event_data.event_id,
+        event_counter.event_number + event_data.index,
         event_data.stream_id,
         event_data.stream_version,
         event_data.correlation_id,
@@ -251,16 +261,16 @@ RETURNING stream_id;
         event_data.metadata,
         event_data.created_at
       FROM event_data, event_counter
-      RETURNING events.event_id;
+      RETURNING events.event_number;
       """,
     ]
   end
 
   def create_subscription do
 """
-INSERT INTO subscriptions (stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version)
+INSERT INTO subscriptions (stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version)
 VALUES ($1, $2, $3, $4)
-RETURNING subscription_id, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version, created_at;
+RETURNING subscription_id, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, created_at;
 """
   end
 
@@ -274,7 +284,7 @@ WHERE stream_uuid = $1 AND subscription_name = $2;
   def ack_last_seen_event do
 """
 UPDATE subscriptions
-SET last_seen_event_id = $3, last_seen_stream_version = $4
+SET last_seen_event_number = $3, last_seen_stream_version = $4
 WHERE stream_uuid = $1 AND subscription_name = $2;
 """
   end
@@ -297,7 +307,7 @@ WHERE source_uuid = $1;
 
   def query_all_subscriptions do
 """
-SELECT subscription_id, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version, created_at
+SELECT subscription_id, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, created_at
 FROM subscriptions
 ORDER BY created_at;
 """
@@ -305,7 +315,7 @@ ORDER BY created_at;
 
   def query_get_subscription do
 """
-SELECT subscription_id, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version, created_at
+SELECT subscription_id, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, created_at
 FROM subscriptions
 WHERE stream_uuid = $1 AND subscription_name = $2;
 """
@@ -337,9 +347,9 @@ LIMIT 1;
 """
   end
 
-  def query_latest_event_id do
+  def query_latest_event_number do
 """
-SELECT event_id
+SELECT event_number
 FROM event_counter
 LIMIT 1;
 """
@@ -357,6 +367,7 @@ WHERE source_uuid = $1;
 """
 SELECT
   e.event_id,
+  e.event_number,
   s.stream_uuid,
   e.stream_version,
   e.event_type,
@@ -377,6 +388,7 @@ LIMIT $3;
 """
 SELECT
   e.event_id,
+  e.event_number,
   s.stream_uuid,
   e.stream_version,
   e.event_type,
@@ -387,8 +399,8 @@ SELECT
   e.created_at
 FROM events e
 INNER JOIN streams s ON s.stream_id = e.stream_id
-WHERE e.event_id >= $1
-ORDER BY e.event_id ASC
+WHERE e.event_number >= $1
+ORDER BY e.event_number ASC
 LIMIT $2;
 """
   end

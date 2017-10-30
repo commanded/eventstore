@@ -9,25 +9,25 @@ defmodule EventStore.Publisher do
 
   defmodule PendingEvents do
     defstruct [
-      initial_event_id: nil,
-      last_event_id: nil,
+      initial_event_number: nil,
+      last_event_number: nil,
       stream_uuid: nil,
       events: [],
     ]
   end
 
   defstruct [
-    last_published_event_id: 0,
+    last_published_event_number: 0,
     pending_events: %{},
     serializer: nil,
   ]
 
   def start_link(serializer) do
-    {:ok, latest_event_id} = Storage.latest_event_id()
+    {:ok, latest_event_number} = Storage.latest_event_number()
 
     GenServer.start_link(__MODULE__, %Publisher{
       serializer: serializer,
-      last_published_event_id: latest_event_id,
+      last_published_event_number: latest_event_number,
     }, name: __MODULE__)
   end
 
@@ -38,16 +38,16 @@ defmodule EventStore.Publisher do
   def init(%Publisher{} = state),
     do: {:ok, state}
 
-  def handle_cast(:notify_pending_events, %Publisher{last_published_event_id: last_published_event_id, pending_events: pending_events, serializer: serializer} = state) do
-    next_event_id = last_published_event_id + 1
+  def handle_cast(:notify_pending_events, %Publisher{last_published_event_number: last_published_event_number, pending_events: pending_events, serializer: serializer} = state) do
+    next_event_number = last_published_event_number + 1
 
-    state = case Map.get(pending_events, next_event_id) do
-      %PendingEvents{stream_uuid: stream_uuid, events: events, last_event_id: last_event_id} ->
+    state = case Map.get(pending_events, next_event_number) do
+      %PendingEvents{stream_uuid: stream_uuid, events: events, last_event_number: last_event_number} ->
         :ok = Subscriptions.notify_events(stream_uuid, events, serializer)
 
-        state = %Publisher{state |
-          last_published_event_id: last_event_id,
-          pending_events: Map.delete(pending_events, next_event_id),
+        %Publisher{state |
+          last_published_event_number: last_event_number,
+          pending_events: Map.delete(pending_events, next_event_number),
         }
 
         :ok = notify_pending_events(state)
@@ -61,31 +61,31 @@ defmodule EventStore.Publisher do
     {:noreply, state}
   end
 
-  def handle_cast({:notify_events, stream_uuid, events}, %Publisher{last_published_event_id: last_published_event_id, pending_events: pending_events, serializer: serializer} = state) do
-    expected_event_id = last_published_event_id + 1
-    initial_event_id = first_event_id(events)
-    last_event_id = last_event_id(events)
+  def handle_cast({:notify_events, stream_uuid, events}, %Publisher{last_published_event_number: last_published_event_number, pending_events: pending_events, serializer: serializer} = state) do
+    expected_event_number = last_published_event_number + 1
+    initial_event_number = first_event_number(events)
+    last_event_number = last_event_number(events)
 
-    state = case initial_event_id do
-      ^expected_event_id ->
+    state = case initial_event_number do
+      ^expected_event_number ->
         # events are in expected order, immediately notify subscribers
         :ok = Subscriptions.notify_events(stream_uuid, events, serializer)
 
         %Publisher{state |
-          last_published_event_id: last_event_id,
+          last_published_event_number: last_event_number,
         }
 
-      initial_event_id ->
+      initial_event_number ->
         # events are out of order, track pending events to be later published in order
         pending = %PendingEvents{
-          initial_event_id: initial_event_id,
-          last_event_id: last_event_id,
+          initial_event_number: initial_event_number,
+          last_event_number: last_event_number,
           stream_uuid: stream_uuid,
-          events: events
+          events: events,
         }
 
         state = %Publisher{state |
-          pending_events: Map.put(pending_events, initial_event_id, pending)
+          pending_events: Map.put(pending_events, initial_event_number, pending),
         }
 
         :ok = notify_pending_events(state)
@@ -103,6 +103,6 @@ defmodule EventStore.Publisher do
   defp notify_pending_events(%Publisher{}),
     do: GenServer.cast(self(), :notify_pending_events)
 
-  defp first_event_id([first | _]), do: first.event_id
-  defp last_event_id(events), do: List.last(events).event_id
+  defp first_event_number([first | _]), do: first.event_number
+  defp last_event_number(events), do: List.last(events).event_number
 end

@@ -40,7 +40,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
       stream_uuid = UUID.uuid4()
       {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
 
-      mapper = fn event -> event.event_id end
+      mapper = fn event -> event.event_number end
       subscription = create_subscription(stream_uuid, mapper: mapper)
 
       assert subscription.data.mapper == mapper
@@ -284,8 +284,8 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
     ack(subscription, List.last(events))
   end
 
-  def ack(subscription, %RecordedEvent{event_id: event_id, stream_version: stream_version}) do
-    StreamSubscription.ack(subscription, {event_id, stream_version})
+  def ack(subscription, %RecordedEvent{event_number: event_number, stream_version: stream_version}) do
+    StreamSubscription.ack(subscription, {event_number, stream_version})
   end
 
   defp assert_receive_caught_up(to) do

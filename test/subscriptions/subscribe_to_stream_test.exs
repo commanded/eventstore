@@ -26,7 +26,7 @@ defmodule EventStore.Subscriptions.SubscribeToStream do
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
       assert_receive {:events, received_events}
 
-      assert pluck(received_events, :event_id) == [4, 5, 6]
+      assert pluck(received_events, :event_number) == [4, 5, 6]
       assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
       assert pluck(received_events, :stream_version) == [1, 2, 3]
       assert pluck(received_events, :correlation_id) == pluck(events, :correlation_id)
@@ -50,7 +50,7 @@ defmodule EventStore.Subscriptions.SubscribeToStream do
       :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
 
       assert_receive {:events, received_events}
-      assert pluck(received_events, :event_id) == [5]
+      assert pluck(received_events, :event_number) == [5]
       assert pluck(received_events, :stream_uuid) == [stream_uuid]
       assert pluck(received_events, :stream_version) == [2]
       assert pluck(received_events, :correlation_id) == pluck(new_events, :correlation_id)
@@ -95,7 +95,7 @@ defmodule EventStore.Subscriptions.SubscribeToStream do
 
       {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
 
-      {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), mapper: fn event -> event.event_id end)
+      {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), mapper: fn event -> event.event_number end)
 
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
 
@@ -201,7 +201,7 @@ defmodule EventStore.Subscriptions.SubscribeToStream do
       :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)
 
       assert_receive {:events, stream1_received_events}
-      assert pluck(stream1_received_events, :event_id) == [1]
+      assert pluck(stream1_received_events, :event_number) == [1]
       assert pluck(stream1_received_events, :stream_uuid) == [stream1_uuid]
       assert pluck(stream1_received_events, :stream_version) == [1]
       assert pluck(stream1_received_events, :correlation_id) == pluck(stream1_events, :correlation_id)
@@ -214,7 +214,7 @@ defmodule EventStore.Subscriptions.SubscribeToStream do
       Subscription.ack(subscription, stream1_received_events)
 
       assert_receive {:events, stream2_received_events}
-      assert pluck(stream2_received_events, :event_id) == [2]
+      assert pluck(stream2_received_events, :event_number) == [2]
       assert pluck(stream2_received_events, :stream_uuid) == [stream2_uuid]
       assert pluck(stream2_received_events, :stream_version) == [1]
       assert pluck(stream2_received_events, :correlation_id) == pluck(stream2_events, :correlation_id)
@@ -240,7 +240,7 @@ defmodule EventStore.Subscriptions.SubscribeToStream do
       :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_initial_events)
       :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_initial_events)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), start_from_event_id: 2)
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), start_from_event_number: 2)
 
       :ok = Stream.append_to_stream(stream1_uuid, 1, stream1_new_events)
       :ok = Stream.append_to_stream(stream2_uuid, 1, stream2_new_events)
@@ -325,7 +325,7 @@ defmodule EventStore.Subscriptions.SubscribeToStream do
       assert pluck(remaining_received_events, :data) == pluck(remaining_events, :data)
     end
 
-    test "should support ack received events by `event_id`", %{subscription_name: subscription_name} do
+    test "should support ack received events by `event_number`", %{subscription_name: subscription_name} do
       stream1_uuid = UUID.uuid4
       stream2_uuid = UUID.uuid4
 
@@ -350,7 +350,7 @@ defmodule EventStore.Subscriptions.SubscribeToStream do
       assert stream1_received_events != stream2_received_events
     end
 
-    test "should error when attempting to ack received events by incorrect `event_id`", %{subscription_name: subscription_name} do
+    test "should error when attempting to ack received events by incorrect `event_number`", %{subscription_name: subscription_name} do
       stream1_uuid = UUID.uuid4
       stream2_uuid = UUID.uuid4
 
@@ -371,7 +371,7 @@ defmodule EventStore.Subscriptions.SubscribeToStream do
       Process.unlink(subscription)
       ref = Process.monitor(subscription)
 
-      # ack an incorrect `event_id` should crash subscription process
+      # ack an incorrect `event_number` should crash subscription process
       Subscription.ack(subscription, 2)
 
       assert_receive {:DOWN, ^ref, _, _, _}

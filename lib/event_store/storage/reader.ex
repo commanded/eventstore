@@ -23,8 +23,8 @@ defmodule EventStore.Storage.Reader do
   @doc """
   Read events appended to all streams forward from the given start event id inclusive
   """
-  def read_all_forward(conn, start_event_id, count) do
-    case Reader.Query.read_all_events_forward(conn, start_event_id, count) do
+  def read_all_forward(conn, start_event_number, count) do
+    case Reader.Query.read_all_events_forward(conn, start_event_number, count) do
       {:ok, []} = reply -> reply
       {:ok, rows} -> map_rows_to_event_data(rows)
       {:error, reason} -> failed_to_read_all_stream(reason)
@@ -50,13 +50,12 @@ defmodule EventStore.Storage.Reader do
     Map event data from the database to `RecordedEvent` struct
     """
 
-    def to_event_data(rows) do
-      rows
-      |> Enum.map(&to_event_data_from_row/1)
-    end
+    def to_event_data(rows),
+      do: Enum.map(rows, &to_event_data_from_row/1)
 
     def to_event_data_from_row([
       event_id,
+      event_number,
       stream_uuid,
       stream_version,
       event_type,
@@ -67,7 +66,8 @@ defmodule EventStore.Storage.Reader do
       created_at])
     do
       %RecordedEvent{
-        event_id: event_id,
+        event_id: event_id |> from_uuid(),
+        event_number: event_number,
         stream_uuid: stream_uuid,
         stream_version: stream_version,
         event_type: event_type,
@@ -97,9 +97,9 @@ defmodule EventStore.Storage.Reader do
       |> handle_response
     end
 
-    def read_all_events_forward(conn, start_event_id, count) do
+    def read_all_events_forward(conn, start_event_number, count) do
       conn
-      |> Postgrex.query(Statements.read_all_events_forward, [start_event_id, count], pool: DBConnection.Poolboy)
+      |> Postgrex.query(Statements.read_all_events_forward, [start_event_number, count], pool: DBConnection.Poolboy)
       |> handle_response
     end
 

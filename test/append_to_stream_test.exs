@@ -80,7 +80,7 @@ defmodule EventStore.AppendToStreamTest do
 
     assert :ok = EventStore.append_to_stream(stream_uuid, 0, events, :infinity)
 
-    assert 1..8_001 |> Enum.to_list() == EventStore.stream_all_forward() |> Stream.map(&(&1.event_id)) |> Enum.to_list()
+    assert 1..8_001 |> Enum.to_list() == EventStore.stream_all_forward() |> Stream.map(&(&1.event_number)) |> Enum.to_list()
   end
 
   defp append_events_to_stream(_context) do

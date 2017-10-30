@@ -12,7 +12,7 @@ defmodule EventStore.Storage.Subscription do
     subscription_id: non_neg_integer(),
     stream_uuid: String.t,
     subscription_name: String.t,
-    last_seen_event_id: nil | non_neg_integer(),
+    last_seen_event_number: nil | non_neg_integer(),
     last_seen_stream_version: nil | non_neg_integer(),
     created_at: NaiveDateTime.t,
   }
@@ -21,7 +21,7 @@ defmodule EventStore.Storage.Subscription do
     subscription_id: nil,
     stream_uuid: nil,
     subscription_name: nil,
-    last_seen_event_id: nil,
+    last_seen_event_number: nil,
     last_seen_stream_version: nil,
     created_at: nil,
   ]
@@ -29,24 +29,22 @@ defmodule EventStore.Storage.Subscription do
   @doc """
   List all known subscriptions
   """
-  def subscriptions(conn) do
-    Subscription.All.execute(conn)
-  end
+  def subscriptions(conn),
+    do: Subscription.All.execute(conn)
 
-  def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from_event_id, start_from_stream_version) do
+  def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version) do
     case Subscription.Query.execute(conn, stream_uuid, subscription_name) do
       {:ok, subscription} -> {:ok, subscription}
-      {:error, :subscription_not_found} -> Subscription.Subscribe.execute(conn, stream_uuid, subscription_name, start_from_event_id, start_from_stream_version)
+      {:error, :subscription_not_found} -> Subscription.Subscribe.execute(conn, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version)
     end
   end
 
-  def ack_last_seen_event(conn, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version) do
-    Subscription.Ack.execute(conn, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version)
+  def ack_last_seen_event(conn, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version) do
+    Subscription.Ack.execute(conn, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version)
   end
 
-  def unsubscribe_from_stream(conn, stream_uuid, subscription_name) do
-    Subscription.Unsubscribe.execute(conn, stream_uuid, subscription_name)
-  end
+  def unsubscribe_from_stream(conn, stream_uuid, subscription_name),
+    do: Subscription.Unsubscribe.execute(conn, stream_uuid, subscription_name)
 
   defmodule All do
     def execute(conn) do
@@ -55,13 +53,11 @@ defmodule EventStore.Storage.Subscription do
       |> handle_response
     end
 
-    defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}) do
-      {:ok, []}
-    end
+    defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}),
+      do: {:ok, []}
 
-    defp handle_response({:ok, %Postgrex.Result{rows: rows}}) do
-      {:ok, Subscription.Adapter.to_subscriptions(rows)}
-    end
+    defp handle_response({:ok, %Postgrex.Result{rows: rows}}),
+      do: {:ok, Subscription.Adapter.to_subscriptions(rows)}
   end
 
   defmodule Query do
@@ -71,21 +67,19 @@ defmodule EventStore.Storage.Subscription do
       |> handle_response
     end
 
-    defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}) do
-      {:error, :subscription_not_found}
-    end
+    defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}),
+      do: {:error, :subscription_not_found}
 
-    defp handle_response({:ok, %Postgrex.Result{rows: rows}}) do
-      {:ok, Subscription.Adapter.to_subscription(rows)}
-    end
+    defp handle_response({:ok, %Postgrex.Result{rows: rows}}),
+      do: {:ok, Subscription.Adapter.to_subscription(rows)}
   end
 
   defmodule Subscribe do
-    def execute(conn, stream_uuid, subscription_name, start_from_event_id, start_from_stream_version) do
+    def execute(conn, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version) do
       _ = Logger.debug(fn -> "Attempting to create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\"" end)
 
       conn
-      |> Postgrex.query(Statements.create_subscription, [stream_uuid, subscription_name, start_from_event_id, start_from_stream_version], pool: DBConnection.Poolboy)
+      |> Postgrex.query(Statements.create_subscription, [stream_uuid, subscription_name, start_from_event_number, start_from_stream_version], pool: DBConnection.Poolboy)
       |> handle_response(stream_uuid, subscription_name)
     end
 
@@ -106,9 +100,9 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Ack do
-    def execute(conn, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version) do
+    def execute(conn, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version) do
       conn
-      |> Postgrex.query(Statements.ack_last_seen_event, [stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version], pool: DBConnection.Poolboy)
+      |> Postgrex.query(Statements.ack_last_seen_event, [stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version], pool: DBConnection.Poolboy)
       |> handle_response(stream_uuid, subscription_name)
     end
 
@@ -150,16 +144,23 @@ defmodule EventStore.Storage.Subscription do
 
     def to_subscription(rows) do
       rows
-      |> List.first
-      |> to_subscription_from_row
+      |> List.first()
+      |> to_subscription_from_row()
     end
 
-    defp to_subscription_from_row([subscription_id, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version, created_at]) do
+    defp to_subscription_from_row([
+      subscription_id,
+      stream_uuid,
+      subscription_name,
+      last_seen_event_number,
+      last_seen_stream_version,
+      created_at,
+    ]) do
       %Subscription{
         subscription_id: subscription_id,
         stream_uuid: stream_uuid,
         subscription_name: subscription_name,
-        last_seen_event_id: last_seen_event_id,
+        last_seen_event_number: last_seen_event_number,
         last_seen_stream_version: last_seen_stream_version,
         created_at: created_at
       }
