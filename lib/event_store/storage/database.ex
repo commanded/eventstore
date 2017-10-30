@@ -6,7 +6,7 @@ defmodule EventStore.Storage.Database do
     database = Keyword.fetch!(config, :database)
     encoding = Keyword.get(config, :encoding, "UTF8")
 
-    {output, status} = run_with_psql(config, "CREATE DATABASE \"#{database}\" ENCODING='#{encoding}'")
+    {output, status} = run_with_psql(config, "template1", "CREATE DATABASE \"#{database}\" ENCODING='#{encoding}'")
 
     cond do
       status == 0                       -> :ok
@@ -18,7 +18,7 @@ defmodule EventStore.Storage.Database do
   def drop(config) do
     database = Keyword.fetch!(config, :database)
 
-    {output, status} = run_with_psql(config, "DROP DATABASE \"#{database}\"")
+    {output, status} = run_with_psql(config, "template1", "DROP DATABASE \"#{database}\"")
 
     cond do
       status == 0                       -> :ok
@@ -30,15 +30,13 @@ defmodule EventStore.Storage.Database do
   def migrate(config, migration) do
     database = Keyword.fetch!(config, :database)
 
-    {output, status} = run_with_psql(config, migration)
-
-    cond do
-      status == 0                       -> :ok
-      true                              -> {:error, output}
+    case run_with_psql(config, database, migration) do
+      {output, 0}       -> :ok
+      {output, _status} -> {:error, output}
     end
   end
 
-  defp run_with_psql(config, sql_command) do
+  defp run_with_psql(config, database, sql_command) do
     unless System.find_executable("psql") do
       raise "could not find executable `psql` in path, " <>
             "please guarantee it is available before running event_store mix commands"
@@ -71,8 +69,9 @@ defmodule EventStore.Storage.Database do
                     "--set", "ON_ERROR_STOP=1",
                     "--set", "VERBOSITY=verbose",
                     "--no-psqlrc",
-                    "-d", "template1",
+                    "-d", database,
                     "-c", sql_command]
+
     System.cmd("psql", args, env: env, stderr_to_stdout: true)
   end
 end
