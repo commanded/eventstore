@@ -21,6 +21,7 @@ defmodule EventStore.Sql.Statements do
       create_subscription_index(),
       create_snapshots_table(),
       create_schema_migrations_table(),
+      record_event_store_schema_version(),
     ]
   end
 
@@ -192,6 +193,14 @@ CREATE TABLE schema_migrations
     migrated_at timestamp without time zone default (now() at time zone 'UTC') NOT NULL,
     PRIMARY KEY(major_version, minor_version, patch_version)
 );
+"""
+  end
+
+  # record current event store schema version
+  defp record_event_store_schema_version do
+"""
+INSERT INTO schema_migrations (major_version, minor_version, patch_version)
+VALUES (0, 13, 0);
 """
   end
 
