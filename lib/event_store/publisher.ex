@@ -45,7 +45,7 @@ defmodule EventStore.Publisher do
       %PendingEvents{stream_uuid: stream_uuid, events: events, last_event_number: last_event_number} ->
         :ok = Subscriptions.notify_events(stream_uuid, events, serializer)
 
-        %Publisher{state |
+        state = %Publisher{state |
           last_published_event_number: last_event_number,
           pending_events: Map.delete(pending_events, next_event_number),
         }
