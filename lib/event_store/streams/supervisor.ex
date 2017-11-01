@@ -4,9 +4,7 @@ defmodule EventStore.Streams.Supervisor do
   """
 
   use Supervisor
-
-  require Logger
-
+  
   alias EventStore.Registration
   alias EventStore.Streams.Stream
 

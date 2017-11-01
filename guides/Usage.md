@@ -52,11 +52,23 @@ new_events = [ %EventStore.EventData{...}, ... ]
 :ok = EventStore.append_to_stream(stream_uuid, stream_version, new_events)
 ```
 
-### Why must you provide the expected stream version?
+#### Why must you provide the expected stream version?
 
 This is to ensure that no events have been appended to the stream by another process between your read and subsequent write.
 
 The `EventStore.append_to_stream/3` function will return `{:error, :wrong_expected_version}` when the version you provide is mismatched with the stream. You can resolve this error by reading the stream's events again, then attempt to append your new events using the latest stream version.
+
+### Optional concurrency check
+
+You can choose to append events to a stream without using the concurrency check, or having first read them from the stream, by using one of the following values instead of the expected version:
+
+- `:any_version` - No concurrency checking; allow any stream version (including no stream).
+- `:no_stream` - Ensure the stream does not exist.
+- `:stream_exists` - Ensure the stream exists.
+
+```elixir
+:ok = EventStore.append_to_stream(stream_uuid, :any_version, events)
+```
 
 ## Reading from a stream
 

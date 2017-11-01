@@ -36,12 +36,12 @@ defmodule EventStore.Storage.Reader do
   end
 
   defp failed_to_read(stream_id, reason) do
-    _ = Logger.warn(fn -> "failed to read events from stream id #{stream_id} due to #{inspect reason}" end)
+    _ = Logger.warn(fn -> "Failed to read events from stream id #{stream_id} due to #{inspect reason}" end)
     {:error, reason}
   end
 
   defp failed_to_read_all_stream(reason) do
-    _ = Logger.warn(fn -> "failed to read events from all streams due to #{inspect reason}" end)
+    _ = Logger.warn(fn -> "Failed to read events from all streams due to #{inspect reason}" end)
     {:error, reason}
   end
 
@@ -55,24 +55,38 @@ defmodule EventStore.Storage.Reader do
       |> Enum.map(&to_event_data_from_row/1)
     end
 
-    def to_event_data_from_row([event_id, stream_uuid, stream_version, event_type, correlation_id, causation_id, data, metadata, created_at]) do
+    def to_event_data_from_row([
+      event_id,
+      stream_uuid,
+      stream_version,
+      event_type,
+      correlation_id,
+      causation_id,
+      data,
+      metadata,
+      created_at])
+    do
       %RecordedEvent{
         event_id: event_id,
         stream_uuid: stream_uuid,
         stream_version: stream_version,
         event_type: event_type,
-        correlation_id: correlation_id,
-        causation_id: causation_id,
+        correlation_id: correlation_id |> from_uuid(),
+        causation_id: causation_id |> from_uuid(),
         data: data,
         metadata: metadata,
-        created_at: to_naive(created_at),
+        created_at: created_at |> to_naive(),
       }
     end
 
+    defp from_uuid(nil), do: nil
+    defp from_uuid(uuid), do: UUID.binary_to_string!(uuid)
+
     defp to_naive(%NaiveDateTime{} = naive), do: naive
     defp to_naive(%Postgrex.Timestamp{year: year, month: month, day: day, hour: hour, min: minute, sec: second, usec: microsecond}) do
-      {:ok, naive} = NaiveDateTime.new(year, month, day, hour, minute, second, {microsecond,  6})
-      naive
+      with {:ok, naive} <- NaiveDateTime.new(year, month, day, hour, minute, second, {microsecond,  6}) do
+        naive
+      end
     end
   end
 
@@ -98,7 +112,7 @@ defmodule EventStore.Storage.Reader do
     end
 
     defp handle_response({:error, %Postgrex.Error{postgres: %{message: reason}}}) do
-      _ = Logger.warn(fn -> "failed to read events from stream due to: #{inspect reason}" end)
+      _ = Logger.warn(fn -> "Failed to read events from stream due to: #{inspect reason}" end)
       {:error, reason}
     end
   end
