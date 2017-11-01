@@ -14,6 +14,12 @@
 
 Run the schema migration [v0.13.0.sql](scripts/upgrades/v0.13.0.sql) script against your event store database.
 
+## v0.12.1
+
+### Bug fixes
+
+- Publisher only notifies first pending event batch ([#81](https://github.com/slashdotdash/eventstore/issues/81)).
+
 ## v0.12.0
 
 ### Enhancements
