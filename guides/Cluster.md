@@ -39,7 +39,7 @@ EventStore supports running on a cluster of nodes. It uses the [Swarm](https://h
         debug: false
       ```
 
-    This is to ensure consistency during a network partition. The `static_quorum_size` setting defines the minimum number of nodes that must be connected in the cluster to allow process registration and distribution. If there are fewer nodes currently available than the quorum size, any calls to the `EventStore` will block until enough nodes have started.
+    This is to ensure consistency during a network partition. The `static_quorum_size` setting defines the minimum number of nodes that must be connected in the cluster to allow process registration and distribution. If there are fewer nodes currently available than the quorum size, any calls to the `EventStore` will return `{:error, :no_node_available}`.
 
 ## Automatic cluster formation
 
