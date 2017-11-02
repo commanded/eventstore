@@ -14,7 +14,6 @@ defmodule Mix.Tasks.EventStore.Create do
 
   use Mix.Task
 
-  alias EventStore.Storage
   alias EventStore.Storage.Database
 
   @shortdoc "Create the database for the EventStore"
@@ -38,8 +37,6 @@ defmodule Mix.Tasks.EventStore.Create do
           Mix.shell.info "The EventStore database has been created."
         end
 
-        initialize_storage!(config)
-
       {:error, :already_up} ->
         unless opts[:quiet] do
           Mix.shell.info "The EventStore database already exists."
@@ -48,11 +45,5 @@ defmodule Mix.Tasks.EventStore.Create do
       {:error, term} ->
         Mix.raise "The EventStore database couldn't be created, reason given: #{inspect term}."
     end
-  end
-
-  defp initialize_storage!(config) do
-    {:ok, conn} = Postgrex.start_link(config)
-
-    Storage.Initializer.run!(conn)
   end
 end
