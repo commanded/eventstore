@@ -1,6 +1,6 @@
 # Upgrading an EventStore
 
-The [CHANGELOG](https://github.com/slashdotdash/eventstore/blob/master/CHANGELOG.md) is used to indicate when a schema migration is required for a given version of the EventStore.
+The [CHANGELOG](https://github.com/commanded/eventstore/blob/master/CHANGELOG.md) is used to indicate when a schema migration is required for a given version of the EventStore.
 
 You can upgrade an existing EventStore database using the following mix task:
 

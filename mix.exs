@@ -20,7 +20,7 @@ defmodule EventStore.Mixfile do
       preferred_cli_env: preferred_cli_env(),
       dialyzer: [plt_add_deps: :project],
       name: "EventStore",
-      source_url: "https://github.com/slashdotdash/eventstore",
+      source_url: "https://github.com/commanded/eventstore",
     ]
   end
 
@@ -92,7 +92,7 @@ EventStore using PostgreSQL for persistence.
       files: ["lib", "priv", "guides", "mix.exs", "README*", "LICENSE*"],
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/slashdotdash/eventstore",
+      links: %{"GitHub" => "https://github.com/commanded/eventstore",
                "Docs" => "https://hexdocs.pm/eventstore/"}
     ]
   end

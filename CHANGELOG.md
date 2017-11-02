@@ -4,13 +4,13 @@
 
 ### Enhancements
 
-- Use a UUID field for the `event_id` column, rename existing field to `event_number` ([#75](https://github.com/slashdotdash/eventstore/issues/75)).
-- Use `uuid` data type for event `correlation_id` and `causation_id` ([#57](https://github.com/slashdotdash/eventstore/pull/57)).
+- Use a UUID field for the `event_id` column, rename existing field to `event_number` ([#75](https://github.com/commanded/eventstore/issues/75)).
+- Use `uuid` data type for event `correlation_id` and `causation_id` ([#57](https://github.com/commanded/eventstore/pull/57)).
 - Mix task to migrate an existing EventStore database (`mix event_store.migrate`).
 
 ### Bug fixes
 
-- Append to stream is limited to 7,281 events in a single request ([#77](https://github.com/slashdotdash/eventstore/issues/77)).
+- Append to stream is limited to 7,281 events in a single request ([#77](https://github.com/commanded/eventstore/issues/77)).
 
 ### Upgrading
 
@@ -20,13 +20,13 @@ Upgrade your existing EventStore database by running: `mix event_store.migrate`
 
 ### Bug fixes
 
-- Publisher only notifies first pending event batch ([#81](https://github.com/slashdotdash/eventstore/issues/81)).
+- Publisher only notifies first pending event batch ([#81](https://github.com/commanded/eventstore/issues/81)).
 
 ## v0.12.0
 
 ### Enhancements
 
-- Allow optimistic concurrency check on write to be optional ([#31](https://github.com/slashdotdash/eventstore/issues/31)).
+- Allow optimistic concurrency check on write to be optional ([#31](https://github.com/commanded/eventstore/issues/31)).
 
 ### Bug fixes
 
@@ -36,7 +36,7 @@ Upgrade your existing EventStore database by running: `mix event_store.migrate`
 
 ### Enhancements
 
-- Support for running on a cluster of nodes using [Swarm](https://hex.pm/packages/swarm) for process distribution ([#53](https://github.com/slashdotdash/eventstore/issues/53)).
+- Support for running on a cluster of nodes using [Swarm](https://hex.pm/packages/swarm) for process distribution ([#53](https://github.com/commanded/eventstore/issues/53)).
 
 - Add `stream_version` column to `streams` table. It is used for stream info querying and optimistic concurrency checks, instead of querying the `events` table.
 
@@ -48,13 +48,13 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 
 ### Bug fixes
 
-- Fix for ack of last seen event in stream subscription ([#66](https://github.com/slashdotdash/eventstore/pull/66)).
+- Fix for ack of last seen event in stream subscription ([#66](https://github.com/commanded/eventstore/pull/66)).
 
 ## v0.10.0
 
 ### Enhancements
 
-- Writer per event stream ([#55](https://github.com/slashdotdash/eventstore/issues/55)).
+- Writer per event stream ([#55](https://github.com/commanded/eventstore/issues/55)).
 
   You **must** run the schema migration [v0.10.0.sql](priv/event_store/migrations/v0.10.0.sql) script against your event store database.
 
@@ -64,7 +64,7 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 
 ### Enhancements
 
-- Adds `causation_id` alongside `correlation_id` for events ([#48](https://github.com/slashdotdash/eventstore/pull/48)).
+- Adds `causation_id` alongside `correlation_id` for events ([#48](https://github.com/commanded/eventstore/pull/48)).
 
   To migrate an existing event store database execute [v0.9.0.sql](priv/event_store/migrations/v0.9.0.sql) script.
 
@@ -80,12 +80,12 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 
 ### Enhancements
 
-- Add Access functions to `EventStore.EventData` and `EventStore.RecordedEvent` modules ([#37](https://github.com/slashdotdash/eventstore/pull/37)).
-- Allow database connection URL to be provided as a system variable ([#39](https://github.com/slashdotdash/eventstore/pull/39)).
+- Add Access functions to `EventStore.EventData` and `EventStore.RecordedEvent` modules ([#37](https://github.com/commanded/eventstore/pull/37)).
+- Allow database connection URL to be provided as a system variable ([#39](https://github.com/commanded/eventstore/pull/39)).
 
 ### Bug fixes
 
-- Writer not parsing database connection URL from config ([#38](https://github.com/slashdotdash/eventstore/pull/38/files)).
+- Writer not parsing database connection URL from config ([#38](https://github.com/commanded/eventstore/pull/38/files)).
 
 ## v0.8.0
 
@@ -109,19 +109,19 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 
 ### Enhancements
 
-- Stream all events forward ([#34](https://github.com/slashdotdash/eventstore/issues/34)).
+- Stream all events forward ([#34](https://github.com/commanded/eventstore/issues/34)).
 
 ## v0.7.1
 
 ### Enhancements
 
-- Allow snapshots to be deleted ([#26](https://github.com/slashdotdash/eventstore/issues/26)).
+- Allow snapshots to be deleted ([#26](https://github.com/commanded/eventstore/issues/26)).
 
 ## v0.7.0
 
 ### Enhancements
 
-- Subscribe to a single stream, or all streams, from a specified start position ([#17](https://github.com/slashdotdash/eventstore/issues/17)).
+- Subscribe to a single stream, or all streams, from a specified start position ([#17](https://github.com/commanded/eventstore/issues/17)).
 
 ## v0.6.2
 
@@ -133,7 +133,7 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 
 ### Enhancements
 
-- Use IO lists to build insert events SQL statement ([#23](https://github.com/slashdotdash/eventstore/issues/23)).
+- Use IO lists to build insert events SQL statement ([#23](https://github.com/commanded/eventstore/issues/23)).
 
 ## v0.6.0
 
@@ -145,16 +145,16 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 
 ### Enhancements
 
-- Provide typespecs for the public API ([#16](https://github.com/slashdotdash/eventstore/issues/16))
-- Fix compilation warnings in mix database task ([#14](https://github.com/slashdotdash/eventstore/issues/14))
+- Provide typespecs for the public API ([#16](https://github.com/commanded/eventstore/issues/16))
+- Fix compilation warnings in mix database task ([#14](https://github.com/commanded/eventstore/issues/14))
 
 ### Bug fixes
 
-- Read stream forward does not use count to limit returned events ([#10](https://github.com/slashdotdash/eventstore/issues/10))
+- Read stream forward does not use count to limit returned events ([#10](https://github.com/commanded/eventstore/issues/10))
 
 ## v0.5.0
 
 ### Enhancements
 
-- Ack handled events in subscribers ([#18](https://github.com/slashdotdash/eventstore/issues/18)).
-- Buffer events between publisher and subscriber ([#19](https://github.com/slashdotdash/eventstore/issues/19)).
+- Ack handled events in subscribers ([#18](https://github.com/commanded/eventstore/issues/18)).
+- Buffer events between publisher and subscriber ([#19](https://github.com/commanded/eventstore/issues/19)).
