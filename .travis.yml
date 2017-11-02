@@ -11,6 +11,7 @@ services:
 
 before_script:
   - MIX_ENV=test mix event_store.create
+  - MIX_ENV=test mix event_store.init
   - epmd -daemon
 
 script:
