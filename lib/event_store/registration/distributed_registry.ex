@@ -6,8 +6,6 @@ defmodule EventStore.Registration.DistributedRegistry do
 
   @behaviour EventStore.Registration
 
-  alias EventStore.Publisher
-
   @doc """
   Return an optional supervisor spec for the registry
   """
@@ -36,6 +34,20 @@ defmodule EventStore.Registration.DistributedRegistry do
   end
 
   @doc """
+  Sends a message to the given dest running on the current node and each
+  connected node, returning `:ok`.
+  """
+  @callback multi_send(dest :: atom(), message :: any()) :: :ok
+  @impl EventStore.Registration
+  def multi_send(dest, message) do
+    for node <- nodes() do
+      Process.send({dest, node}, message, [:noconnect])
+    end
+
+    :ok
+  end
+
+  @doc """
   Get the pid of a registered name.
   """
   @spec whereis_name(name :: term) :: pid | :undefined
@@ -49,45 +61,51 @@ defmodule EventStore.Registration.DistributedRegistry do
   @impl EventStore.Registration
   def via_tuple(name), do: {:via, :swarm, name}
 
-  @doc """
-  Publish events to the `EventStore.Publisher` running on each connected node
-  """
-  @callback publish_events(stream_uuid :: term, events :: list(EventStore.RecordedEvent.t)) :: :ok
-  @impl EventStore.Registration
-  def publish_events(stream_uuid, events) do
-    # send to publisher on current node and all connected nodes
-    [Node.self() | Node.list(:connected)]
-    |> Enum.map(&Task.async(fn -> publish_events_to_node(&1, stream_uuid, events) end))
-    |> Enum.map(&Task.await(&1, 30_000))
-  end
-
   #
   # `GenServer` callback functions used by Swarm
   #
 
-  # Shutdown the process when a cluster toplogy change indicates it is now running on the wrong host.
-  # This is to prevent a spike in process restarts as they are moved. Instead, allow the process to
-  # be started on request.
+  @doc false
   def handle_call({:swarm, :begin_handoff}, _from, state) do
+    # Stop the process when a cluster toplogy change indicates it is now running
+    # on the wrong host. This is to prevent a spike in process restarts as they
+    # are moved. Instead, allow the process to be started on request.
     {:stop, :shutdown, :ignore, state}
+  end
+
+  @doc false
+  def handle_call(_request, _from, _state) do
+    raise "attempted to call GenServer #{inspect proc()} but no handle_call/3 clause was provided"
   end
 
   def handle_cast({:swarm, :end_handoff, _state}, state) do
     {:noreply, state}
   end
 
-  # Take the remote process state after net split has been resolved
+  @doc false
   def handle_cast({:swarm, :resolve_conflict, state}, _state) do
     {:noreply, state}
   end
 
-  # Stop the process as it is being moved to another node, or there are not currently enough nodes running
+  @doc false
+  def handle_cast(_request, _state) do
+    raise "attempted to cast GenServer #{inspect proc()} but no handle_cast/2 clause was provided"
+  end
+
+  @doc false
   def handle_info({:swarm, :die}, state) do
+    # Stop the process as it is being moved to another node, or there are not
+    # currently enough nodes running
     {:stop, :shutdown, state}
   end
 
-  defp publish_events_to_node(node, stream_uuid, events) do
-    Publisher.notify_events({Publisher, node}, stream_uuid, events)
+  defp nodes, do: [Node.self() | Node.list()]
+
+  defp proc do
+    case Process.info(self(), :registered_name) do
+      {_, []}   -> self()
+      {_, name} -> name
+    end
   end
 end
 end

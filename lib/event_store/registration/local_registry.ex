@@ -5,8 +5,6 @@ defmodule EventStore.Registration.LocalRegistry do
 
   @behaviour EventStore.Registration
 
-  alias EventStore.Publisher
-
   @doc """
   Return the local supervisor child spec
   """
@@ -14,7 +12,7 @@ defmodule EventStore.Registration.LocalRegistry do
   @impl EventStore.Registration
   def child_spec do
     [
-      Supervisor.child_spec({Registry, [keys: :unique, name: EventStore.Registration.LocalRegistry]}, id: :event_store_local_registry),
+      {Registry, keys: :unique, name: EventStore.Registration.LocalRegistry},
     ]
   end
 
@@ -38,6 +36,16 @@ defmodule EventStore.Registration.LocalRegistry do
   end
 
   @doc """
+  Sends a message to the given dest and returns `:ok`.
+  """
+  @callback multi_send(dest :: atom(), message :: any()) :: :ok
+  @impl EventStore.Registration
+  def multi_send(server, message) do
+    send(server, message)
+    :ok
+  end
+
+  @doc """
   Get the pid of a registered name.
   """
   @spec whereis_name(name :: term) :: pid | :undefined
@@ -50,13 +58,4 @@ defmodule EventStore.Registration.LocalRegistry do
   @spec via_tuple(name :: term()) :: {:via, module(), name :: term()}
   @impl EventStore.Registration
   def via_tuple(name), do: {:via, Registry, {EventStore.Registration.LocalRegistry, name}}
-
-  @doc """
-  Publish events to the `EventStore.Publisher` process
-  """
-  @callback publish_events(stream_uuid :: term, events :: list(EventStore.RecordedEvent.t)) :: :ok
-  @impl EventStore.Registration
-  def publish_events(stream_uuid, events) do
-    Publisher.notify_events(Publisher, stream_uuid, events)
-  end
 end

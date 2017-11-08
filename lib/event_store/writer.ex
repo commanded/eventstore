@@ -2,8 +2,8 @@ defmodule EventStore.Writer do
   @moduledoc false
 
   alias EventStore.{
+    Publisher,
     RecordedEvent,
-    Registration,
     Storage,
   }
 
@@ -36,5 +36,5 @@ defmodule EventStore.Writer do
   end
 
   defp publish_events(events, stream_uuid),
-    do: Registration.publish_events(stream_uuid, events)
+    do: Publisher.notify_events(stream_uuid, events)
 end

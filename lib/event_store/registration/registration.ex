@@ -16,6 +16,11 @@ defmodule EventStore.Registration do
   @callback start_child(name :: term(), supervisor :: module(), args :: [any()]) :: {:ok, pid()} | {:error, reason :: term()}
 
   @doc """
+  Sends a message to the given dest and returns `:ok`.
+  """
+  @callback multi_send(dest :: atom(), message :: any()) :: :ok
+
+  @doc """
   Get the pid of a registered name.
 
   Returns `:undefined` if the name is unregistered.
@@ -27,11 +32,6 @@ defmodule EventStore.Registration do
   """
   @callback via_tuple(name :: term()) :: {:via, module(), name :: term()}
 
-  @doc """
-  Publish events to any `EventStore.Publisher` process
-  """
-  @callback publish_events(stream_uuid :: term, events :: list(EventStore.RecordedEvent.t)) :: :ok
-
   @doc false
   @spec child_spec() :: [:supervisor.child_spec()]
   def child_spec, do: registry_provider().child_spec()
@@ -41,16 +41,16 @@ defmodule EventStore.Registration do
   def start_child(name, supervisor, args), do: registry_provider().start_child(name, supervisor, args)
 
   @doc false
+  @spec multi_send(server :: atom(), message :: any()) :: :ok
+  def multi_send(server, message), do: registry_provider().multi_send(server, message)
+
+  @doc false
   @spec whereis_name(term()) :: pid() | :undefined
   def whereis_name(name), do: registry_provider().whereis_name(name)
 
   @doc false
   @spec via_tuple(name :: term()) :: {:via, module(), name :: term()}
   def via_tuple(name), do: registry_provider().via_tuple(name)
-
-  @doc false
-  @spec publish_events(stream_uuid :: term, events :: list(EventStore.RecordedEvent.t)) :: :ok
-  def publish_events(stream_uuid, events), do: registry_provider().publish_events(stream_uuid, events)
 
   @doc """
   Get the configured registry provider, defaults to `:local` if not configured

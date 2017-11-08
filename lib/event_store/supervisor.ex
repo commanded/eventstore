@@ -13,8 +13,8 @@ defmodule EventStore.Supervisor do
   def init([config, serializer]) do
     children = [
       {Postgrex, postgrex_opts(config)},
-      Supervisor.child_spec({Registry, [keys: :unique, name: EventStore.Subscriptions.Subscription]}, id: :event_store_subscriptions),
-      Supervisor.child_spec({Registry, [keys: :duplicate, name: EventStore.Subscriptions.PubSub, partitions: System.schedulers_online]}, id: :event_store_pub_sub),
+      {Registry, keys: :unique, name: EventStore.Subscriptions.Subscription},
+      {Registry, keys: :duplicate, name: EventStore.Subscriptions.PubSub, partitions: System.schedulers_online},
       {EventStore.Subscriptions.Supervisor, []},
       {EventStore.Streams.Supervisor, serializer},
       {EventStore.Publisher, serializer},
@@ -24,9 +24,21 @@ defmodule EventStore.Supervisor do
   end
 
   defp postgrex_opts(config) do
-    [pool_size: 10, pool_overflow: 0]
+    [
+      pool_size: 10,
+      pool_overflow: 0,
+    ]
     |> Keyword.merge(config)
-    |> Keyword.take([:username, :password, :database, :hostname, :port, :pool, :pool_size, :pool_overflow])
+    |> Keyword.take([
+      :username,
+      :password,
+      :database,
+      :hostname,
+      :port,
+      :pool,
+      :pool_size,
+      :pool_overflow
+    ])
     |> Keyword.merge(name: :event_store)
   end
 end

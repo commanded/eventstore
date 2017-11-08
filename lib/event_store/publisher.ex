@@ -5,7 +5,7 @@ defmodule EventStore.Publisher do
 
   use GenServer
 
-  alias EventStore.{Publisher,Storage,Subscriptions}
+  alias EventStore.{Publisher,Registration,Storage,Subscriptions}
 
   defmodule PendingEvents do
     defstruct [
@@ -31,12 +31,11 @@ defmodule EventStore.Publisher do
     }, name: __MODULE__)
   end
 
-  def notify_events(pid, stream_uuid, events) do
-    GenServer.cast(pid, {:notify_events, stream_uuid, events})
+  def notify_events(stream_uuid, events) do
+    Registration.multi_send(__MODULE__, {:notify_events, stream_uuid, events})
   end
 
-  def init(%Publisher{} = state),
-    do: {:ok, state}
+  def init(%Publisher{} = state), do: {:ok, state}
 
   def handle_cast(:notify_pending_events, %Publisher{last_published_event_number: last_published_event_number, pending_events: pending_events, serializer: serializer} = state) do
     next_event_number = last_published_event_number + 1
@@ -61,7 +60,7 @@ defmodule EventStore.Publisher do
     {:noreply, state}
   end
 
-  def handle_cast({:notify_events, stream_uuid, events}, %Publisher{last_published_event_number: last_published_event_number, pending_events: pending_events, serializer: serializer} = state) do
+  def handle_info({:notify_events, stream_uuid, events}, %Publisher{last_published_event_number: last_published_event_number, pending_events: pending_events, serializer: serializer} = state) do
     expected_event_number = last_published_event_number + 1
     initial_event_number = first_event_number(events)
     last_event_number = last_event_number(events)
