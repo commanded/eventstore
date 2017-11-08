@@ -59,7 +59,8 @@ defmodule Mix.Tasks.EventStore.Migrate do
     for migration <- migrations do
       unless opts[:quiet], do: Mix.shell.info "Running migration v#{migration}..."
 
-      script = File.read!("priv/event_store/migrations/v#{migration}.sql")
+      path = Application.app_dir(:eventstore, "priv/event_store/migrations/v#{migration}.sql")
+      script = File.read!(path)
 
       case Database.migrate(config, script) do
         :ok -> :ok

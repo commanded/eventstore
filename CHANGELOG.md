@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.13.1
+
+### Bug fixes
+
+- EventStore migrate mix task read migration SQL scripts from app dir (`Application.app_dir(:eventstore)`).
+
 ## v0.13.0
 
 ### Enhancements
