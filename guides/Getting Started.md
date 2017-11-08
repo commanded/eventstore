@@ -31,7 +31,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
   3. Create the EventStore database and tables using the `mix` task:
 
       ```console
-      $ mix event_store.setup
+      $ mix do event_store.create, event_store.init
       ```
 
 ## Initialize an existing database
