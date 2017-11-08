@@ -131,6 +131,7 @@ You should include unit tests to cover any changes.
 - [Jan Vereecken](https://github.com/javereec)
 - [Olafur Arason](https://github.com/olafura)
 - [Paul Iannazzo](https://github.com/boxxxie)
+- [Raphaël Lustin](https://github.com/rlustin)
 - [Simon Harris](https://github.com/harukizaemon)
 - [Stuart Corbishley](https://github.com/stuartc)
 
