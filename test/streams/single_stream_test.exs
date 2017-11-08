@@ -102,7 +102,7 @@ defmodule EventStore.Streams.SingleStreamTest do
       read_events = Stream.stream_forward(context[:stream_uuid], 0, 1) |> Enum.to_list()
 
       assert length(read_events) == 3
-      assert pluck(read_events, :event_id) == [1, 2, 3]
+      assert pluck(read_events, :event_number) == [1, 2, 3]
       assert pluck(read_events, :stream_version) == [1, 2, 3]
     end
 
@@ -122,7 +122,7 @@ defmodule EventStore.Streams.SingleStreamTest do
       read_events = Stream.stream_forward(context[:stream_uuid], 2, 1) |> Enum.to_list()
 
       assert length(read_events) == 2
-      assert pluck(read_events, :event_id) == [2, 3]
+      assert pluck(read_events, :event_number) == [2, 3]
       assert pluck(read_events, :stream_version) == [2, 3]
     end
 
@@ -170,7 +170,7 @@ defmodule EventStore.Streams.SingleStreamTest do
     {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
     :ok = Stream.append_to_stream(stream_uuid, 0, events)
 
-    # stream above needed for preventing accidental event_id/stream_version match
+    # stream above needed for preventing accidental event_number/stream_version match
     stream_uuid = UUID.uuid4
     events = EventFactory.create_events(3)
 

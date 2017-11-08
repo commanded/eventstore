@@ -10,10 +10,7 @@ defmodule EventStore.Subscriptions.Subscription do
   require Logger
 
   alias EventStore.RecordedEvent
-  alias EventStore.Subscriptions.{
-    StreamSubscription,
-    Subscription,
-  }
+  alias EventStore.Subscriptions.{StreamSubscription,Subscription}
 
   defstruct [
     stream_uuid: nil,
@@ -38,7 +35,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc """
-  Confirm receipt of the given event by its `event_id` or `stream_version`
+  Confirm receipt of the given event by its `event_number` or `stream_version`
   """
   def ack(subscription, ack) when is_integer(ack) do
     GenServer.cast(subscription, {:ack, ack})
@@ -54,8 +51,8 @@ defmodule EventStore.Subscriptions.Subscription do
   @doc """
   Confirm receipt of the given event
   """
-  def ack(subscription, %RecordedEvent{event_id: event_id, stream_version: stream_version}) do
-    GenServer.cast(subscription, {:ack, {event_id, stream_version}})
+  def ack(subscription, %RecordedEvent{event_number: event_number, stream_version: stream_version}) do
+    GenServer.cast(subscription, {:ack, {event_number, stream_version}})
   end
 
   @doc false
@@ -169,5 +166,6 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   # no-op
-  defp handle_subscription_state(_state), do: :ok
+  defp handle_subscription_state(_state),
+    do: :ok
 end

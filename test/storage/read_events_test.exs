@@ -26,7 +26,8 @@ defmodule EventStore.Storage.ReadEventsTest do
       assert {:ok, [read_event]} = Storage.read_stream_forward(stream_id, 0, 1_000)
 
       assert recorded_event == read_event
-      assert read_event.event_id == 1
+      assert read_event.event_id == recorded_event.event_id
+      assert read_event.event_number == 1
       assert read_event.stream_uuid == stream_uuid
       assert read_event.data == recorded_event.data
       assert read_event.metadata == recorded_event.metadata
@@ -66,7 +67,7 @@ defmodule EventStore.Storage.ReadEventsTest do
       {:ok, read_events} = Storage.read_stream_forward(stream_id, 0, 5)
 
       assert length(read_events) == 5
-      assert pluck(read_events, :event_id) == Enum.to_list(1..5)
+      assert pluck(read_events, :event_number) == Enum.to_list(1..5)
     end
 
     test "with multiple events from stream version limited by count", %{conn: conn} do
@@ -75,7 +76,7 @@ defmodule EventStore.Storage.ReadEventsTest do
       {:ok, read_events} = Storage.read_stream_forward(stream_id, 6, 5)
 
       assert length(read_events) == 5
-      assert pluck(read_events, :event_id) == Enum.to_list(6..10)
+      assert pluck(read_events, :event_number) == Enum.to_list(6..10)
     end
   end
 
@@ -96,7 +97,7 @@ defmodule EventStore.Storage.ReadEventsTest do
       {:ok, events} = Storage.read_all_streams_forward(0, 1_000)
 
       assert length(events) == 4
-      assert [1, 2, 3, 4] == Enum.map(events, &(&1.event_id))
+      assert [1, 2, 3, 4] == Enum.map(events, &(&1.event_number))
       assert [stream1_uuid, stream2_uuid, stream1_uuid, stream2_uuid] == Enum.map(events, &(&1.stream_uuid))
       assert [1, 1, 2, 2] == Enum.map(events, &(&1.stream_version))
     end
@@ -125,12 +126,12 @@ defmodule EventStore.Storage.ReadEventsTest do
       {:ok, events} = Storage.read_all_streams_forward(0, 10)
 
       assert length(events) == 10
-      assert pluck(events, :event_id) == Enum.to_list(1..10)
+      assert pluck(events, :event_number) == Enum.to_list(1..10)
 
       {:ok, events} = Storage.read_all_streams_forward(11, 10)
 
       assert length(events) == 10
-      assert pluck(events, :event_id) == Enum.to_list(11..20)
+      assert pluck(events, :event_number) == Enum.to_list(11..20)
     end
   end
 
@@ -145,7 +146,7 @@ defmodule EventStore.Storage.ReadEventsTest do
   defp create_stream_containing_events(conn, event_count) do
     with {:ok, stream_uuid, stream_id} <- create_stream(conn),
          recorded_events <- EventFactory.create_recorded_events(event_count, stream_uuid),
-         {:ok, _event_ids} <- Appender.append(conn, stream_id, recorded_events) do
+         {:ok, _event_numbers} <- Appender.append(conn, stream_id, recorded_events) do
       {:ok, stream_uuid, stream_id}
     end
   end

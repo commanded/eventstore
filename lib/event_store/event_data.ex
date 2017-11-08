@@ -2,16 +2,20 @@ defmodule EventStore.EventData do
   @moduledoc """
   EventData contains the data for a single event before being persisted to storage
   """
-  
-  defstruct correlation_id: nil,
-            causation_id: nil,
-            event_type: nil ,
-            data: nil,
-            metadata: nil
+
+  defstruct [
+    :correlation_id,
+    :causation_id,
+    :event_type,
+    :data,
+    :metadata,
+  ]
+
+  @type uuid :: String.t
 
   @type t :: %EventStore.EventData{
-    correlation_id: String.t,
-    causation_id: String.t,
+    correlation_id: uuid() | nil,
+    causation_id: uuid() | nil,
     event_type: String.t,
     data: binary,
     metadata: binary

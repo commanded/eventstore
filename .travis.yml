@@ -10,8 +10,7 @@ services:
   - postgresql
 
 before_script:
-  - MIX_ENV=test mix event_store.create
-  - MIX_ENV=test mix event_store.init
+  - MIX_ENV=test mix event_store.setup
   - epmd -daemon
 
 script:

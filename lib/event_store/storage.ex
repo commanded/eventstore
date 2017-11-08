@@ -50,8 +50,8 @@ defmodule EventStore.Storage do
   @doc """
   Read events for all streams forward from the starting event id, use zero for all events for all streams
   """
-  def read_all_streams_forward(start_event_id, count) do
-    Stream.read_all_streams_forward(@event_store, start_event_id, count)
+  def read_all_streams_forward(start_event_number, count) do
+    Stream.read_all_streams_forward(@event_store, start_event_number, count)
   end
 
   @doc """
@@ -64,8 +64,8 @@ defmodule EventStore.Storage do
   @doc """
   Get the id of the last event persisted to storage
   """
-  def latest_event_id do
-    Stream.latest_event_id(@event_store)
+  def latest_event_number do
+    Stream.latest_event_number(@event_store)
   end
 
   @doc """
@@ -78,15 +78,15 @@ defmodule EventStore.Storage do
   @doc """
   Create, or locate an existing, persistent subscription to a stream using a unique name and starting position (event id or stream version)
   """
-  def subscribe_to_stream(stream_uuid, subscription_name, start_from_event_id \\ nil, start_from_stream_version \\ nil) do
-    Subscription.subscribe_to_stream(@event_store, stream_uuid, subscription_name, start_from_event_id, start_from_stream_version)
+  def subscribe_to_stream(stream_uuid, subscription_name, start_from_event_number \\ nil, start_from_stream_version \\ nil) do
+    Subscription.subscribe_to_stream(@event_store, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version)
   end
 
   @doc """
-  Acknowledge receipt of an event by id, for a single subscription
+  Acknowledge receipt of an event by its number, for a single subscription
   """
-  def ack_last_seen_event(stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version) do
-    Subscription.ack_last_seen_event(@event_store, stream_uuid, subscription_name, last_seen_event_id, last_seen_stream_version)
+  def ack_last_seen_event(stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version) do
+    Subscription.ack_last_seen_event(@event_store, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version)
   end
 
   @doc """

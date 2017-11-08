@@ -10,7 +10,7 @@ EventStore supports [running on a cluster of nodes](guides/Cluster.md) (since v0
 
 MIT License
 
-[![Build Status](https://travis-ci.org/slashdotdash/eventstore.svg?branch=master)](https://travis-ci.org/slashdotdash/eventstore)
+[![Build Status](https://travis-ci.org/commanded/eventstore.svg?branch=master)](https://travis-ci.org/commanded/eventstore)
 
 ---
 
@@ -123,6 +123,7 @@ You should include unit tests to cover any changes.
 ### Contributors
 
 - [Andrey Akulov](https://github.com/astery)
+- [Ben Smith](https://github.com/slashdotdash)
 - [Craig Savolainen](https://github.com/maedhr)
 - [David Soff](https://github.com/Davidsoff)
 - [Dominik Guzei](https://github.com/DominikGuzei)
@@ -135,6 +136,6 @@ You should include unit tests to cover any changes.
 
 ## Need help?
 
-Please [open an issue](https://github.com/slashdotdash/eventstore/issues) if you encounter a problem, or need assistance.
+Please [open an issue](https://github.com/commanded/eventstore/issues) if you encounter a problem, or need assistance.
 
 For commercial support, and consultancy, please contact [Ben Smith](mailto:ben@10consulting.com).

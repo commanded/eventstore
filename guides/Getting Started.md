@@ -28,13 +28,26 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
   - `:pool_size` - The number of connections (default: `10`).
   - `:pool_overflow` - The maximum number of overflow connections to start if all connections are checked out (default: `0`).
 
-  3. Create the EventStore database using the `mix` task:
+  3. Create the EventStore database and tables using the `mix` task:
 
       ```console
-      $ mix event_store.create
+      $ mix event_store.setup
       ```
 
-  4. Initialize the EventStore tables using the `mix` task:
+## Initialize an existing database
 
-      ```console
-      $ mix event_store.init
+You can use an existing PostgreSQL database with EventStore by running the `mix` task:
+
+```console
+$ mix event_store.init
+```
+
+## Reset an existing database
+
+To drop an existing EventStore database and recreate it you can run the `mix` task:
+
+```console
+$ mix event_store.reset
+```
+
+*Warning* this will delete all EventStore data.

@@ -20,7 +20,7 @@ defmodule EventStore.Mixfile do
       preferred_cli_env: preferred_cli_env(),
       dialyzer: [plt_add_deps: :project],
       name: "EventStore",
-      source_url: "https://github.com/slashdotdash/eventstore",
+      source_url: "https://github.com/commanded/eventstore",
     ]
   end
 
@@ -89,19 +89,20 @@ EventStore using PostgreSQL for persistence.
 
   defp package do
     [
-      files: ["lib", "guides", "mix.exs", "README*", "LICENSE*"],
+      files: ["lib", "priv", "guides", "mix.exs", "README*", "LICENSE*"],
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/slashdotdash/eventstore",
+      links: %{"GitHub" => "https://github.com/commanded/eventstore",
                "Docs" => "https://hexdocs.pm/eventstore/"}
     ]
   end
 
   defp aliases do
     [
-      "es.setup":           ["event_store.create"],
-      "es.reset":           ["event_store.drop", "event_store.create"],
-      "event_store.reset":  ["event_store.drop", "event_store.create"],
+      "event_store.setup":  ["event_store.create", "event_store.init"],
+      "event_store.reset":  ["event_store.drop", "event_store.setup"],
+      "es.setup":           ["event_store.setup"],
+      "es.reset":           ["event_store.reset"],
       "benchmark":          ["es.reset", "app.start", "bench"],
       "test.all":           ["test.registries", "test --only slow"],
       "test.registries":    &test_registries/1,

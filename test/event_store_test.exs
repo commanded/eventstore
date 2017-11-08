@@ -38,11 +38,14 @@ defmodule EventStoreTest do
     created_event = hd(events)
     recorded_event = hd(recorded_events)
 
-    assert is_integer(recorded_event.event_id)
-    assert recorded_event.event_id > 0
+    assert_is_uuid(recorded_event.event_id)
+    assert is_integer(recorded_event.event_number)
+    assert recorded_event.event_number > 0
     assert recorded_event.stream_uuid == stream_uuid
     assert recorded_event.data == created_event.data
     assert recorded_event.metadata == created_event.metadata
+    assert_is_uuid(recorded_event.causation_id)
+    assert_is_uuid(recorded_event.correlation_id)
   end
 
   test "stream forward from event store" do
@@ -55,7 +58,9 @@ defmodule EventStoreTest do
     created_event = hd(events)
     recorded_event = hd(recorded_events)
 
-    assert recorded_event.event_id > 0
+    assert_is_uuid(recorded_event.event_id)
+    assert is_integer(recorded_event.event_number)
+    assert recorded_event.event_number > 0
     assert recorded_event.stream_uuid == stream_uuid
     assert recorded_event.data == created_event.data
     assert recorded_event.metadata == created_event.metadata
@@ -71,7 +76,9 @@ defmodule EventStoreTest do
     created_event = hd(events)
     recorded_event = hd(recorded_events)
 
-    assert recorded_event.event_id > 0
+    assert_is_uuid(recorded_event.event_id)
+    assert is_integer(recorded_event.event_number)
+    assert recorded_event.event_number > 0
     assert recorded_event.stream_uuid == stream_uuid
     assert recorded_event.data == created_event.data
     assert recorded_event.metadata == created_event.metadata
@@ -123,7 +130,7 @@ defmodule EventStoreTest do
     EventStore.ack(subscription, received_events)
 
     assert length(received_events) == 3
-    assert pluck(received_events, :event_id) == [1, 2, 3]
+    assert pluck(received_events, :event_number) == [1, 2, 3]
     assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
     assert pluck(received_events, :stream_version) == [1, 2, 3]
     assert pluck(received_events, :correlation_id) == pluck(events, :correlation_id)
@@ -141,7 +148,7 @@ defmodule EventStoreTest do
     EventStore.ack(subscription, received_events)
 
     assert length(received_events) == 3
-    assert pluck(received_events, :event_id) == [4, 5, 6]
+    assert pluck(received_events, :event_number) == [4, 5, 6]
     assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
     assert pluck(received_events, :stream_version) == [4, 5, 6]
     assert pluck(received_events, :correlation_id) == pluck(new_events, :correlation_id)
@@ -190,6 +197,10 @@ defmodule EventStoreTest do
     :ok = EventStore.record_snapshot(snapshot)
 
     snapshot
+  end
+
+  defp assert_is_uuid(uuid) do
+    assert uuid |> UUID.string_to_binary!() |> is_binary()
   end
 
   defp pluck(enumerable, field), do: Enum.map(enumerable, &Map.get(&1, field))

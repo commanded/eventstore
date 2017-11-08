@@ -18,7 +18,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
   defstate initial do
     defevent subscribe(stream_uuid, subscription_name, subscriber, opts), data: %SubscriptionState{} = data do
-      case subscribe_to_stream(stream_uuid, subscription_name, opts[:start_from_event_id], opts[:start_from_stream_version]) do
+      case subscribe_to_stream(stream_uuid, subscription_name, opts[:start_from_event_number], opts[:start_from_stream_version]) do
         {:ok, subscription} ->
           last_ack = subscription_provider(stream_uuid).last_ack(subscription) || 0
 
@@ -111,17 +111,17 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     defevent notify_events(events), data: %SubscriptionState{stream_uuid: stream_uuid, last_seen: last_seen, last_ack: last_ack, pending_events: pending_events, max_size: max_size} = data do
       expected_event = last_seen + 1
       next_ack = last_ack + 1
-      first_event_id = events |> hd() |> subscription_provider(stream_uuid).event_id()
-      last_event_id = events |> List.last() |> subscription_provider(stream_uuid).event_id()
+      first_event_number = events |> hd() |> subscription_provider(stream_uuid).event_number()
+      last_event_number = events |> List.last() |> subscription_provider(stream_uuid).event_number()
 
-      case first_event_id do
+      case first_event_number do
         ^next_ack ->
           # subscriber is up-to-date, so send events
           notify_subscriber(data, events)
 
           data = %SubscriptionState{data |
-            last_seen: last_event_id,
-            last_received: last_event_id,
+            last_seen: last_event_number,
+            last_received: last_event_number,
           }
 
           next_state(:subscribed, data)
@@ -130,8 +130,8 @@ defmodule EventStore.Subscriptions.StreamSubscription do
           # subscriber has not yet ack'd last seen event so pending events
           # until subscriber ready to receive (back pressure)
           data = %SubscriptionState{data |
-            last_seen: last_event_id,
-            last_received: last_event_id,
+            last_seen: last_event_number,
+            last_received: last_event_number,
             pending_events: pending_events ++ events
           }
 
@@ -145,7 +145,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
         _ ->
           # received a different event than expected; must catch-up with all unseen events
-          next_state(:request_catch_up, %SubscriptionState{data | last_received: last_event_id})
+          next_state(:request_catch_up, %SubscriptionState{data | last_received: last_event_number})
       end
     end
 
@@ -248,8 +248,8 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   defp subscription_provider(@all_stream), do: AllStreamsSubscription
   defp subscription_provider(_stream_uuid), do: SingleStreamSubscription
 
-  defp subscribe_to_stream(stream_uuid, subscription_name, start_from_event_id, start_from_stream_version) do
-    Storage.subscribe_to_stream(stream_uuid, subscription_name, start_from_event_id, start_from_stream_version)
+  defp subscribe_to_stream(stream_uuid, subscription_name, start_from_event_number, start_from_stream_version) do
+    Storage.subscribe_to_stream(stream_uuid, subscription_name, start_from_event_number, start_from_stream_version)
   end
 
   defp unsubscribe_from_stream(stream_uuid, subscription_name) do
@@ -258,7 +258,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
   defp track_last_received(events, %SubscriptionState{stream_uuid: stream_uuid} = data) do
     %SubscriptionState{data |
-      last_received: events |> List.last() |> subscription_provider(stream_uuid).event_id()
+      last_received: events |> List.last() |> subscription_provider(stream_uuid).event_number()
     }
   end
 
@@ -288,7 +288,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
           last_seen = case last_event do
             nil -> last_seen
-            event -> subscription_provider(stream_uuid).event_id(event)
+            event -> subscription_provider(stream_uuid).event_number(event)
           end
 
           # notify subscription caught up to given last seen event
@@ -303,11 +303,11 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   defp wait_for_ack(stream_uuid, events) when is_list(events) do
     events
     |> List.last()
-    |> subscription_provider(stream_uuid).event_id()
+    |> subscription_provider(stream_uuid).event_number()
     |> wait_for_ack()
   end
 
-  # wait until the subscriber ack's the `event_id` or `stream_version`
+  # wait until the subscriber ack's the `event_number` or `stream_version`
   defp wait_for_ack(ack) do
     receive do
       {:ack, ^ack} ->
@@ -336,7 +336,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   defp notify_pending_events(%SubscriptionState{pending_events: [first_pending_event | _] = pending_events, stream_uuid: stream_uuid, last_ack: last_ack} = data) do
     next_ack = last_ack + 1
 
-    case subscription_provider(stream_uuid).event_id(first_pending_event) do
+    case subscription_provider(stream_uuid).event_number(first_pending_event) do
       ^next_ack ->
         # subscriber has ack'd last received event, so send pending
         pending_events
@@ -353,17 +353,20 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     end
   end
 
-  defp chunk_by(%RecordedEvent{stream_uuid: stream_uuid, correlation_id: correlation_id}), do: {stream_uuid, correlation_id}
+  defp chunk_by(%RecordedEvent{stream_uuid: stream_uuid, correlation_id: correlation_id}),
+    do: {stream_uuid, correlation_id}
 
   defp notify_subscriber(%SubscriptionState{}, []), do: nil
-  defp notify_subscriber(%SubscriptionState{subscriber: subscriber, mapper: mapper}, events) when is_function(mapper) do
+  defp notify_subscriber(%SubscriptionState{subscriber: subscriber, mapper: mapper}, events)
+    when is_function(mapper)
+  do
     send_to_subscriber(subscriber, Enum.map(events, mapper))
   end
-  defp notify_subscriber(%SubscriptionState{subscriber: subscriber}, events), do: send_to_subscriber(subscriber, events)
+  defp notify_subscriber(%SubscriptionState{subscriber: subscriber}, events),
+    do: send_to_subscriber(subscriber, events)
 
-  defp send_to_subscriber(subscriber, events) do
-    send(subscriber, {:events, events})
-  end
+  defp send_to_subscriber(subscriber, events),
+    do: send(subscriber, {:events, events})
 
   defp ack_events(%SubscriptionState{stream_uuid: stream_uuid, subscription_name: subscription_name} = data, ack) do
     ack = extract_ack(stream_uuid, ack)
@@ -373,10 +376,11 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     %SubscriptionState{data| last_ack: ack}
   end
 
-  # An `ack` can be a single integer, indicating an `event_id` or `stream_version`, or a tuple containing both, as `{event_id, stream_version}`.
+  # An `ack` can be a single integer, indicating an `event_number` or `stream_version`, or a tuple containing both, as `{event_number, stream_version}`.
   # This function extracts the relevant value depending upon the type of subscription (all / single stream).
-  defp extract_ack(_stream_uuid, ack) when is_integer(ack), do: ack
-  defp extract_ack(stream_uuid, ack) when is_tuple(ack) do
-    subscription_provider(stream_uuid).extract_ack(ack)
-  end
+  defp extract_ack(_stream_uuid, ack) when is_integer(ack),
+    do: ack
+
+  defp extract_ack(stream_uuid, ack) when is_tuple(ack),
+    do: subscription_provider(stream_uuid).extract_ack(ack)
 end

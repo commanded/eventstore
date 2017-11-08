@@ -14,16 +14,16 @@ defmodule EventStore.Storage.Appender do
   transaction. This is due to Postgres' limit of 65,535 parameters in a single
   statement.
 
-  Returns `{:ok, event_ids}` on success, where `event_ids` is a list of the ids
-  assigned by the database.
+  Returns `{:ok, event_numbers}` on success, where `event_numbers` is a list of
+  the `event_number` assigned to each event by the database.
   """
   def append(conn, stream_id, events) do
     Postgrex.transaction(conn, fn transaction ->
       events
       |> Enum.chunk_every(1_000)
-      |> Enum.reduce([], fn (batch, event_ids) ->
+      |> Enum.reduce([], fn (batch, event_numbers) ->
         case execute_using_multirow_value_insert(transaction, stream_id, batch) do
-          {:ok, batch_ids} -> event_ids ++ batch_ids
+          {:ok, batch_event_numbers} -> event_numbers ++ batch_event_numbers
           {:error, reason} -> Postgrex.rollback(transaction, reason)
         end
       end)
@@ -51,6 +51,7 @@ defmodule EventStore.Storage.Appender do
     |> Enum.flat_map(fn {event, index} ->
       [
         index,
+        event.event_id |> uuid(),
         stream_id,
         event.stream_version,
         event.correlation_id |> uuid(),
@@ -77,10 +78,10 @@ defmodule EventStore.Storage.Appender do
   end
 
   defp handle_response({:ok, %Postgrex.Result{num_rows: num_rows, rows: rows}}, events) do
-    event_ids = List.flatten(rows)
+    event_numbers = List.flatten(rows)
 
-    _ = Logger.info(fn -> "Appended #{num_rows} event(s) to stream \"#{stream_uuid(events)}\" (event ids: #{Enum.join(event_ids, ", ")})" end)
-    {:ok, event_ids}
+    _ = Logger.info(fn -> "Appended #{num_rows} event(s) to stream \"#{stream_uuid(events)}\" (event numbers: #{Enum.join(event_numbers, ", ")})" end)
+    {:ok, event_numbers}
   end
 
   defp handle_response({:error, %Postgrex.Error{postgres: %{code: :foreign_key_violation, message: message}}}, events) do
