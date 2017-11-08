@@ -31,7 +31,7 @@ defmodule EventStore.Storage.Database do
     database = Keyword.fetch!(config, :database)
 
     case run_with_psql(config, database, migration) do
-      {output, 0}       -> :ok
+      {_output, 0}       -> :ok
       {output, _status} -> {:error, output}
     end
   end

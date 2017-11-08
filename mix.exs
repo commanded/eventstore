@@ -99,9 +99,10 @@ EventStore using PostgreSQL for persistence.
 
   defp aliases do
     [
-      "es.setup":           ["event_store.create"],
-      "es.reset":           ["event_store.drop", "event_store.create"],
-      "event_store.reset":  ["event_store.drop", "event_store.create"],
+      "event_store.setup":  ["event_store.create", "event_store.init"],
+      "event_store.reset":  ["event_store.drop", "event_store.setup"],
+      "es.setup":           ["event_store.setup"],
+      "es.reset":           ["event_store.reset"],
       "benchmark":          ["es.reset", "app.start", "bench"],
       "test.all":           ["test.registries", "test --only slow"],
       "test.registries":    &test_registries/1,
