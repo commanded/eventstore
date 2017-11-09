@@ -12,7 +12,7 @@ defmodule EventStore.Registration.LocalRegistry do
   @impl EventStore.Registration
   def child_spec do
     [
-      {Registry, keys: :unique, name: EventStore.Registration.LocalRegistry},
+      Supervisor.child_spec({Registry, keys: :unique, name: EventStore.Registration.LocalRegistry}, id: EventStore.Registration.LocalRegistry),
     ]
   end
 
