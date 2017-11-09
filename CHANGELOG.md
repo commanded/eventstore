@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.13.2
+
+### Bug fixes
+
+- Use `Supervisor.child_spec` with an explicit `id` for Registry processes to support Elixir v1.5.0 and v1.5.1 ([v1.5.2](https://github.com/elixir-lang/elixir/blob/v1.5/CHANGELOG.md#v152-2017-09-29) contains a fix for this issue).
+
 ## v0.13.1
 
 ### Bug fixes
