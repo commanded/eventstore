@@ -72,7 +72,7 @@ defmodule EventStore.AppendToStreamTest do
     end
   end
 
-  @tag :slow
+  @tag :manual
   @tag timeout: 180_000
   test "should append many events to a stream" do
     stream_uuid = UUID.uuid4
