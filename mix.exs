@@ -59,7 +59,7 @@ defmodule EventStore.Mixfile do
       {:poison, "~> 3.1", optional: true},
       {:poolboy, "~> 1.5"},
       {:postgrex, "~> 0.13"},
-      {:swarm, "~> 3.0", optional: true},
+      {:swarm, "~> 3.1", optional: true},
       {:uuid, "~> 1.1"},
     ]
   end
