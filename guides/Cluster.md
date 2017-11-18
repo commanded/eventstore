@@ -9,7 +9,7 @@ EventStore supports running on a cluster of nodes. It uses the [Swarm](https://h
       ```elixir
       defp deps do
         [
-          {:swarm, "~> 3.0"},
+          {:swarm, "~> 3.1"},
         ]
       end
       ```
@@ -49,7 +49,9 @@ You will need to include `libcluster` as an additional dependency:
 
 ```elixir
 defp deps do
-  [{:libcluster, "~> 2.2"}]
+  [
+    {:libcluster, "~> 2.2"},
+  ]
 end
 ```
 

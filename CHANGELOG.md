@@ -28,6 +28,8 @@
 
 Upgrade your existing EventStore database by running: `mix event_store.migrate`
 
+Or you can drop and recreate the EventStore database by running: `mix do event_store.drop, event_store.create, event_store.init`
+
 ## v0.12.1
 
 ### Bug fixes
