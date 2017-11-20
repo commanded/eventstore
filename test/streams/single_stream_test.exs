@@ -27,7 +27,8 @@ defmodule EventStore.Streams.SingleStreamTest do
     end
 
     test "stream crash should allow restarting stream process", %{stream: stream, stream_uuid: stream_uuid} do
-      shutdown_stream(stream)
+      ProcessHelper.shutdown(stream)
+      wait_for_event_store()
 
       {:ok, stream} = Streams.Supervisor.open_stream(stream_uuid)
       assert stream != nil
@@ -148,6 +149,8 @@ defmodule EventStore.Streams.SingleStreamTest do
 
       refute_receive {:events, _received_events}
 
+      wait_for_event_store()
+
       events = EventFactory.create_events(1, 4)
       :ok = Stream.append_to_stream(context[:stream_uuid], 3, events)
 
@@ -178,7 +181,8 @@ defmodule EventStore.Streams.SingleStreamTest do
     :ok = Stream.append_to_stream(stream_uuid, 0, events)
     {:ok, 3} = Stream.stream_version(stream_uuid)
 
-    shutdown_stream(stream)
+    ProcessHelper.shutdown(stream)
+    wait_for_event_store()
 
     {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
     {:ok, 3} = Stream.stream_version(stream_uuid)
@@ -202,9 +206,7 @@ defmodule EventStore.Streams.SingleStreamTest do
     [stream_uuid: stream_uuid, events: events, stream: stream]
   end
 
-  defp shutdown_stream(stream) do
-    ProcessHelper.shutdown(stream)
-
+  defp wait_for_event_store do
     case Application.get_env(:eventstore, :restart_stream_timeout) do
       nil -> :ok
       timeout -> :timer.sleep(timeout)
