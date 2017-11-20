@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+- Add JSONB support ([#86](https://github.com/commanded/eventstore/pull/86)).
+
 ## v0.13.2
 
 ### Bug fixes
