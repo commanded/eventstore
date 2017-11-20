@@ -1,6 +1,8 @@
 defmodule EventStore.EventFactory do
   alias EventStore.{EventData,RecordedEvent}
 
+  @serializer Application.get_env(:eventstore, EventStore.Storage)[:serializer] || EventStore.JsonSerializer
+
   defmodule Event do
     defstruct event: nil
   end
@@ -58,11 +60,11 @@ defmodule EventStore.EventFactory do
   end
 
   defp serialize(term) do
-    EventStore.JsonSerializer.serialize(term)
+    apply(@serializer, :serialize, [term])
   end
 
-  defp deserialize(binary, type) do
-    EventStore.JsonSerializer.deserialize(binary, type)
+  defp deserialize(term, type) do
+    apply(@serializer, :deserialize, [term, type])
   end
 
   defp now, do: DateTime.utc_now |> DateTime.to_naive
