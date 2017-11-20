@@ -42,6 +42,7 @@ defmodule EventStore.Mixfile do
   end
 
   defp elixirc_paths(:bench),       do: ["lib", "test/support"]
+  defp elixirc_paths(:jsonb),       do: ["lib", "test/support"]
   defp elixirc_paths(:distributed), do: ["lib", "test/support"]
   defp elixirc_paths(:local),       do: ["lib", "test/support"]
   defp elixirc_paths(:test),        do: ["lib", "test/support"]
@@ -104,7 +105,8 @@ EventStore using PostgreSQL for persistence.
       "es.setup":           ["event_store.setup"],
       "es.reset":           ["event_store.reset"],
       "benchmark":          ["es.reset", "app.start", "bench"],
-      "test.all":           ["test.registries", "test --only slow"],
+      "test.all":           ["test.registries", "test.jsonb", "test --only manual"],
+      "test.jsonb":         &test_jsonb/1,
       "test.registries":    &test_registries/1,
       "test.distributed":   &test_distributed/1,
       "test.local":         &test_local/1,
@@ -114,24 +116,26 @@ EventStore using PostgreSQL for persistence.
   defp preferred_cli_env do
     [
       "test.all":         :test,
+      "test.jsonb":       :test,
+      "test.registries":  :test,
       "test.distributed": :test,
       "test.local":       :test,
     ]
   end
 
-  @registries [:local, :distributed]
+  defp test_jsonb(args), do: test_env(:jsonb, args)
+  defp test_registries(args), do: Enum.map([:local, :distributed], &test_env(&1, args))
+  defp test_distributed(args), do: test_env(:distributed, args)
+  defp test_local(args), do: test_env(:local, args)
 
-  defp test_registries(args), do: Enum.map(@registries, &test_registry(&1, args))
-  defp test_distributed(args), do: test_registry(:distributed, args)
-  defp test_local(args), do: test_registry(:local, args)
-  defp test_registry(registry, args) do
+  defp test_env(env, args) do
     test_args = if IO.ANSI.enabled?, do: ["--color"|args], else: ["--no-color"|args]
 
-    IO.puts "==> Running tests for MIX_ENV=#{registry} mix test #{Enum.join(args, " ")}"
+    IO.puts "==> Running tests for MIX_ENV=#{env} mix test #{Enum.join(args, " ")}"
 
     {_, res} = System.cmd "mix", ["test"|test_args],
                           into: IO.binstream(:stdio, :line),
-                          env: [{"MIX_ENV", to_string(registry)}]
+                          env: [{"MIX_ENV", to_string(env)}]
 
     if res > 0 do
       System.at_exit(fn _ -> exit({:shutdown, 1}) end)
