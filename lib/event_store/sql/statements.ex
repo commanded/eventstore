@@ -2,9 +2,6 @@ defmodule EventStore.Sql.Statements do
   @moduledoc """
   PostgreSQL statements to intialize the event store schema and read/write streams and events.
   """
-  
-  @data_column_data_type Application.get_env(:eventstore, :data_column_data_type, "bytea")
-  @metadata_column_data_type Application.get_env(:eventstore, :metadata_column_data_type, "bytea")
 
   def initializers do
     [
@@ -112,8 +109,8 @@ CREATE TABLE events
     event_type text NOT NULL,
     correlation_id uuid NULL,
     causation_id uuid NULL,
-    data #{@data_column_data_type} NOT NULL,
-    metadata #{@metadata_column_data_type} NULL,
+    data #{column_data_type()} NOT NULL,
+    metadata #{column_data_type()} NULL,
     created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
 );
 """
@@ -178,8 +175,8 @@ CREATE TABLE snapshots
     source_uuid text PRIMARY KEY NOT NULL,
     source_version bigint NOT NULL,
     source_type text NOT NULL,
-    data #{@data_column_data_type} NOT NULL,
-    metadata #{@metadata_column_data_type} NULL,
+    data #{column_data_type()} NOT NULL,
+    metadata #{column_data_type()} NULL,
     created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
 );
 """
@@ -215,7 +212,7 @@ RETURNING stream_id;
 """
   end
 
-  def create_events(number_of_events \\ 1) do
+  def create_events(number_of_events, column_data_type) do
     params =
       1..number_of_events
       |> Enum.map(fn event_number ->
@@ -229,8 +226,8 @@ RETURNING stream_id;
           Integer.to_string(index + 5), "::uuid, $",     # correlation_id
           Integer.to_string(index + 6), "::uuid, $",     # causation_id
           Integer.to_string(index + 7), ", $",           # event_type
-          Integer.to_string(index + 8), "::", @data_column_data_type, ", $",    # data
-          Integer.to_string(index + 9), "::", @metadata_column_data_type, ", $",    # metadata
+          Integer.to_string(index + 8), "::", column_data_type, ", $",    # data
+          Integer.to_string(index + 9), "::", column_data_type, ", $",    # metadata
           Integer.to_string(index + 10), "::timestamp)"  # created_at
         ]
 
@@ -416,4 +413,6 @@ ORDER BY e.event_number ASC
 LIMIT $2;
 """
   end
+
+  defp column_data_type, do: EventStore.Config.column_data_type()
 end

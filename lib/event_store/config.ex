@@ -39,4 +39,6 @@ defmodule EventStore.Config do
 
     Enum.reject(opts, fn {_k, v} -> is_nil(v) end)
   end
+
+  def column_data_type, do: Application.get_env(:eventstore, :column_data_type, "bytea")
 end

@@ -12,12 +12,11 @@ config :eventstore, EventStore.Storage,
   types: EventStore.PostgresTypes,
   username: "postgres",
   password: "postgres",
-  database: "eventstore_test",
+  database: "eventstore_jsonb_test",
   hostname: "localhost",
   pool_size: 1,
   pool_overflow: 0
 
 config :eventstore,
   registry: :local,
-  data_column_data_type: "jsonb",
-  metadata_column_data_type: "jsonb"
+  column_data_type: "jsonb"

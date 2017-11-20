@@ -5,6 +5,7 @@ defmodule EventStore.Storage.Appender do
 
   require Logger
 
+  alias EventStore.Config
   alias EventStore.Sql.Statements
 
   @doc """
@@ -42,8 +43,9 @@ defmodule EventStore.Storage.Appender do
     |> handle_response(events)
   end
 
-  defp build_insert_statement(event_count),
-    do: Statements.create_events(event_count)
+  defp build_insert_statement(event_count) do
+    Statements.create_events(event_count, Config.column_data_type())
+  end
 
   defp build_insert_parameters(stream_id, events) do
     events
