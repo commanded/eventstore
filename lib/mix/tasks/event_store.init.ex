@@ -16,6 +16,15 @@ defmodule Mix.Tasks.EventStore.Init do
 
   alias EventStore.Storage
 
+  @is_events_table_exists """
+    SELECT EXISTS (
+      SELECT 1
+      FROM   information_schema.tables
+      WHERE  table_schema = 'public'
+      AND    table_name = 'events'
+    )
+  """
+
   @shortdoc "Initialize the database for the EventStore"
 
   @doc false
@@ -33,10 +42,19 @@ defmodule Mix.Tasks.EventStore.Init do
   defp initialize_storage!(config, opts) do
     {:ok, conn} = Postgrex.start_link(config)
 
-    Storage.Initializer.run!(conn)
+    Postgrex.query!(conn, @is_events_table_exists, [], pool: DBConnection.Poolboy)
+    |> case do
+      %{rows: [[true]]} ->
+        info("The EventStore database has been already initialized.", opts)
+      %{rows: [[false]]} ->
+        Storage.Initializer.run!(conn)
+        info("The EventStore database has been initialized.", opts)
+    end
+  end
 
+  defp info(msg, opts) do
     unless opts[:quiet] do
-      Mix.shell.info "The EventStore database has been initialized."
+      Mix.shell.info msg
     end
   end
 end
