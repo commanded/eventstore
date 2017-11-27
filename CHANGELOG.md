@@ -3,6 +3,8 @@
 ## Next release
 
 - Add JSONB support ([#86](https://github.com/commanded/eventstore/pull/86)).
+- Add `:ssl` and `:ssl_opts` config params ([#88](https://github.com/commanded/eventstore/pull/88)).
+- Make `mix event_store.init` task do nothing if events table already exists ([#89](https://github.com/commanded/eventstore/pull/89)).
 
 ## v0.13.2
 

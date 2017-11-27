@@ -45,7 +45,7 @@ defmodule Mix.Tasks.EventStore.Init do
     Postgrex.query!(conn, @is_events_table_exists, [], pool: DBConnection.Poolboy)
     |> case do
       %{rows: [[true]]} ->
-        info("The EventStore database has been already initialized.", opts)
+        info("The EventStore database has already been initialized.", opts)
       %{rows: [[false]]} ->
         Storage.Initializer.run!(conn)
         info("The EventStore database has been initialized.", opts)
