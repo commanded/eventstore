@@ -144,6 +144,7 @@ defmodule EventStore.Streams.SingleStreamTest do
       assert length(received_events) == 3
     end
 
+    @tag :ignore
     test "from current should receive only new events", context do
       {:ok, _subscription} = Stream.subscribe_to_stream(context[:stream_uuid], @subscription_name, self(), start_from: :current)
 

@@ -82,7 +82,7 @@ defmodule EventStore.Storage.Appender do
   defp handle_response({:ok, %Postgrex.Result{num_rows: num_rows, rows: rows}}, events) do
     event_numbers = List.flatten(rows)
 
-    _ = Logger.info(fn -> "Appended #{num_rows} event(s) to stream \"#{stream_uuid(events)}\" (event numbers: #{Enum.join(event_numbers, ", ")})" end)
+    _ = Logger.debug(fn -> "Appended #{num_rows} event(s) to stream \"#{stream_uuid(events)}\" (event numbers: #{Enum.join(event_numbers, ", ")})" end)
     {:ok, event_numbers}
   end
 
