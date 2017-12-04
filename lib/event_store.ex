@@ -86,9 +86,9 @@ defmodule EventStore do
       If not set it will be limited to returning 1,000 events from the stream.
   """
   @spec read_stream_forward(String.t, non_neg_integer, non_neg_integer) :: {:ok, list(RecordedEvent.t)} | {:error, reason :: term}
-  def read_stream_forward(stream_uuid, start_version \\ 0, count \\ 1_000) do
+  def read_stream_forward(stream_uuid, start_version \\ 0, count \\ 1_000, timeout \\ 5_000) do
     with {:ok, _stream} <- EventStore.Streams.Supervisor.open_stream(stream_uuid) do
-      Stream.read_stream_forward(stream_uuid, start_version, count)
+      Stream.read_stream_forward(stream_uuid, start_version, count, timeout)
     else
       reply -> reply
     end
