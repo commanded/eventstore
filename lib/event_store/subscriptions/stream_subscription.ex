@@ -127,7 +127,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
           next_state(:subscribed, data)
 
         ^expected_event ->
-          # subscriber has not yet ack'd last seen event so pending events
+          # subscriber has not yet ack'd last seen event so store pending events
           # until subscriber ready to receive (back pressure)
           data = %SubscriptionState{data |
             last_seen: last_event_number,
