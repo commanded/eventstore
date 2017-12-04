@@ -5,7 +5,7 @@ defmodule EventStore.Publisher do
 
   use GenServer
 
-  alias EventStore.{Publisher,Registration,Storage,Subscriptions}
+  alias EventStore.{Publisher,Registration,Subscriptions}
 
   defstruct [
     serializer: nil,

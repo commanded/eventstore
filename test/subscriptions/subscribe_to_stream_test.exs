@@ -1,4 +1,4 @@
-defmodule EventStore.Subscriptions.SubscribeToStream do
+defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   use EventStore.StorageCase
 
   alias EventStore.{EventFactory,ProcessHelper,Wait}

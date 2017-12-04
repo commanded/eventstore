@@ -107,12 +107,12 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   end
 
   defstate subscribed do
-    # notify events for single stream subscription
+    # notify events when subscribed
     defevent notify_events(events), data: %SubscriptionState{stream_uuid: stream_uuid, last_seen: last_seen, last_ack: last_ack, pending_events: pending_events, max_size: max_size} = data do
       expected_event = last_seen + 1
       next_ack = last_ack + 1
       first_event_number = events |> hd() |> subscription_provider(stream_uuid).event_number()
-      last_event_number = events |> List.last() |> subscription_provider(stream_uuid).event_number()
+      last_event_number = last_event_number(events, data)
 
       case first_event_number do
         ^next_ack ->
@@ -144,8 +144,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
           end
 
         _ ->
-          # received a different event than expected; must catch-up with all unseen events
-          next_state(:request_catch_up, %SubscriptionState{data | last_received: last_event_number})
+          next_state(:request_catch_up, data)
       end
     end
 
@@ -256,15 +255,20 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     Storage.unsubscribe_from_stream(stream_uuid, subscription_name)
   end
 
-  defp track_last_received(events, %SubscriptionState{stream_uuid: stream_uuid} = data) do
+  defp track_last_received(events, %SubscriptionState{} = data) do
     %SubscriptionState{data |
-      last_received: events |> List.last() |> subscription_provider(stream_uuid).event_number()
+      last_received: last_event_number(events, data),
     }
   end
 
-  # Fetch unseen events from the stream transition to `subscribed` state when no
-  # events are found or count of events is less than max buffer size so no
-  # further unseen events.
+  defp last_event_number(events, %SubscriptionState{stream_uuid: stream_uuid}) do
+    events
+    |> List.last()
+    |> subscription_provider(stream_uuid).event_number()
+  end
+
+  # Fetch unseen events from the stream, transition to `subscribed` state when
+  # stream ends
   defp catch_up_from_stream(%SubscriptionState{stream_uuid: stream_uuid, last_seen: last_seen} = data) do
     reply_to = self()
 
@@ -274,14 +278,15 @@ defmodule EventStore.Subscriptions.StreamSubscription do
         data
 
       unseen_event_stream ->
-        # stream unseen events to subscriber in a separate process
+        # stream unseen events to subscriber in a separate process so the
+        # subscription process is not blocked
         catch_up_pid = spawn_link(fn ->
           last_event =
             unseen_event_stream
             |> Stream.chunk_by(&chunk_by(&1))
             |> Stream.each(fn events ->
               notify_subscriber(data, events)
-              wait_for_ack(stream_uuid, events)
+              wait_for_ack(events, data)
             end)
             |> Stream.map(&Enum.at(&1, -1))
             |> Enum.at(-1)
@@ -300,10 +305,9 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   end
 
   # wait until the subscriber ack's the last sent event
-  defp wait_for_ack(stream_uuid, events) when is_list(events) do
+  defp wait_for_ack(events, %SubscriptionState{} = data) when is_list(events) do
     events
-    |> List.last()
-    |> subscription_provider(stream_uuid).event_number()
+    |> last_event_number(data)
     |> wait_for_ack()
   end
 
@@ -376,8 +380,10 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     %SubscriptionState{data| last_ack: ack}
   end
 
-  # An `ack` can be a single integer, indicating an `event_number` or `stream_version`, or a tuple containing both, as `{event_number, stream_version}`.
-  # This function extracts the relevant value depending upon the type of subscription (all / single stream).
+  # An `ack` can be a single integer, indicating an `event_number` or
+  # `stream_version`, or a tuple containing both, as `{event_number, stream_version}`.
+  # This function extracts the relevant value depending upon the type of
+  # subscription (all / single stream).
   defp extract_ack(_stream_uuid, ack) when is_integer(ack),
     do: ack
 
