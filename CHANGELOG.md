@@ -6,6 +6,7 @@
 - Add `:ssl` and `:ssl_opts` config params ([#88](https://github.com/commanded/eventstore/pull/88)).
 - Make `mix event_store.init` task do nothing if events table already exists ([#89](https://github.com/commanded/eventstore/pull/89)).
 - Timeout issue when using `EventStore.read_stream_forward\3` ([#92](https://github.com/commanded/eventstore/pull/92)).
+- Dealing better with Poison dependancy ([#91](https://github.com/commanded/eventstore/issues/91)).
 
 ## v0.13.2
 

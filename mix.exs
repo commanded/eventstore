@@ -57,7 +57,7 @@ defmodule EventStore.Mixfile do
       {:fsm, "~> 0.3"},
       {:markdown, github: "devinus/markdown", only: :dev},
       {:mix_test_watch, "~> 0.5", only: :dev},
-      {:poison, "~> 3.1", optional: true},
+      {:poison, "~> 2.2 or ~> 3.0", optional: true},
       {:poolboy, "~> 1.5"},
       {:postgrex, "~> 0.13"},
       {:swarm, "~> 3.1", optional: true},
