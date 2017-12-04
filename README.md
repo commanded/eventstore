@@ -128,6 +128,7 @@ You should include unit tests to cover any changes.
 - [David Soff](https://github.com/Davidsoff)
 - [Dominik Guzei](https://github.com/DominikGuzei)
 - [Douglas Vought](https://github.com/voughtdq)
+- [Eamon Taaffe](https://github.com/eamontaaffe)
 - [Floris Huetink](https://github.com/florish)
 - [Jan Vereecken](https://github.com/javereec)
 - [Olafur Arason](https://github.com/olafura)
