@@ -39,8 +39,8 @@ defmodule EventStore.Streams.Stream do
     GenServer.call(via_name(stream_uuid), {:append_to_stream, expected_version, events}, timeout)
   end
 
-  def read_stream_forward(stream_uuid, start_version, count) do
-    GenServer.call(via_name(stream_uuid), {:read_stream_forward, start_version, count})
+  def read_stream_forward(stream_uuid, start_version, count, timeout \\ 5_000) do
+    GenServer.call(via_name(stream_uuid), {:read_stream_forward, start_version, count}, timeout)
   end
 
   def stream_forward(stream_uuid, start_version, read_batch_size) do
