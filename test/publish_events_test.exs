@@ -1,7 +1,7 @@
 defmodule EventStore.PublishEventsTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory,Publisher,Subscriptions,Subscriber,Wait}
+  alias EventStore.{EventFactory,Publisher,Storage,Subscriptions,Subscriber,Wait}
   alias EventStore.ProcessHelper
   alias EventStore.Subscriptions.Subscription
 
@@ -15,6 +15,10 @@ defmodule EventStore.PublishEventsTest do
     stream3_events = EventFactory.create_recorded_events(1, stream3_uuid, 3)
 
     {:ok, subscriber, subscription} = subscribe_to_all_streams(start_from_event_number: 0)
+
+    append_to_stream(stream1_uuid, stream1_events)
+    append_to_stream(stream2_uuid, stream2_events)
+    append_to_stream(stream3_uuid, stream3_events)
 
     # notify stream2 events before stream3 and stream1 (out of order)
     Publisher.notify_events(stream2_uuid, stream2_events)
@@ -48,6 +52,10 @@ defmodule EventStore.PublishEventsTest do
     stream3_events = EventFactory.create_recorded_events(3, stream3_uuid, 7)
 
     {:ok, subscriber, subscription} = subscribe_to_all_streams(start_from_event_id: 0)
+
+    append_to_stream(stream1_uuid, stream1_events)
+    append_to_stream(stream2_uuid, stream2_events)
+    append_to_stream(stream3_uuid, stream3_events)
 
     # notify stream3 events before stream2 and stream1 (out of order)
     Publisher.notify_events(stream3_uuid, stream3_events)
@@ -89,6 +97,13 @@ defmodule EventStore.PublishEventsTest do
     # should receive published events
     assert_receive {:events, stream2_received_events}
     assert stream2_received_events == EventFactory.deserialize_events(stream2_events)
+  end
+
+  # append events to storage directly and bypass the publisher
+  defp append_to_stream(stream_uuid, recorded_events) do
+    with {:ok, stream_id} <- Storage.create_stream(stream_uuid) do
+      Storage.append_to_stream(stream_id, recorded_events)
+    end
   end
 
   # subscribe to all streams and wait for the subscription to be subscribed
