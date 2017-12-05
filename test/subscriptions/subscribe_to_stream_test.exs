@@ -255,6 +255,24 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert stream1_received_events != stream2_received_events
     end
 
+    test "should ignore already received events", %{subscription_name: subscription_name} do
+      stream_uuid = UUID.uuid4()
+      recorded_events = EventFactory.create_recorded_events(3, stream_uuid, 1)
+
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
+
+      Subscription.notify_events(subscription, recorded_events)
+
+      assert_receive {:events, received_events}
+      assert length(received_events) == 3
+      assert pluck(received_events, :data) == pluck(recorded_events, :data)
+
+      # notify duplicate events, should be ignored
+      Subscription.notify_events(subscription, recorded_events)
+
+      refute_receive {:events, _events}
+    end
+
     test "should monitor all stream subscription, terminate subscription and subscriber on error", %{subscription_name: subscription_name} do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(1)
@@ -276,9 +294,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       # other subscription should be unaffected
       assert Process.alive?(subscription2) == true
       assert Process.alive?(subscriber2) == true
-
-      # wait for subscriptions to receive DOWN notification
-      :timer.sleep(500)
 
       # appending events to stream should notify subscription 2
       :ok = Stream.append_to_stream(stream_uuid, 0, events)

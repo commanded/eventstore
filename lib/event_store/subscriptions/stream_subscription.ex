@@ -108,13 +108,21 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
   defstate subscribed do
     # notify events when subscribed
-    defevent notify_events(events), data: %SubscriptionState{stream_uuid: stream_uuid, last_seen: last_seen, last_ack: last_ack, pending_events: pending_events, max_size: max_size} = data do
+    defevent notify_events(events), data: %SubscriptionState{last_seen: last_seen, last_ack: last_ack, pending_events: pending_events, max_size: max_size} = data do
       expected_event = last_seen + 1
       next_ack = last_ack + 1
-      first_event_number = events |> hd() |> subscription_provider(stream_uuid).event_number()
+      first_event_number = first_event_number(events, data)
       last_event_number = last_event_number(events, data)
 
       case first_event_number do
+        past when past < expected_event ->
+          # ignore already seen events
+          next_state(:subscribed, data)
+
+        future when future > expected_event ->
+          # missed events, go back and catch-up with unseen
+          next_state(:request_catch_up, data)
+
         ^next_ack ->
           # subscriber is up-to-date, so send events
           notify_subscriber(data, events)
@@ -142,9 +150,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
             # remain subscribed, waiting for subscriber to ack already sent events
             next_state(:subscribed, data)
           end
-
-        _ ->
-          next_state(:request_catch_up, data)
       end
     end
 
@@ -259,6 +264,10 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     %SubscriptionState{data |
       last_received: last_event_number(events, data),
     }
+  end
+
+  defp first_event_number([first_event | _], %SubscriptionState{stream_uuid: stream_uuid}) do
+    first_event |> subscription_provider(stream_uuid).event_number()
   end
 
   defp last_event_number(events, %SubscriptionState{stream_uuid: stream_uuid}) do

@@ -48,6 +48,7 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
       append_to_stream(stream1_uuid, 3)
       append_to_stream(stream2_uuid, 3)
 
+      # notify the subscription with unexpected events
       unexpected_events = EventFactory.create_recorded_events(5, stream1_uuid, 999)
       Subscription.notify_events(subscription, unexpected_events)
 
@@ -77,8 +78,6 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
 
     with {:ok, _stream} <- Streams.Supervisor.open_stream(stream_uuid) do
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
-
-      :timer.sleep 100
     end
   end
 
