@@ -8,6 +8,13 @@ defmodule EventStore.Storage.Initializer do
   def reset!(conn),
     do: execute(conn, Statements.reset())
 
-  defp execute(conn, statements),
-    do: Enum.each(statements, &(Postgrex.query!(conn, &1, [], pool: DBConnection.Poolboy)))
+  defp execute(conn, statements) do
+    statements
+    |> wrap_transaction
+    |> Enum.each(&(Postgrex.query!(conn, &1, [], pool: DBConnection.Poolboy)))
+  end
+
+  defp wrap_transaction(statements) do
+    ["BEGIN"] ++ statements ++ ["COMMIT"]
+  end
 end
