@@ -84,6 +84,22 @@ defmodule EventStoreTest do
     assert recorded_event.metadata == created_event.metadata
   end
 
+  test "unicode character support" do
+    unicode_text = "Unicode characters are supported ✅"
+    stream_uuid = UUID.uuid4()
+    event = %EventStore.EventData{
+      event_type: "Elixir.EventStore.EventFactory.Event",
+      data: %EventStore.EventFactory.Event{
+        event: unicode_text,
+      },
+    }
+    :ok = EventStore.append_to_stream(stream_uuid, 0, [ event ])
+
+    [ recorded_event ] = EventStore.stream_all_forward() |> Enum.to_list
+
+    assert recorded_event.data.event == unicode_text
+  end
+
   test "notify subscribers after event persisted" do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(1)
