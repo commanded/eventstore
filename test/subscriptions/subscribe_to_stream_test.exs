@@ -20,12 +20,11 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       events = EventFactory.create_events(3)
 
       {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self())
 
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
-      assert_receive {:events, received_events}
 
+      assert_receive {:events, received_events}
       assert pluck(received_events, :event_number) == [4, 5, 6]
       assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
       assert pluck(received_events, :stream_version) == [1, 2, 3]

@@ -2,8 +2,9 @@ defmodule EventStore.Subscriptions.Subscription do
   @moduledoc """
   Subscription to a single, or all, event streams.
 
-  A subscription is persistent so that resuming the subscription will continue from the last acknowledged event.
-  This guarantees at least once delivery of every event appended to storage.
+  A subscription is persistent so that resuming the subscription will continue
+  from the last acknowledged event. This guarantees at least once delivery of
+  every event appended to storage.
   """
 
   use GenServer
@@ -13,20 +14,23 @@ defmodule EventStore.Subscriptions.Subscription do
   alias EventStore.Subscriptions.{StreamSubscription,Subscription}
 
   defstruct [
+    conn: nil,
     stream_uuid: nil,
     subscription_name: nil,
     subscriber: nil,
     subscription: nil,
     subscription_opts: [],
+    postgrex_config: nil
   ]
 
-  def start_link(stream_uuid, subscription_name, subscriber, subscription_opts, opts \\ []) do
+  def start_link(postgrex_config, stream_uuid, subscription_name, subscriber, subscription_opts, opts \\ []) do
     GenServer.start_link(__MODULE__, %Subscription{
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
       subscriber: subscriber,
       subscription: StreamSubscription.new(),
       subscription_opts: subscription_opts,
+      postgrex_config: postgrex_config
     }, opts)
   end
 
@@ -71,12 +75,36 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc false
-  def init(%Subscription{subscriber: subscriber} = state) do
+  def init(%Subscription{subscriber: subscriber, postgrex_config: postgrex_config} = state) do
     Process.link(subscriber)
+    
+    # A subscription has its own connection to the database to enforce locking
+    {:ok, conn} = Postgrex.start_link(postgrex_config)
 
-    GenServer.cast(self(), :subscribe_to_stream)
+    send(self(), :subscribe_to_stream)
 
-    {:ok, state}
+    {:ok, %Subscription{state | conn: conn}}
+  end
+
+  def handle_info(:subscribe_to_stream, %Subscription{} = state) do
+    %Subscription{
+      conn: conn,
+      stream_uuid: stream_uuid,
+      subscription_name: subscription_name,
+      subscriber: subscriber,
+      subscription: subscription,
+      subscription_opts: opts
+    } = state
+
+    subscription = StreamSubscription.subscribe(subscription, conn, stream_uuid, subscription_name, subscriber, opts)
+
+    state = %Subscription{state | subscription: subscription}
+
+    :ok = handle_subscription_state(state)
+
+    subscribe_to_events(stream_uuid)
+
+    {:noreply, state}
   end
 
   def handle_cast({:notify_events, events}, %Subscription{subscription: subscription} = state) do
@@ -85,18 +113,6 @@ defmodule EventStore.Subscriptions.Subscription do
     state = %Subscription{state | subscription: subscription}
 
     :ok = handle_subscription_state(state)
-
-    {:noreply, state}
-  end
-
-  def handle_cast(:subscribe_to_stream, %Subscription{stream_uuid: stream_uuid, subscription_name: subscription_name, subscriber: subscriber, subscription: subscription, subscription_opts: opts} = state) do
-    subscription = StreamSubscription.subscribe(subscription, stream_uuid, subscription_name, subscriber, opts)
-
-    state = %Subscription{state | subscription: subscription}
-
-    :ok = handle_subscription_state(state)
-
-    subscribe_to_stream(stream_uuid)
 
     {:noreply, state}
   end
@@ -152,8 +168,14 @@ defmodule EventStore.Subscriptions.Subscription do
     {:reply, reply, state}
   end
 
-  defp subscribe_to_stream(stream_uuid) do
+  defp subscribe_to_events(stream_uuid) do
     {:ok, _} = Registry.register(EventStore.Subscriptions.PubSub, stream_uuid, {Subscription, :notify_events})
+  end
+
+  defp handle_subscription_state(%Subscription{subscription: %{state: :initial}, subscription_name: subscription_name}) do
+    retry_interval = subscription_retry_interval()
+    Logger.debug(fn -> "Failed to subscribe to #{subscription_name}, will retry in #{retry_interval}ms" end)
+    Process.send_after(self(), :subscribe_to_stream, retry_interval)
   end
 
   defp handle_subscription_state(%Subscription{subscription: %{state: :request_catch_up}}) do
@@ -165,7 +187,15 @@ defmodule EventStore.Subscriptions.Subscription do
     :ok
   end
 
-  # no-op
-  defp handle_subscription_state(_state),
-    do: :ok
+  # no-op for all other subscription states
+  defp handle_subscription_state(_state), do: :ok
+
+  # get the delay between subscription attempts, in milliseconds, from app
+  # config. Default value is one minute.
+  defp subscription_retry_interval do
+    case Application.get_env(:eventstore, :subscription_retry_interval) do
+      interval when is_integer(interval) -> interval
+      _ -> 60_000
+    end
+  end
 end

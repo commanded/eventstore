@@ -290,6 +290,12 @@ WHERE stream_uuid = $1 AND subscription_name = $2;
 """
   end
 
+  def try_advisory_lock do
+"""
+SELECT pg_try_advisory_lock($1);
+"""
+  end
+
   def ack_last_seen_event do
 """
 UPDATE subscriptions

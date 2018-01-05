@@ -1,18 +1,25 @@
 defmodule EventStore.StorageCase do
   use ExUnit.CaseTemplate
 
-  alias EventStore.Registration
+  alias EventStore.{ProcessHelper,Registration}
 
   setup do
     registry = Registration.registry_provider()
 
     before_reset(registry)
 
-    EventStore.StorageInitializer.reset_storage!()
+    {:ok, conn} =
+      EventStore.configuration()
+      |> EventStore.Config.parse()
+      |> Postgrex.start_link()
+
+    EventStore.Storage.Initializer.reset!(conn)
 
     after_reset(registry)
 
-    {:ok, conn} = EventStore.configuration() |> EventStore.Config.parse() |> Postgrex.start_link()
+    on_exit fn ->
+      ProcessHelper.shutdown(conn)
+    end
 
     {:ok, %{conn: conn}}
   end

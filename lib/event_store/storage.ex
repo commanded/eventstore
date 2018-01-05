@@ -79,28 +79,37 @@ defmodule EventStore.Storage do
   unique name and starting position (event number or stream version).
   """
   def subscribe_to_stream(stream_uuid, subscription_name, start_from_event_number \\ nil, start_from_stream_version \\ nil) do
-    Subscription.subscribe_to_stream(@event_store, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version)
+    Subscription.subscribe_to_stream(@event_store, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version, pool: DBConnection.Poolboy)
+  end
+
+  @doc """
+  Attempt to acquire an exclusive lock for the given subscription id. Uses
+  PostgreSQL's advisory locks[1] to provide session level locking.
+  [1] https://www.postgresql.org/docs/current/static/explicit-locking.html#ADVISORY-LOCKS
+  """
+  def try_acquire_exclusive_lock(subscription_id) do
+    Subscription.try_acquire_exclusive_lock(@event_store, subscription_id, pool: DBConnection.Poolboy)
   end
 
   @doc """
   Acknowledge receipt of an event by its number, for a single subscription.
   """
   def ack_last_seen_event(stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version) do
-    Subscription.ack_last_seen_event(@event_store, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version)
+    Subscription.ack_last_seen_event(@event_store, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, pool: DBConnection.Poolboy)
   end
 
   @doc """
   Unsubscribe from an existing named subscription to a stream.
   """
   def unsubscribe_from_stream(stream_uuid, subscription_name) do
-    Subscription.unsubscribe_from_stream(@event_store, stream_uuid, subscription_name)
+    Subscription.unsubscribe_from_stream(@event_store, stream_uuid, subscription_name, pool: DBConnection.Poolboy)
   end
 
   @doc """
   Get all known subscriptions, to any stream.
   """
   def subscriptions do
-    Subscription.subscriptions(@event_store)
+    Subscription.subscriptions(@event_store, pool: DBConnection.Poolboy)
   end
 
   @doc """
