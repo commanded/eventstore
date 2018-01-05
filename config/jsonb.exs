@@ -18,5 +18,6 @@ config :eventstore, EventStore.Storage,
   pool_overflow: 0
 
 config :eventstore,
+  column_data_type: "jsonb",
   registry: :local,
-  column_data_type: "jsonb"
+  subscription_retry_interval: 1_000

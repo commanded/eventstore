@@ -19,7 +19,8 @@ config :eventstore, EventStore.Storage,
 
 config :eventstore,
   registry: :distributed,
-  restart_stream_timeout: 1_000
+  restart_stream_timeout: 1_000,
+  subscription_retry_interval: 1_000
 
 config :swarm,
   nodes: [:"node1@127.0.0.1", :"node2@127.0.0.1", :"node3@127.0.0.1"],
