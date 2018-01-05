@@ -30,7 +30,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     test "create subscription to all streams", context do
       subscription = create_subscription(context)
 
-      assert subscription.state == :request_catch_up
+      assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
       assert subscription.data.subscriber == self()
       assert subscription.data.last_seen == 0
@@ -41,7 +41,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     test "create subscription to all streams from starting event id", context do
       subscription = create_subscription(context, start_from_event_number: 2)
 
-      assert subscription.state == :request_catch_up
+      assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
       assert subscription.data.subscriber == self()
       assert subscription.data.last_seen == 2
@@ -53,6 +53,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   test "catch-up subscription, no persisted events", context do
     subscription =
       create_subscription(context)
+      |> StreamSubscription.subscribed()
       |> StreamSubscription.catch_up()
 
     assert subscription.state == :catching_up
@@ -70,6 +71,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
     subscription =
       create_subscription(context)
+      |> StreamSubscription.subscribed()
       |> StreamSubscription.catch_up()
 
     assert subscription.state == :catching_up
@@ -97,6 +99,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
     subscription =
       create_subscription(context)
+      |> StreamSubscription.subscribed()
       |> StreamSubscription.catch_up()
       |> StreamSubscription.caught_up(0)
       |> StreamSubscription.notify_events(events)
@@ -114,6 +117,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   test "should catch up when events received while catching up", context do
     subscription =
       create_subscription(context)
+      |> StreamSubscription.subscribed()
       |> StreamSubscription.catch_up()
 
     assert subscription.state == :catching_up
@@ -146,6 +150,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
       subscription =
         create_subscription(context)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
 
       assert_receive_caught_up(3)
@@ -164,6 +169,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     test "should replay events when catching up and events had not been acknowledged", context do
       subscription =
         create_subscription(context)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
 
       # should receive already seen events
@@ -184,6 +190,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     def create_caught_up_subscription(context) do
       subscription =
         create_subscription(context)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
 
       assert subscription.state == :catching_up
@@ -210,6 +217,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
     subscription =
       create_subscription(context)
+      |> StreamSubscription.subscribed()
       |> StreamSubscription.catch_up()
       |> StreamSubscription.caught_up(0)
       |> StreamSubscription.notify_events(initial_events)
@@ -255,6 +263,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
       subscription =
         create_subscription(context, max_size: 3)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
         |> StreamSubscription.caught_up(0)
         |> StreamSubscription.notify_events(initial_events)
@@ -292,6 +301,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
       subscription =
         create_subscription(context, max_size: 3)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
         |> StreamSubscription.caught_up(0)
         |> StreamSubscription.notify_events(initial_events)
@@ -331,11 +341,11 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     setup [:create_second_connection, :create_two_duplicate_subscriptions]
 
     test "should only allow one subscriber", %{subscription1: subscription1, subscription2: subscription2} do
-      assert subscription1.state == :request_catch_up
+      assert subscription1.state == :subscribe_to_events
       assert subscription2.state == :initial
     end
 
-    test "should allow second subscriber to takeover when first connection terminates", %{subscription_conn: conn, subscription_conn2: conn2, subscription1: subscription1, subscription2: subscription2} do
+    test "should allow second subscriber to takeover when first connection terminates", %{subscription_conn: conn, subscription_conn2: conn2, subscription2: subscription2} do
       # attempt to resubscribe should fail
       subscription2 = StreamSubscription.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
       assert subscription2.state == :initial
@@ -345,7 +355,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
       # attempt to resubscribe should now succeed
       subscription2 = StreamSubscription.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
-      assert subscription2.state == :request_catch_up
+      assert subscription2.state == :subscribe_to_events
     end
 
     defp create_second_connection(%{postgrex_config: config}) do

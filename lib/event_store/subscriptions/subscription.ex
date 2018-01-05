@@ -35,7 +35,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def notify_events(subscription, events) when is_list(events) do
-    GenServer.cast(subscription, {:notify_events, events})
+    send(subscription, {:notify_events, events})
   end
 
   @doc """
@@ -77,8 +77,8 @@ defmodule EventStore.Subscriptions.Subscription do
   @doc false
   def init(%Subscription{subscriber: subscriber, postgrex_config: postgrex_config} = state) do
     Process.link(subscriber)
-    
-    # A subscription has its own connection to the database to enforce locking
+
+    # Each subscription has its own connection to the database to enforce locking
     {:ok, conn} = Postgrex.start_link(postgrex_config)
 
     send(self(), :subscribe_to_stream)
@@ -98,53 +98,39 @@ defmodule EventStore.Subscriptions.Subscription do
 
     subscription = StreamSubscription.subscribe(subscription, conn, stream_uuid, subscription_name, subscriber, opts)
 
-    state = %Subscription{state | subscription: subscription}
-
-    :ok = handle_subscription_state(state)
-
-    subscribe_to_events(stream_uuid)
-
-    {:noreply, state}
+    {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
-  def handle_cast({:notify_events, events}, %Subscription{subscription: subscription} = state) do
+  def handle_info({:notify_events, events}, %Subscription{subscription: subscription} = state) do
     subscription = StreamSubscription.notify_events(subscription, events)
 
-    state = %Subscription{state | subscription: subscription}
+    {:noreply, apply_subscription_to_state(subscription, state)}
+  end
 
-    :ok = handle_subscription_state(state)
+  def handle_cast(:subscribe_to_events, %Subscription{subscription: subscription} = state) do
+    subscribe_to_events(state)
 
-    {:noreply, state}
+    subscription = StreamSubscription.subscribed(subscription)
+
+    {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
   def handle_cast(:catch_up, %Subscription{subscription: subscription} = state) do
     subscription = StreamSubscription.catch_up(subscription)
 
-    state = %Subscription{state | subscription: subscription}
-
-    :ok = handle_subscription_state(state)
-
-    {:noreply, state}
+    {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
   def handle_cast({:caught_up, last_seen}, %Subscription{subscription: subscription} = state) do
     subscription = StreamSubscription.caught_up(subscription, last_seen)
 
-    state = %Subscription{state | subscription: subscription}
-
-    :ok = handle_subscription_state(state)
-
-    {:noreply, state}
+    {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
   def handle_cast({:ack, ack}, %Subscription{subscription: subscription} = state) do
     subscription = StreamSubscription.ack(subscription, ack)
 
-    state = %Subscription{state | subscription: subscription}
-
-    :ok = handle_subscription_state(state)
-
-    {:noreply, state}
+    {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
   def handle_call(:unsubscribe, _from, %Subscription{subscriber: subscriber, subscription: subscription} = state) do
@@ -152,34 +138,41 @@ defmodule EventStore.Subscriptions.Subscription do
 
     subscription = StreamSubscription.unsubscribe(subscription)
 
-    state = %Subscription{state | subscription: subscription}
-
-    :ok = handle_subscription_state(state)
-
-    {:reply, :ok, state}
+    {:reply, :ok, apply_subscription_to_state(subscription, state)}
   end
 
   def handle_call(:subscribed?, _from, %Subscription{subscription: %{state: subscription_state}} = state) do
-    reply = case subscription_state do
-      :subscribed -> true
-      _ -> false
-    end
+    reply =
+      case subscription_state do
+        :subscribed -> true
+        _ -> false
+      end
 
     {:reply, reply, state}
   end
 
-  defp subscribe_to_events(stream_uuid) do
-    {:ok, _} = Registry.register(EventStore.Subscriptions.PubSub, stream_uuid, {Subscription, :notify_events})
+  defp apply_subscription_to_state(%StreamSubscription{} = subscription, %Subscription{} = state) do
+    state = %Subscription{state | subscription: subscription}
+
+    :ok = handle_subscription_state(state)
+
+    state
   end
 
   defp handle_subscription_state(%Subscription{subscription: %{state: :initial}, subscription_name: subscription_name}) do
     retry_interval = subscription_retry_interval()
+
     Logger.debug(fn -> "Failed to subscribe to #{subscription_name}, will retry in #{retry_interval}ms" end)
     Process.send_after(self(), :subscribe_to_stream, retry_interval)
+    :ok
+  end
+
+  defp handle_subscription_state(%Subscription{subscription: %{state: :subscribe_to_events}}) do
+    :ok = GenServer.cast(self(), :subscribe_to_events)
   end
 
   defp handle_subscription_state(%Subscription{subscription: %{state: :request_catch_up}}) do
-    GenServer.cast(self(), :catch_up)
+    :ok = GenServer.cast(self(), :catch_up)
   end
 
   defp handle_subscription_state(%Subscription{subscription: %{state: :max_capacity}, subscription_name: subscription_name}) do
@@ -189,6 +182,10 @@ defmodule EventStore.Subscriptions.Subscription do
 
   # no-op for all other subscription states
   defp handle_subscription_state(_state), do: :ok
+
+  defp subscribe_to_events(%Subscription{stream_uuid: stream_uuid}) do
+    {:ok, _} = Registry.register(EventStore.Subscriptions.PubSub, stream_uuid, [])
+  end
 
   # get the delay between subscription attempts, in milliseconds, from app
   # config. Default value is one minute.

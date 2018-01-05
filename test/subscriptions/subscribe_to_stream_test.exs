@@ -3,8 +3,9 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
   alias EventStore.{EventFactory,ProcessHelper,Wait}
   alias EventStore.{Streams,Subscriptions,Subscriber}
-  alias EventStore.Subscriptions.Subscription
   alias EventStore.Streams.Stream
+  alias EventStore.Subscriptions.Subscription
+  alias EventStore.Support.CollectingSubscriber
 
   setup do
     subscription_name = UUID.uuid4()
@@ -483,49 +484,73 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     end
   end
 
-  defmodule CollectingSubscriber do
-    use GenServer
+  describe "duplicate subscriptions" do
+    setup [:create_two_duplicate_subscriptions]
 
-    def start_link(subscription_name) do
-      GenServer.start_link(__MODULE__, subscription_name)
+    test "should only allow single active subscription", %{subscription1: subscription1, subscription2: subscription2} do
+       stream1_uuid = append_events_to_stream(3)
+
+      # subscriber1 should receive events
+      assert_receive {:events, received_events}
+      assert Subscription.subscribed?(subscription1)
+
+      Subscription.ack(subscription1, received_events)
+
+      assert length(received_events) == 3
+      Enum.each(received_events, fn event ->
+        assert event.stream_uuid == stream1_uuid
+      end)
+
+      # subscriber2 should not receive any events
+      refute Subscription.subscribed?(subscription2)
+      refute_receive {:events, _received_events}
+
+      # shutdown subscriber1 process
+      ProcessHelper.shutdown(subscription1)
+
+      wait_until_subscribed(subscription2)
+
+      stream2_uuid = append_events_to_stream(3)
+
+      # subscriber2 should now start receiving events
+      assert_receive {:events, received_events}, 5_000
+      Subscription.ack(subscription2, received_events)
+
+      assert length(received_events) == 3
+      Enum.each(received_events, fn event ->
+        assert event.stream_uuid == stream2_uuid
+      end)
+
+      refute_receive {:events, _received_events}
     end
 
-    def received_events(subscriber) do
-      GenServer.call(subscriber, {:received_events})
+    defp create_two_duplicate_subscriptions(%{subscription_name: subscription_name}) do
+      postgrex_config =
+        EventStore.configuration()
+        |> EventStore.Config.parse()
+        |> Keyword.drop([:pool, :pool_size, :pool_overflow, :serializer])
+
+      {:ok, subscription1} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from_event_number: 0)
+
+      wait_until_subscribed(subscription1)
+
+      {:ok, subscription2} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from_event_number: 0)
+
+      [
+        subscription1: subscription1,
+        subscription2: subscription2
+      ]
     end
 
-    def subscribed?(subscriber) do
-      GenServer.call(subscriber, {:subscribed?})
-    end
+    defp append_events_to_stream(count) do
+      stream_uuid = UUID.uuid4()
+      stream_events = EventFactory.create_events(count)
 
-    def unsubscribe(subscriber) do
-      GenServer.call(subscriber, {:unsubscribe})
-    end
+      with {:ok, _stream} <- Streams.Supervisor.open_stream(stream_uuid) do
+        :ok = Stream.append_to_stream(stream_uuid, 0, stream_events)
+      end
 
-    def init(subscription_name) do
-      {:ok, subscription} = Subscriptions.subscribe_to_all_streams(subscription_name, self())
-
-      {:ok, %{events: [], subscription: subscription, subscription_name: subscription_name}}
-    end
-
-    def handle_call({:received_events}, _from, %{events: events} = state) do
-      {:reply, events, state}
-    end
-
-    def handle_call({:subscribed?}, _from, %{subscription: subscription} = state) do
-      reply = Subscription.subscribed?(subscription)
-      {:reply, reply, state}
-    end
-
-    def handle_call({:unsubscribe}, _from, %{subscription_name: subscription_name} = state) do
-      Subscriptions.unsubscribe_from_all_streams(subscription_name)
-      {:reply, :ok, state}
-    end
-
-    def handle_info({:events, received_events}, %{events: events, subscription: subscription} = state) do
-      Subscription.ack(subscription, received_events)
-
-      {:noreply, %{state | events: events ++ received_events}}
+      stream_uuid
     end
   end
 

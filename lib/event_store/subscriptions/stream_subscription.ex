@@ -16,6 +16,11 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   @all_stream "$all"
   @max_buffer_size 1_000
 
+  # The main flow between states in this finite state machine is:
+  #
+  #   initial -> subscribe_to_events -> request_catch_up -> catching_up -> subscribed
+  #
+
   defstate initial do
     defevent subscribe(conn, stream_uuid, subscription_name, subscriber, opts), data: %SubscriptionState{} = data do
       data = %SubscriptionState{data |
@@ -27,7 +32,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
         max_size: opts[:max_size] || @max_buffer_size,
       }
 
-      with {:ok, subscription} <- subscribe_to_stream(data, opts),
+      with {:ok, subscription} <- create_subscription(data, opts),
             :ok <- try_acquire_exclusive_lock(conn, subscription) do
 
         last_ack = subscription_provider(stream_uuid).last_ack(subscription) || 0
@@ -38,7 +43,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
           last_ack: last_ack,
         }
 
-        next_state(:request_catch_up, data)
+        next_state(:subscribe_to_events, data)
       else
         _ ->
           # Failed to subscribe to stream, retry after delay
@@ -51,9 +56,24 @@ defmodule EventStore.Subscriptions.StreamSubscription do
       next_state(:initial, data)
     end
 
-    # ignore event notifications before subscribed
-    defevent notify_events(events), data: %SubscriptionState{} = data do
-      next_state(:initial, track_last_received(events, data))
+    defevent unsubscribe, data: %SubscriptionState{} = data do
+      unsubscribe_from_stream(data)
+      next_state(:unsubscribed, data)
+    end
+  end
+
+  defstate subscribe_to_events do
+    defevent subscribed, data: %SubscriptionState{} = data do
+      next_state(:request_catch_up, data)
+    end
+
+    defevent ack(ack), data: %SubscriptionState{} = data do
+      data =
+        data
+        |> ack_events(ack)
+        |> notify_pending_events()
+
+      next_state(:subscribe_to_events, data)
     end
 
     defevent unsubscribe, data: %SubscriptionState{} = data do
@@ -252,7 +272,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   defp subscription_provider(@all_stream), do: AllStreamsSubscription
   defp subscription_provider(_stream_uuid), do: SingleStreamSubscription
 
-  defp subscribe_to_stream(%SubscriptionState{} = data, opts) do
+  defp create_subscription(%SubscriptionState{} = data, opts) do
     %SubscriptionState{
       conn: conn,
       stream_uuid: stream_uuid,

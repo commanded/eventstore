@@ -33,7 +33,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
 
       subscription = create_subscription(context)
 
-      assert subscription.state == :request_catch_up
+      assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
       assert subscription.data.subscriber == self()
       assert subscription.data.last_seen == 0
@@ -45,7 +45,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
 
       subscription = create_subscription(context, start_from_stream_version: 2)
 
-      assert subscription.state == :request_catch_up
+      assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
       assert subscription.data.subscriber == self()
       assert subscription.data.last_seen == 2
@@ -70,6 +70,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
 
       subscription =
         create_subscription(context)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
 
       assert subscription.state == :catching_up
@@ -85,6 +86,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
     test "unseen persisted events", %{recorded_events: recorded_events} = context do
       subscription =
         create_subscription(context)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
 
       assert subscription.state == :catching_up
@@ -107,6 +109,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
     test "confirm subscription caught up to persisted events", context do
       subscription =
         create_subscription(context)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
 
       assert subscription.state == :catching_up
@@ -134,6 +137,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
 
     subscription =
       create_subscription(context)
+      |> StreamSubscription.subscribed()
       |> StreamSubscription.catch_up()
       |> StreamSubscription.caught_up(0)
       |> StreamSubscription.notify_events(events)
@@ -159,6 +163,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
 
       subscription =
         create_subscription(context)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
 
       assert subscription.state == :catching_up
@@ -177,6 +182,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
     test "should replay events when not acknowledged", context do
       subscription =
         create_subscription(context)
+        |> StreamSubscription.subscribed()
         |> StreamSubscription.catch_up()
 
       assert subscription.state == :catching_up
@@ -222,6 +228,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
   defp subscribe_to_stream(context) do
     subscription =
       create_subscription(context)
+      |> StreamSubscription.subscribed()
       |> StreamSubscription.catch_up()
 
     assert subscription.state == :catching_up
@@ -247,6 +254,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
 
     subscription =
       create_subscription(context)
+      |> StreamSubscription.subscribed()
       |> StreamSubscription.catch_up()
       |> StreamSubscription.caught_up(0)
       |> StreamSubscription.notify_events(initial_events)
