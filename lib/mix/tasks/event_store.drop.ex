@@ -10,14 +10,14 @@ defmodule Mix.Tasks.EventStore.Drop do
 
   use Mix.Task
 
-  alias EventStore.Storage
+  alias EventStore.Config
   alias EventStore.Storage.Database
 
   @shortdoc "Drop the database for the EventStore"
-  
+
   @doc false
   def run(_args) do
-    config = EventStore.Config.parse Application.get_env(:eventstore, Storage)
+    config = Config.parsed()
 
     if skip_safety_warnings?() or Mix.shell.yes?("Are you sure you want to drop the EventStore database?") do
       drop_database(config)

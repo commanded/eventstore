@@ -2,9 +2,9 @@ defmodule EventStore.Application do
   @moduledoc false
   use Application
 
-  def start(_, _) do
-    config = EventStore.configuration() |> EventStore.Config.parse()
+  alias EventStore.Config
 
-    EventStore.Supervisor.start_link(config)
+  def start(_, _) do
+    EventStore.Supervisor.start_link([Config.parsed(), Config.serializer()])
   end
 end

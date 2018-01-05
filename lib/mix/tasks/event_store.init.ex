@@ -14,7 +14,7 @@ defmodule Mix.Tasks.EventStore.Init do
 
   use Mix.Task
 
-  alias EventStore.Storage
+  alias EventStore.{Config,Storage}
 
   @is_events_table_exists """
     SELECT EXISTS (
@@ -31,7 +31,7 @@ defmodule Mix.Tasks.EventStore.Init do
   def run(args) do
     {:ok, _} = Application.ensure_all_started(:postgrex)
 
-    config = EventStore.configuration() |> EventStore.Config.parse()
+    config = Config.parsed()
     {opts, _, _} = OptionParser.parse(args, switches: [quiet: :boolean])
 
     initialize_storage!(config, opts)

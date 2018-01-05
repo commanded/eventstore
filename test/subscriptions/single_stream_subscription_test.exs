@@ -1,18 +1,15 @@
 defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory,ProcessHelper,RecordedEvent}
+  alias EventStore.{Config,EventFactory,ProcessHelper,RecordedEvent}
   alias EventStore.Storage.{Appender,CreateStream}
   alias EventStore.Subscriptions.StreamSubscription
 
   @subscription_name "test_subscription"
 
   setup do
-    config =
-      EventStore.configuration()
-      |> EventStore.Config.parse()
-      |> Keyword.drop([:pool, :pool_size, :pool_overflow, :serializer])
-
+    config = Config.parsed() |> Config.subscription_postgrex_opts()
+    
     {:ok, conn} = Postgrex.start_link(config)
 
     on_exit fn ->

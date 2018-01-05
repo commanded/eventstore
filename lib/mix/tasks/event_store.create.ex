@@ -14,6 +14,7 @@ defmodule Mix.Tasks.EventStore.Create do
 
   use Mix.Task
 
+  alias EventStore.Config
   alias EventStore.Storage.Database
 
   @shortdoc "Create the database for the EventStore"
@@ -22,7 +23,7 @@ defmodule Mix.Tasks.EventStore.Create do
   def run(args) do
     {:ok, _} = Application.ensure_all_started(:postgrex)
 
-    config = EventStore.configuration() |> EventStore.Config.parse()
+    config = Config.parsed()
     {opts, _, _} = OptionParser.parse(args, switches: [quiet: :boolean])
 
     create_database(config, opts)

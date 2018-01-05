@@ -3,19 +3,14 @@ defmodule EventStore.Streams.AllStream do
   A logical stream containing events appended to all streams
   """
 
-  alias EventStore.{RecordedEvent,Storage}
-  alias EventStore.Subscriptions
+  alias EventStore.{Config,RecordedEvent,Storage,Subscriptions}
 
   def read_stream_forward(start_event_number, count) do
-    serializer = EventStore.configured_serializer()
-
-    read_storage_forward(start_event_number, count, serializer)
+    read_storage_forward(start_event_number, count, Config.serializer())
   end
 
   def stream_forward(start_event_number, read_batch_size) do
-    serializer = EventStore.configured_serializer()
-
-    stream_storage_forward(start_event_number, read_batch_size, serializer)
+    stream_storage_forward(start_event_number, read_batch_size, Config.serializer())
   end
 
   def subscribe_to_stream(subscription_name, subscriber, opts) do
@@ -41,7 +36,9 @@ defmodule EventStore.Streams.AllStream do
     end
   end
 
-  defp stream_storage_forward(0, read_batch_size, serializer), do: stream_storage_forward(1, read_batch_size, serializer)
+  defp stream_storage_forward(0, read_batch_size, serializer),
+    do: stream_storage_forward(1, read_batch_size, serializer)
+
   defp stream_storage_forward(start_event_number, read_batch_size, serializer) do
     Stream.resource(
       fn -> start_event_number end,

@@ -1,8 +1,7 @@
 defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory,ProcessHelper,Wait}
-  alias EventStore.{Subscriptions,Subscriber}
+  alias EventStore.{Config,EventFactory,ProcessHelper,Subscriptions,Subscriber,Wait}
   alias EventStore.Streams.Stream
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Support.CollectingSubscriber
@@ -495,10 +494,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     end
 
     defp create_two_duplicate_subscriptions(%{subscription_name: subscription_name}) do
-      postgrex_config =
-        EventStore.configuration()
-        |> EventStore.Config.parse()
-        |> Keyword.drop([:pool, :pool_size, :pool_overflow, :serializer])
+      postgrex_config = Config.parsed() |> Config.subscription_postgrex_opts()
 
       {:ok, subscription1} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from_event_number: 0)
 
