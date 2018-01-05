@@ -17,4 +17,5 @@ config :eventstore, EventStore.Storage,
   pool_overflow: 0
 
 config :eventstore,
-  registry: :local
+  registry: :local,
+  subscription_retry_interval: 1_000

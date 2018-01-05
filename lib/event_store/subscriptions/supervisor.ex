@@ -7,8 +7,8 @@ defmodule EventStore.Subscriptions.Supervisor do
 
   alias EventStore.Subscriptions.Subscription
 
-  def start_link(_) do
-    Supervisor.start_link(__MODULE__, nil, name: __MODULE__)
+  def start_link(postgrex_config) do
+    Supervisor.start_link(__MODULE__, postgrex_config, name: __MODULE__)
   end
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, subscription_opts) do
@@ -28,9 +28,9 @@ defmodule EventStore.Subscriptions.Supervisor do
     end
   end
 
-  def init(_) do
+  def init(postgrex_config) do
     children = [
-      worker(Subscription, [], restart: :temporary),
+      worker(Subscription, [postgrex_config], restart: :temporary),
     ]
 
     supervise(children, strategy: :simple_one_for_one)
