@@ -103,13 +103,23 @@ Example output:
 
 ```
 ## AppendEventsBench
-append events, single writer                  100   10170.26 µs/op
-append events, 10 concurrent writers           20   85438.80 µs/op
-append events, 100 concurrent writers           2   1102006.00 µs/op
+benchmark name                         iterations   average time
+append events, single writer                  100   20288.68 µs/op
+append events, 10 concurrent writers           10   127416.90 µs/op
+append events, 20 concurrent writers            5   376836.60 µs/op
+append events, 50 concurrent writers            2   582350.50 µs/op
 ## ReadEventsBench
-read events, single reader                   1000   1578.10 µs/op
-read events, 10 concurrent readers            100   16799.80 µs/op
-read events, 100 concurrent readers            10   167397.30 µs/op
+benchmark name                         iterations   average time
+read events, single reader                    500   3674.93 µs/op
+read events, 10 concurrent readers             50   44653.98 µs/op
+read events, 20 concurrent readers             20   73927.55 µs/op
+read events, 50 concurrent readers             10   188244.80 µs/op
+## SubscribeToStreamBench
+benchmark name                         iterations   average time
+subscribe to stream, 1 subscription           100   27687.97 µs/op
+subscribe to stream, 10 subscriptions          50   56047.72 µs/op
+subscribe to stream, 20 subscriptions          10   194164.40 µs/op
+subscribe to stream, 50 subscriptions           5   320435.40 µs/op
 ```
 
 ## Contributing

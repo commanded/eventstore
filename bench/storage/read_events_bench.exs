@@ -17,17 +17,19 @@ defmodule ReadEventsBench do
   end
 
   bench "read events, single reader" do
-    {:ok, _} = EventStore.read_stream_forward(bench_context)
-
-    :ok
+    read_stream_forward(bench_context, 1)
   end
 
   bench "read events, 10 concurrent readers" do
     read_stream_forward(bench_context, 10)
   end
 
-  bench "read events, 100 concurrent readers" do
-    read_stream_forward(bench_context, 100)
+  bench "read events, 20 concurrent readers" do
+    read_stream_forward(bench_context, 20)
+  end
+
+  bench "read events, 50 concurrent readers" do
+    read_stream_forward(bench_context, 50)
   end
 
   defp read_stream_forward(stream_uuid, concurrency) do

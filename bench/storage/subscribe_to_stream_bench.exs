@@ -19,8 +19,12 @@ defmodule SubscribeToStreamBench do
     subscribe_to_stream(bench_context, 10)
   end
 
-  bench "subscribe to stream, 100 subscriptions" do
-    subscribe_to_stream(bench_context, 100)
+  bench "subscribe to stream, 20 subscriptions" do
+    subscribe_to_stream(bench_context, 20)
+  end
+
+  bench "subscribe to stream, 50 subscriptions" do
+    subscribe_to_stream(bench_context, 50)
   end
 
   defp subscribe_to_stream(events, concurrency) do

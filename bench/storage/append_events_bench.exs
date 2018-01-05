@@ -12,15 +12,19 @@ defmodule AppendEventsBench do
   end
 
   bench "append events, single writer" do
-    EventStore.append_to_stream(UUID.uuid4, 0, bench_context)
+    append_events(bench_context, 1)
   end
 
   bench "append events, 10 concurrent writers" do
     append_events(bench_context, 10)
   end
 
-  bench "append events, 100 concurrent writers" do
-    append_events(bench_context, 100)
+  bench "append events, 20 concurrent writers" do
+    append_events(bench_context, 20)
+  end
+
+  bench "append events, 50 concurrent writers" do
+    append_events(bench_context, 50)
   end
 
   defp append_events(events, concurrency) do
