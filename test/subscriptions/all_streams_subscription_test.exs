@@ -20,7 +20,10 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
       ProcessHelper.shutdown(conn)
     end
 
-    [subscription_conn: conn]
+    [
+      postgrex_config: config,
+      subscription_conn: conn
+    ]
   end
 
   describe "subscribe to all streams" do
@@ -321,6 +324,50 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
       assert pluck(received_events, :correlation_id) == pluck(remaining_events, :correlation_id)
       assert pluck(received_events, :causation_id) == pluck(remaining_events, :causation_id)
       assert pluck(received_events, :data) == pluck(remaining_events, :data)
+    end
+  end
+
+  describe "duplicate subscriptions" do
+    setup [:create_second_connection, :create_two_duplicate_subscriptions]
+
+    test "should only allow one subscriber", %{subscription1: subscription1, subscription2: subscription2} do
+      assert subscription1.state == :request_catch_up
+      assert subscription2.state == :initial
+    end
+
+    test "should allow second subscriber to takeover when first connection terminates", %{subscription_conn: conn, subscription_conn2: conn2, subscription1: subscription1, subscription2: subscription2} do
+      # attempt to resubscribe should fail
+      subscription2 = StreamSubscription.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
+      assert subscription2.state == :initial
+
+      # stop subscription1 connection
+      ProcessHelper.shutdown(conn)
+
+      # attempt to resubscribe should now succeed
+      subscription2 = StreamSubscription.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
+      assert subscription2.state == :request_catch_up
+    end
+
+    defp create_second_connection(%{postgrex_config: config}) do
+      {:ok, conn} = Postgrex.start_link(config)
+
+      on_exit fn ->
+        ProcessHelper.shutdown(conn)
+      end
+
+      [subscription_conn2: conn]
+    end
+
+    # Create two identically named subscriptions to the same stream, but using
+    # different database connections
+    defp create_two_duplicate_subscriptions(%{subscription_conn: conn1, subscription_conn2: conn2}) do
+      subscription1 = create_subscription(%{subscription_conn: conn1})
+      subscription2 = create_subscription(%{subscription_conn: conn2})
+
+      [
+        subscription1: subscription1,
+        subscription2: subscription2,
+      ]
     end
   end
 
