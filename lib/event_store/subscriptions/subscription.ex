@@ -187,11 +187,12 @@ defmodule EventStore.Subscriptions.Subscription do
     {:ok, _} = Registry.register(EventStore.Subscriptions.PubSub, stream_uuid, [])
   end
 
-  # get the delay between subscription attempts, in milliseconds, from app
-  # config. Default value is one minute.
+  # Get the delay between subscription attempts, in milliseconds, from app
+  # config. The default value is one minute and minimum allowed value is one
+  # second.
   defp subscription_retry_interval do
     case Application.get_env(:eventstore, :subscription_retry_interval) do
-      interval when is_integer(interval) -> interval
+      interval when is_integer(interval) and interval > 0 -> min(interval, 1_000)
       _ -> 60_000
     end
   end
