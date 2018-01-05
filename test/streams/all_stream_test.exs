@@ -2,7 +2,6 @@ defmodule EventStore.Streams.AllStreamTest do
   use EventStore.StorageCase
 
   alias EventStore.EventFactory
-  alias EventStore.Streams
   alias EventStore.Streams.{AllStream,Stream}
   alias EventStore.Subscriptions.Subscription
 
@@ -85,15 +84,13 @@ defmodule EventStore.Streams.AllStreamTest do
   end
 
   defp append_events_to_streams(_context) do
-    {stream1_uuid, stream1, stream1_events} = append_events_to_stream()
-    {stream2_uuid, stream2, stream2_events} = append_events_to_stream()
+    {stream1_uuid, stream1_events} = append_events_to_stream()
+    {stream2_uuid, stream2_events} = append_events_to_stream()
 
     [
       stream1_uuid: stream1_uuid,
-      stream1: stream1,
       stream1_events: stream1_events,
       stream2_uuid: stream2_uuid,
-      stream2: stream2,
       stream2_events: stream2_events,
     ]
   end
@@ -102,9 +99,8 @@ defmodule EventStore.Streams.AllStreamTest do
     stream_uuid = UUID.uuid4
     events = EventFactory.create_events(3)
 
-    {:ok, stream} = Streams.Supervisor.open_stream(stream_uuid)
     :ok = Stream.append_to_stream(stream_uuid, 0, events)
 
-    {stream_uuid, stream, events}
+    {stream_uuid, events}
   end
 end

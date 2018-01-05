@@ -65,13 +65,12 @@ defmodule EventStore do
     {:error, :stream_does_not_exist} |
     {:error, reason :: term}
   def append_to_stream(stream_uuid, expected_version, events, timeout \\ 5_000)
-  def append_to_stream(@all_stream, _expected_version, _events, _timeout), do: {:error, :cannot_append_to_all_stream}
+
+  def append_to_stream(@all_stream, _expected_version, _events, _timeout),
+    do: {:error, :cannot_append_to_all_stream}
+
   def append_to_stream(stream_uuid, expected_version, events, timeout) do
-    with {:ok, _stream} <- EventStore.Streams.Supervisor.open_stream(stream_uuid) do
-      Stream.append_to_stream(stream_uuid, expected_version, events, timeout)
-    else
-      reply -> reply
-    end
+    Stream.append_to_stream(stream_uuid, expected_version, events, timeout)
   end
 
   @doc """
@@ -86,12 +85,10 @@ defmodule EventStore do
       If not set it will be limited to returning 1,000 events from the stream.
   """
   @spec read_stream_forward(String.t, non_neg_integer, non_neg_integer) :: {:ok, list(RecordedEvent.t)} | {:error, reason :: term}
-  def read_stream_forward(stream_uuid, start_version \\ 0, count \\ 1_000, timeout \\ 5_000) do
-    with {:ok, _stream} <- EventStore.Streams.Supervisor.open_stream(stream_uuid) do
-      Stream.read_stream_forward(stream_uuid, start_version, count, timeout)
-    else
-      reply -> reply
-    end
+  def read_stream_forward(stream_uuid, start_version \\ 0, count \\ 1_000, timeout \\ 5_000)
+
+  def read_stream_forward(stream_uuid, start_version, count, timeout) do
+    Stream.read_stream_forward(stream_uuid, start_version, count, timeout)
   end
 
   @doc """
@@ -104,12 +101,10 @@ defmodule EventStore do
       Defaults to reading 1,000 events per batch.
   """
   @spec stream_forward(String.t, non_neg_integer, non_neg_integer) :: Enumerable.t | {:error, reason :: term}
-  def stream_forward(stream_uuid, start_version \\ 0, read_batch_size \\ 1_000) do
-    with {:ok, _stream} <- EventStore.Streams.Supervisor.open_stream(stream_uuid) do
-      Stream.stream_forward(stream_uuid, start_version, read_batch_size)
-    else
-      reply -> reply
-    end
+  def stream_forward(stream_uuid, start_version \\ 0, read_batch_size \\ 1_000)
+
+  def stream_forward(stream_uuid, start_version, read_batch_size) do
+    Stream.stream_forward(stream_uuid, start_version, read_batch_size)
   end
 
   @doc """
@@ -163,12 +158,9 @@ defmodule EventStore do
     | {:error, :subscription_already_exists}
     | {:error, reason :: term}
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
+
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    with {:ok, _stream} <- EventStore.Streams.Supervisor.open_stream(stream_uuid) do
-      Stream.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
-    else
-      reply -> reply
-    end
+    Stream.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
   end
 
   @doc """

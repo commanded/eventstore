@@ -2,47 +2,9 @@ defmodule EventStore.Streams.SingleStreamTest do
   use EventStore.StorageCase
 
   alias EventStore.EventFactory
-  alias EventStore.ProcessHelper
-  alias EventStore.Streams
   alias EventStore.Streams.Stream
 
   @subscription_name "test_subscription"
-
-  describe "open a single stream" do
-    setup [:open_a_single_stream]
-
-    test "should open stream", %{stream: stream} do
-      assert stream != nil
-    end
-
-    test "should be identical stream when opening the same stream twice" do
-      stream_uuid = UUID.uuid4()
-
-      {:ok, stream1} = Streams.Supervisor.open_stream(stream_uuid)
-      {:ok, stream2} = Streams.Supervisor.open_stream(stream_uuid)
-
-      assert stream1 != nil
-      assert stream2 != nil
-      assert stream1 == stream2
-    end
-
-    test "stream crash should allow restarting stream process", %{stream: stream, stream_uuid: stream_uuid} do
-      ProcessHelper.shutdown(stream)
-      wait_for_event_store()
-
-      {:ok, stream} = Streams.Supervisor.open_stream(stream_uuid)
-      assert stream != nil
-    end
-
-    test "should stop process when closed", %{stream: stream, stream_uuid: stream_uuid} do
-      ref = Process.monitor(stream)
-
-      :ok = Streams.Supervisor.close_stream(stream_uuid)
-
-      assert_receive {:DOWN, ^ref, :process, ^stream, :shutdown}
-      assert %{active: 0, specs: 1, supervisors: 0, workers: 0} == Supervisor.count_children(Streams.Supervisor)
-    end
-  end
 
   describe "append events to stream" do
     setup [:append_events_to_stream]
@@ -74,16 +36,14 @@ defmodule EventStore.Streams.SingleStreamTest do
 
   test "attempt to read an unknown stream forward should error stream not found" do
     unknown_stream_uuid = UUID.uuid4()
-    {:ok, _stream} = Streams.Supervisor.open_stream(unknown_stream_uuid)
 
-    {:error, :stream_not_found} = Stream.read_stream_forward(unknown_stream_uuid, 0, 1)
+    assert {:error, :stream_not_found} = Stream.read_stream_forward(unknown_stream_uuid, 0, 1)
   end
 
   test "attempt to stream an unknown stream should error stream not found" do
     unknown_stream_uuid = UUID.uuid4()
-    {:ok, _stream} = Streams.Supervisor.open_stream(unknown_stream_uuid)
 
-    {:error, :stream_not_found} = Stream.stream_forward(unknown_stream_uuid, 0, 1)
+    assert {:error, :stream_not_found} = Stream.stream_forward(unknown_stream_uuid, 0, 1)
   end
 
   describe "read stream forward" do
@@ -166,44 +126,31 @@ defmodule EventStore.Streams.SingleStreamTest do
     end
   end
 
-  test "stream should correctly restore `stream_version` after reopening" do
-    stream_uuid = UUID.uuid4
+  test "should return stream version" do
+    stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
-    {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
     :ok = Stream.append_to_stream(stream_uuid, 0, events)
 
     # stream above needed for preventing accidental event_number/stream_version match
-    stream_uuid = UUID.uuid4
+    stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
-    {:ok, stream} = Streams.Supervisor.open_stream(stream_uuid)
     :ok = Stream.append_to_stream(stream_uuid, 0, events)
-    {:ok, 3} = Stream.stream_version(stream_uuid)
 
-    ProcessHelper.shutdown(stream)
-    wait_for_event_store()
-
-    {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-    {:ok, 3} = Stream.stream_version(stream_uuid)
-  end
-
-  defp open_a_single_stream(_context) do
-    stream_uuid = UUID.uuid4()
-
-    {:ok, stream} = Streams.Supervisor.open_stream(stream_uuid)
-
-    [stream_uuid: stream_uuid, stream: stream]
+    assert {:ok, 3} = Stream.stream_version(stream_uuid)
   end
 
   defp append_events_to_stream(_context) do
     stream_uuid = UUID.uuid4
     events = EventFactory.create_events(3)
 
-    {:ok, stream} = Streams.Supervisor.open_stream(stream_uuid)
     :ok = Stream.append_to_stream(stream_uuid, 0, events)
 
-    [stream_uuid: stream_uuid, events: events, stream: stream]
+    [
+      stream_uuid: stream_uuid,
+      events: events
+    ]
   end
 
   defp wait_for_event_store do

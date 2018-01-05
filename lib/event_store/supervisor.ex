@@ -19,7 +19,6 @@ defmodule EventStore.Supervisor do
       Supervisor.child_spec({Registry, keys: :unique, name: EventStore.Subscriptions.Subscription}, id: EventStore.Subscriptions.Subscription),
       Supervisor.child_spec({Registry, keys: :duplicate, name: EventStore.Subscriptions.PubSub, partitions: System.schedulers_online}, id: EventStore.Subscriptions.PubSub),
       {EventStore.Subscriptions.Supervisor, subscription_postgrex_config},
-      {EventStore.Streams.Supervisor, serializer},
       {EventStore.Publisher, serializer},
     ] ++ Registration.child_spec()
 

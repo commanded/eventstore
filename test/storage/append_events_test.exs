@@ -1,9 +1,8 @@
 defmodule EventStore.Storage.AppendEventsTest do
   use EventStore.StorageCase
-  doctest EventStore.Storage.Appender
-
+  
   alias EventStore.EventFactory
-  alias EventStore.Storage.{Appender,Stream}
+  alias EventStore.Storage.{Appender,CreateStream}
 
   test "append single event to new stream", %{conn: conn} do
     {:ok, stream_uuid, stream_id} = create_stream(conn)
@@ -77,7 +76,7 @@ defmodule EventStore.Storage.AppendEventsTest do
 
   defp create_stream(conn) do
     stream_uuid = UUID.uuid4()
-    {:ok, stream_id} = Stream.create_stream(conn, stream_uuid)
+    {:ok, stream_id} = CreateStream.execute(conn, stream_uuid)
 
     {:ok, stream_uuid, stream_id}
   end
