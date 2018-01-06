@@ -10,6 +10,7 @@
 - Dealing better with Poison dependancy ([#91](https://github.com/commanded/eventstore/issues/91)).
 - Publish events directly to subscriptions ([#93](https://github.com/commanded/eventstore/pull/93)).
 - Use PostgreSQL advisory locks to enforce only one subscription instance ([#98](https://github.com/commanded/eventstore/pull/98)).
+- Remove stream process ([#99](https://github.com/commanded/eventstore/pull/99)).
 
 ## v0.13.2
 
