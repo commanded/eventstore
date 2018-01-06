@@ -5,7 +5,6 @@ defmodule EventStore.Storage.Appender do
 
   require Logger
 
-  alias EventStore.Config
   alias EventStore.Sql.Statements
 
   @doc """
@@ -21,7 +20,7 @@ defmodule EventStore.Storage.Appender do
   def append(conn, stream_id, events) do
     Postgrex.transaction(conn, fn transaction ->
       events
-      |> Enum.chunk_every(1_000)
+      |> Stream.chunk_every(1_000)
       |> Enum.reduce([], fn (batch, event_numbers) ->
         case execute_using_multirow_value_insert(transaction, stream_id, batch) do
           {:ok, batch_event_numbers} -> event_numbers ++ batch_event_numbers
@@ -33,10 +32,11 @@ defmodule EventStore.Storage.Appender do
 
   defp execute_using_multirow_value_insert(conn, stream_id, [first_event | _] = events) do
     event_count = length(events)
-    stream_version = first_event.stream_version + event_count - 1
+    expected_stream_version = first_event.stream_version - 1
+    resultant_stream_version = expected_stream_version + event_count
 
     statement = build_insert_statement(event_count)
-    parameters = [event_count, stream_version, stream_id] ++ build_insert_parameters(stream_id, events)
+    parameters = [event_count, stream_id, resultant_stream_version] ++ build_insert_parameters(stream_id, events)
 
     conn
     |> Postgrex.query(statement, parameters, pool: DBConnection.Poolboy)
@@ -44,7 +44,7 @@ defmodule EventStore.Storage.Appender do
   end
 
   defp build_insert_statement(event_count) do
-    Statements.create_events(event_count, Config.column_data_type())
+    Statements.create_events(event_count)
   end
 
   defp build_insert_parameters(stream_id, events) do
