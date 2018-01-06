@@ -96,7 +96,7 @@ You can use any standard PostgreSQL tool to manage the event store data:
 Run the benchmark suite using mix with the `bench` environment, as configured in `config/bench.exs`. Logging is disabled for benchmarking.
 
 ```console
-$ MIX_ENV=bench mix do es.reset, app.start, bench
+MIX_ENV=bench mix do es.reset, app.start, bench
 ```
 
 Example output:
@@ -120,6 +120,18 @@ subscribe to stream, 1 subscription           100   27687.97 µs/op
 subscribe to stream, 10 subscriptions          50   56047.72 µs/op
 subscribe to stream, 20 subscriptions          10   194164.40 µs/op
 subscribe to stream, 50 subscriptions           5   320435.40 µs/op
+```
+
+After running two benchmarks you can compare the runs:
+
+```console
+MIX_ENV=bench mix bench.cmp -d percent
+```
+
+You can also produce an HTML page containing a graph comparing benchmark runs:
+
+```console
+MIX_ENV=bench mix bench.graph
 ```
 
 ## Contributing
