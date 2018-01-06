@@ -5,10 +5,11 @@ defmodule EventStore.Subscriptions.Supervisor do
 
   use Supervisor
 
+  alias EventStore.Config
   alias EventStore.Subscriptions.Subscription
 
-  def start_link(postgrex_config) do
-    Supervisor.start_link(__MODULE__, postgrex_config, name: __MODULE__)
+  def start_link(config) do
+    Supervisor.start_link(__MODULE__, config, name: __MODULE__)
   end
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, subscription_opts) do
@@ -28,7 +29,9 @@ defmodule EventStore.Subscriptions.Supervisor do
     end
   end
 
-  def init(postgrex_config) do
+  def init(config) do
+    postgrex_config = Config.subscription_postgrex_opts(config)
+
     children = [
       worker(Subscription, [postgrex_config], restart: :temporary),
     ]

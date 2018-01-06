@@ -158,8 +158,13 @@ defmodule EventStore.Streams.Stream do
   # Returns the current naive date time in UTC.
   defp utc_now, do: NaiveDateTime.utc_now()
 
-  defp write_to_stream(prepared_events, %Stream{stream_id: stream_id, stream_uuid: stream_uuid}) do
-    Writer.append_to_stream(prepared_events, stream_id, stream_uuid)
+  defp write_to_stream(prepared_events, %Stream{stream_id: stream_id}) do
+    with {:ok, _} <- Storage.append_to_stream(stream_id, prepared_events) do
+      :ok
+    else
+      reply -> reply
+    end
+    # Writer.append_to_stream(prepared_events, stream_id, stream_uuid)
   end
 
   defp read_storage_forward(_start_version, _count, %Stream{stream_id: stream_id})

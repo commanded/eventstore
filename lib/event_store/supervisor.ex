@@ -9,15 +9,14 @@ defmodule EventStore.Supervisor do
   end
 
   def init([config, serializer]) do
-    postgrex_config = Config.postgrex_opts(config)
-    subscription_postgrex_config = Config.subscription_postgrex_opts(config)
+    postgrex_opts = Config.postgrex_opts(config)
 
     children = [
-      {Postgrex, postgrex_config},
+      {Postgrex, postgrex_opts},
       Supervisor.child_spec({Registry, keys: :unique, name: EventStore.Subscriptions.Subscription}, id: EventStore.Subscriptions.Subscription),
       Supervisor.child_spec({Registry, keys: :duplicate, name: EventStore.Subscriptions.PubSub, partitions: System.schedulers_online}, id: EventStore.Subscriptions.PubSub),
-      {EventStore.Subscriptions.Supervisor, subscription_postgrex_config},
-      {EventStore.Publisher, serializer},
+      {EventStore.Subscriptions.Supervisor, config},
+      {EventStore.Notifications.Supervisor, [config, serializer]},
     ] ++ Registration.child_spec()
 
     Supervisor.init(children, strategy: :one_for_one)
