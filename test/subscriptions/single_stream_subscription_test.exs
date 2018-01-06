@@ -1,18 +1,15 @@
 defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory,ProcessHelper,RecordedEvent,Streams}
-  alias EventStore.Storage.{Appender,Stream}
+  alias EventStore.{Config,EventFactory,ProcessHelper,RecordedEvent}
+  alias EventStore.Storage.{Appender,CreateStream}
   alias EventStore.Subscriptions.StreamSubscription
 
   @subscription_name "test_subscription"
 
   setup do
-    config =
-      EventStore.configuration()
-      |> EventStore.Config.parse()
-      |> Keyword.drop([:pool, :pool_size, :pool_overflow, :serializer])
-
+    config = Config.parsed() |> Config.subscription_postgrex_opts()
+    
     {:ok, conn} = Postgrex.start_link(config)
 
     on_exit fn ->
@@ -28,9 +25,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
   describe "subscribe to stream" do
     setup [:append_events_to_another_stream]
 
-    test "create subscription to a single stream", %{stream_uuid: stream_uuid} = context do
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-
+    test "create subscription to a single stream", context do
       subscription = create_subscription(context)
 
       assert subscription.state == :subscribe_to_events
@@ -40,9 +35,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
       assert subscription.data.last_ack == 0
     end
 
-    test "create subscription to a single stream from starting stream version", %{stream_uuid: stream_uuid} = context do
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-
+    test "create subscription to a single stream from starting stream version", context do
       subscription = create_subscription(context, start_from_stream_version: 2)
 
       assert subscription.state == :subscribe_to_events
@@ -52,9 +45,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
       assert subscription.data.last_ack == 2
     end
 
-    test "create subscription to a single stream with event mapping function", %{stream_uuid: stream_uuid} = context do
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-
+    test "create subscription to a single stream with event mapping function", context do
       mapper = fn event -> event.event_number end
       subscription = create_subscription(context, mapper: mapper)
 
@@ -65,9 +56,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
   describe "catch-up subscription on empty stream" do
     setup [:append_events_to_another_stream]
 
-    test "should be caught up", %{stream_uuid: stream_uuid} = context do
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-
+    test "should be caught up", context do
       subscription =
         create_subscription(context)
         |> StreamSubscription.subscribed()
@@ -131,8 +120,6 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
   end
 
   test "notify events", %{stream_uuid: stream_uuid} = context do
-    {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-
     events = EventFactory.create_recorded_events(1, stream_uuid)
 
     subscription =
@@ -212,15 +199,12 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
   end
 
   defp create_stream(%{conn: conn, stream_uuid: stream_uuid}) do
-    {:ok, stream_id} = Stream.create_stream(conn, stream_uuid)
+    {:ok, stream_id} = CreateStream.execute(conn, stream_uuid)
 
     recorded_events = EventFactory.create_recorded_events(3, stream_uuid, 4)
     {:ok, [4, 5, 6]} = Appender.append(conn, stream_id, recorded_events)
 
-    {:ok, stream} = Streams.Supervisor.open_stream(stream_uuid)
-
     [
-      stream: stream,
       recorded_events: recorded_events,
     ]
   end
@@ -249,8 +233,6 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
     events = EventFactory.create_recorded_events(6, stream_uuid)
     initial_events = Enum.take(events, 3)
     remaining_events = Enum.drop(events, 3)
-
-    {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
 
     subscription =
       create_subscription(context)

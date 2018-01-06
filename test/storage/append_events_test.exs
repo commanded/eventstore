@@ -1,9 +1,8 @@
 defmodule EventStore.Storage.AppendEventsTest do
   use EventStore.StorageCase
-  doctest EventStore.Storage.Appender
 
   alias EventStore.EventFactory
-  alias EventStore.Storage.{Appender,Stream}
+  alias EventStore.Storage.{Appender,CreateStream}
 
   test "append single event to new stream", %{conn: conn} do
     {:ok, stream_uuid, stream_id} = create_stream(conn)
@@ -75,9 +74,31 @@ defmodule EventStore.Storage.AppendEventsTest do
     {:error, :wrong_expected_version} = Appender.append(conn, stream_id, events)
   end
 
+  test "append events to same stream concurrently", %{conn: conn} do
+    {:ok, stream_uuid, stream_id} = create_stream(conn)
+    events = EventFactory.create_recorded_events(10, stream_uuid)
+
+    results =
+      1..5
+      |> Enum.map(fn _ ->
+        Task.async(fn ->
+          Appender.append(conn, stream_id, events)
+        end)
+      end)
+      |> Enum.map(&Task.await/1)
+
+    assert [
+      ok: Enum.to_list(1..10),
+      error: :wrong_expected_version,
+      error: :wrong_expected_version,
+      error: :wrong_expected_version,
+      error: :wrong_expected_version
+    ] == results
+  end
+
   defp create_stream(conn) do
     stream_uuid = UUID.uuid4()
-    {:ok, stream_id} = Stream.create_stream(conn, stream_uuid)
+    {:ok, stream_id} = CreateStream.execute(conn, stream_uuid)
 
     {:ok, stream_uuid, stream_id}
   end

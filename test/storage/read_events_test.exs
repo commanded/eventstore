@@ -1,10 +1,9 @@
 defmodule EventStore.Storage.ReadEventsTest do
   use EventStore.StorageCase
-  doctest EventStore.Storage
 
   alias EventStore.EventFactory
   alias EventStore.{RecordedEvent,Storage}
-  alias EventStore.Storage.{Appender,Stream}
+  alias EventStore.Storage.{Appender,CreateStream}
 
   describe "read stream forward" do
     test "when stream does not exist" do
@@ -138,7 +137,7 @@ defmodule EventStore.Storage.ReadEventsTest do
   defp create_stream(conn) do
     stream_uuid = UUID.uuid4()
 
-    with {:ok, stream_id} <- Stream.create_stream(conn, stream_uuid) do
+    with {:ok, stream_id} <- CreateStream.execute(conn, stream_uuid) do
       {:ok, stream_uuid, stream_id}
     end
   end

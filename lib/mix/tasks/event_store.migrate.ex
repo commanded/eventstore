@@ -14,6 +14,7 @@ defmodule Mix.Tasks.EventStore.Migrate do
 
   use Mix.Task
 
+  alias EventStore.Config
   alias EventStore.Storage.Database
 
   @shortdoc "Migrate an existing EventStore database"
@@ -22,7 +23,7 @@ defmodule Mix.Tasks.EventStore.Migrate do
   def run(args) do
     {:ok, _} = Application.ensure_all_started(:postgrex)
 
-    config = EventStore.configuration() |> EventStore.Config.parse()
+    config = Config.parsed()
     {opts, _, _} = OptionParser.parse(args, switches: [quiet: :boolean])
 
     migrate_database(config, opts)

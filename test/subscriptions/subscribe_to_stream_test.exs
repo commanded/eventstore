@@ -1,8 +1,7 @@
 defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory,ProcessHelper,Wait}
-  alias EventStore.{Streams,Subscriptions,Subscriber}
+  alias EventStore.{Config,EventFactory,ProcessHelper,Subscriptions,Subscriber,Wait}
   alias EventStore.Streams.Stream
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Support.CollectingSubscriber
@@ -20,7 +19,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(3)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self())
 
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
@@ -42,7 +40,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       initial_events = EventFactory.create_events(1)
       new_events = EventFactory.create_events(1, 2)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
       :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
 
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), start_from_stream_version: 1)
@@ -63,7 +60,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
     test "subscribe to stream more than once using same subscription name should error", %{subscription_name: subscription_name} do
       stream_uuid = UUID.uuid4
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
 
       {:ok, _subscription} = Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, self())
       {:error, :subscription_already_exists} = Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, self())
@@ -75,9 +71,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       interested_events = EventFactory.create_events(1)
       other_events = EventFactory.create_events(1)
-
-      {:ok, _interested_stream} = Streams.Supervisor.open_stream(interested_stream_uuid)
-      {:ok, _other_stream} = Streams.Supervisor.open_stream(other_stream_uuid)
 
       {:ok, _subscription} = subscribe_to_stream(interested_stream_uuid, subscription_name, self())
 
@@ -93,8 +86,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(3)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), mapper: fn event -> event.event_number end)
 
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
@@ -108,7 +99,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       initial_events = EventFactory.create_events(1)
       new_events = EventFactory.create_events(1, 2)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
       :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
       :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
 
@@ -132,7 +122,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       initial_events = EventFactory.create_events(1)
       new_events = EventFactory.create_events(1, 2)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
       :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
       :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
 
@@ -156,7 +145,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       initial_events = EventFactory.create_events(1)
       new_events = EventFactory.create_events(1, 2)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
       :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
       :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
 
@@ -194,9 +182,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
 
-      {:ok, _stream1} = Streams.Supervisor.open_stream(stream1_uuid)
-      {:ok, _stream2} = Streams.Supervisor.open_stream(stream2_uuid)
-
       :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_events)
       :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)
 
@@ -233,9 +218,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream2_initial_events = EventFactory.create_events(1)
       stream1_new_events = EventFactory.create_events(1, 2)
       stream2_new_events = EventFactory.create_events(1, 2)
-
-      {:ok, _stream1} = Streams.Supervisor.open_stream(stream1_uuid)
-      {:ok, _stream2} = Streams.Supervisor.open_stream(stream2_uuid)
 
       :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_initial_events)
       :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_initial_events)
@@ -277,8 +259,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(1)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-
       {:ok, subscriber1} = Subscriber.start(self())
       {:ok, subscriber2} = Subscriber.start_link(self())
 
@@ -314,8 +294,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
-
       :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
 
       assert_receive {:events, initial_received_events}
@@ -349,9 +327,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, subscription} = Subscriptions.subscribe_to_all_streams(subscription_name, self())
 
-      {:ok, _stream1} = Streams.Supervisor.open_stream(stream1_uuid)
-      {:ok, _stream2} = Streams.Supervisor.open_stream(stream2_uuid)
-
       :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_events)
       :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)
 
@@ -371,9 +346,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       stream1_events = EventFactory.create_events(1)
       stream2_events = EventFactory.create_events(1)
-
-      {:ok, _stream1} = Streams.Supervisor.open_stream(stream1_uuid)
-      {:ok, _stream2} = Streams.Supervisor.open_stream(stream2_uuid)
 
       :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_events)
       :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)
@@ -398,7 +370,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(1)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
       {:ok, subscriber1} = Subscriber.start_link(self())
       {:ok, subscriber2} = Subscriber.start_link(self())
 
@@ -435,7 +406,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(1)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
       {:ok, subscriber1} = Subscriber.start_link(self())
       {:ok, subscriber2} = Subscriber.start_link(self())
 
@@ -472,7 +442,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(1)
 
-      {:ok, _stream} = Streams.Supervisor.open_stream(stream_uuid)
       {:ok, subscription} = subscribe_to_stream(stream_uuid, subscription_name, self())
 
       :ok = Subscriptions.unsubscribe_from_stream(stream_uuid, subscription_name)
@@ -525,10 +494,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     end
 
     defp create_two_duplicate_subscriptions(%{subscription_name: subscription_name}) do
-      postgrex_config =
-        EventStore.configuration()
-        |> EventStore.Config.parse()
-        |> Keyword.drop([:pool, :pool_size, :pool_overflow, :serializer])
+      postgrex_config = Config.parsed() |> Config.subscription_postgrex_opts()
 
       {:ok, subscription1} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from_event_number: 0)
 
@@ -546,9 +512,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream_uuid = UUID.uuid4()
       stream_events = EventFactory.create_events(count)
 
-      with {:ok, _stream} <- Streams.Supervisor.open_stream(stream_uuid) do
-        :ok = Stream.append_to_stream(stream_uuid, 0, stream_events)
-      end
+      :ok = Stream.append_to_stream(stream_uuid, 0, stream_events)
 
       stream_uuid
     end
@@ -573,9 +537,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
         assert CollectingSubscriber.subscribed?(subscriber3)
         assert CollectingSubscriber.subscribed?(subscriber4)
       end)
-
-      {:ok, _stream1} = Streams.Supervisor.open_stream(stream1_uuid)
-      {:ok, _stream2} = Streams.Supervisor.open_stream(stream2_uuid)
 
       :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_events)
       :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)

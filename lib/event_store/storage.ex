@@ -5,7 +5,15 @@ defmodule EventStore.Storage do
 
   alias EventStore.Snapshots.SnapshotData
   alias EventStore.Storage
-  alias EventStore.Storage.{Appender,Reader,Snapshot,Stream,Subscription}
+  alias EventStore.Storage.{
+    Appender,
+    CreateStream,
+    QueryLatestEventNumber,
+    QueryStreamInfo,
+    Reader,
+    Snapshot,
+    Subscription,
+  }
 
   @event_store :event_store
 
@@ -27,7 +35,7 @@ defmodule EventStore.Storage do
   Create a new event stream with the given unique identifier.
   """
   def create_stream(stream_uuid) do
-    Stream.create_stream(@event_store, stream_uuid)
+    CreateStream.execute(@event_store, stream_uuid)
   end
 
   @doc """
@@ -50,28 +58,21 @@ defmodule EventStore.Storage do
   all events for all streams.
   """
   def read_all_streams_forward(start_event_number, count) do
-    Stream.read_all_streams_forward(@event_store, start_event_number, count)
+    Reader.read_all_forward(@event_store, start_event_number, count)
   end
 
   @doc """
   Get the id and version of the stream with the given `stream_uuid`.
   """
   def stream_info(stream_uuid) do
-    Stream.stream_info(@event_store, stream_uuid)
+    QueryStreamInfo.execute(@event_store, stream_uuid)
   end
 
   @doc """
   Get the event number of the last event persisted to storage.
   """
   def latest_event_number do
-    Stream.latest_event_number(@event_store)
-  end
-
-  @doc """
-  Get the latest version of events persisted to the given stream.
-  """
-  def latest_stream_version(stream_uuid) do
-    Stream.latest_stream_version(@event_store, stream_uuid)
+    QueryLatestEventNumber.execute(@event_store)
   end
 
   @doc """

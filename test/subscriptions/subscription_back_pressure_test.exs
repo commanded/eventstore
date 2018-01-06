@@ -1,10 +1,9 @@
 defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory,Wait}
-  alias EventStore.{Streams,Subscriptions}
-  alias EventStore.Subscriptions.Subscription
+  alias EventStore.{EventFactory,Subscriptions,Wait}
   alias EventStore.Streams.Stream
+  alias EventStore.Subscriptions.Subscription
 
   setup do
     subscription_name = UUID.uuid4()
@@ -76,9 +75,7 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
   defp append_to_stream(stream_uuid, event_count) do
     events = EventFactory.create_events(event_count)
 
-    with {:ok, _stream} <- Streams.Supervisor.open_stream(stream_uuid) do
-      :ok = Stream.append_to_stream(stream_uuid, 0, events)
-    end
+    :ok = Stream.append_to_stream(stream_uuid, 0, events)
   end
 
   # subscribe to all streams and wait for the subscription to be subscribed

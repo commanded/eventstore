@@ -3,6 +3,8 @@ defmodule EventStore.Sql.Statements do
   PostgreSQL statements to intialize the event store schema and read/write streams and events.
   """
 
+  alias EventStore.Config
+
   def initializers do
     [
       create_event_counter_table(),
@@ -212,65 +214,89 @@ RETURNING stream_id;
 """
   end
 
-  def create_events(number_of_events, column_data_type) do
+  def create_events(number_of_events) do
+    column_data_type = column_data_type()
     params =
       1..number_of_events
-      |> Enum.map(fn event_number ->
-        index = (event_number - 1) * 10 + 3
-        event_params = [
-          "($",
-          Integer.to_string(index + 1), "::bigint, $",   # index
-          Integer.to_string(index + 2), "::uuid, $",     # event_id
-          Integer.to_string(index + 3), "::bigint, $",   # stream_id
-          Integer.to_string(index + 4), "::bigint, $",   # stream_version
-          Integer.to_string(index + 5), "::uuid, $",     # correlation_id
-          Integer.to_string(index + 6), "::uuid, $",     # causation_id
-          Integer.to_string(index + 7), ", $",           # event_type
-          Integer.to_string(index + 8), "::", column_data_type, ", $",    # data
-          Integer.to_string(index + 9), "::", column_data_type, ", $",    # metadata
-          Integer.to_string(index + 10), "::timestamp)"  # created_at
-        ]
+      |> Stream.map(fn
+        1 ->
+          # first row of values define their types
+          [
+            "($4::bigint, $5::uuid, $6::bigint, $7::bigint, $8::uuid, $9::uuid, $10, $11::",
+            column_data_type,
+            ", $12::",
+            column_data_type,
+            ", $13::timestamp)"
+          ]
 
-        case event_number do
-          ^number_of_events -> event_params
-          _ -> [event_params, ","]
-        end
+        event_number ->
+          index = (event_number - 1) * 10 + 3
+          params = [
+            Integer.to_string(index + 1),  # index
+            Integer.to_string(index + 2),  # event_id
+            Integer.to_string(index + 3),  # stream_id
+            Integer.to_string(index + 4),  # stream_version
+            Integer.to_string(index + 5),  # correlation_id
+            Integer.to_string(index + 6),  # causation_id
+            Integer.to_string(index + 7),  # event_type
+            Integer.to_string(index + 8),  # data
+            Integer.to_string(index + 9),  # metadata
+            Integer.to_string(index + 10)  # created_at
+          ]
+
+          [
+            "($",
+            Enum.intersperse(params, ", $"),
+            ")"
+          ]
       end)
+      |> Enum.intersperse(",")
 
     [
       """
       WITH
         stream AS (
-          UPDATE streams
-          SET stream_version = $2::bigint
-          WHERE stream_id = $3::bigint
+          UPDATE streams SET stream_version = $3
+          WHERE stream_id = $2
         ),
         event_counter AS (
           UPDATE event_counter
-          SET event_number = event_number + $1::bigint
-          RETURNING event_number - $1::bigint as event_number
+          SET event_number = event_number + $1
+          RETURNING event_number - $1 as event_number
         ),
-        event_data (index, event_id, stream_id, stream_version, correlation_id, causation_id, event_type, data, metadata, created_at) AS (
+        events (index, event_id, stream_id, stream_version, correlation_id, causation_id, event_type, data, metadata, created_at)
+        AS (
           VALUES
       """,
       params,
       """
         )
       INSERT INTO events
-        (event_id, event_number, stream_id, stream_version, correlation_id, causation_id, event_type, data, metadata, created_at)
+        (
+          event_id,
+          event_number,
+          stream_id,
+          stream_version,
+          correlation_id,
+          causation_id,
+          event_type,
+          data,
+          metadata,
+          created_at
+        )
       SELECT
-        event_data.event_id,
-        event_counter.event_number + event_data.index,
-        event_data.stream_id,
-        event_data.stream_version,
-        event_data.correlation_id,
-        event_data.causation_id,
-        event_data.event_type,
-        event_data.data,
-        event_data.metadata,
-        event_data.created_at
-      FROM event_data, event_counter
-      RETURNING events.event_number;
+        events.event_id,
+        event_counter.event_number + events.index,
+        events.stream_id,
+        events.stream_version,
+        events.correlation_id,
+        events.causation_id,
+        events.event_type,
+        events.data,
+        events.metadata,
+        events.created_at
+      FROM events, event_counter
+      RETURNING event_number;
       """,
     ]
   end
@@ -420,5 +446,5 @@ LIMIT $2;
 """
   end
 
-  defp column_data_type, do: EventStore.Config.column_data_type()
+  defp column_data_type, do: Config.column_data_type()
 end

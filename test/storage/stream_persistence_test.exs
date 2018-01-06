@@ -2,26 +2,26 @@ defmodule EventStore.Storage.StreamPersistenceTest do
   use EventStore.StorageCase
 
   alias EventStore.EventFactory
-  alias EventStore.Storage.{Appender,Stream}
+  alias EventStore.Storage.{Appender,CreateStream,QueryStreamInfo}
 
   test "create stream", %{conn: conn} do
     stream_uuid = UUID.uuid4
 
-    {:ok, _stream_id} = Stream.create_stream(conn, stream_uuid)
+    {:ok, _stream_id} = CreateStream.execute(conn, stream_uuid)
   end
 
   test "create stream when already exists", %{conn: conn} do
     stream_uuid = UUID.uuid4
 
-    {:ok, _stream_id} = Stream.create_stream(conn, stream_uuid)
-    {:error, :stream_exists} = Stream.create_stream(conn, stream_uuid)
+    {:ok, _stream_id} = CreateStream.execute(conn, stream_uuid)
+    {:error, :stream_exists} = CreateStream.execute(conn, stream_uuid)
   end
 
   test "stream info for stream with no events", %{conn: conn} do
     stream_uuid = UUID.uuid4
 
-    {:ok, stream_id} = Stream.create_stream(conn, stream_uuid)
-    {:ok, ^stream_id, 0} = Stream.stream_info(conn, stream_uuid)
+    {:ok, stream_id} = CreateStream.execute(conn, stream_uuid)
+    {:ok, ^stream_id, 0} = QueryStreamInfo.execute(conn, stream_uuid)
   end
 
   test "stream info for stream with one event", %{conn: conn} do
@@ -29,14 +29,14 @@ defmodule EventStore.Storage.StreamPersistenceTest do
 
     {:ok, stream_id} = create_stream_with_events(conn, stream_uuid, 1)
 
-    {:ok, ^stream_id, 1} = Stream.stream_info(conn, stream_uuid)
+    {:ok, ^stream_id, 1} = QueryStreamInfo.execute(conn, stream_uuid)
   end
 
   test "stream info for stream with some events", %{conn: conn} do
     stream_uuid = UUID.uuid4
     {:ok, stream_id} = create_stream_with_events(conn, stream_uuid, 3)
 
-    {:ok, ^stream_id, 3} = Stream.stream_info(conn, stream_uuid)
+    {:ok, ^stream_id, 3} = QueryStreamInfo.execute(conn, stream_uuid)
   end
 
   test "stream info for additional stream with some events", %{conn: conn} do
@@ -46,18 +46,18 @@ defmodule EventStore.Storage.StreamPersistenceTest do
     {:ok, first_stream_id} = create_stream_with_events(conn, first_stream_uuid, 3)
     {:ok, second_stream_id} = create_stream_with_events(conn, second_stream_uuid, 2, 4)
 
-    {:ok, ^first_stream_id, 3} = Stream.stream_info(conn, first_stream_uuid)
-    {:ok, ^second_stream_id, 2} = Stream.stream_info(conn, second_stream_uuid)
+    {:ok, ^first_stream_id, 3} = QueryStreamInfo.execute(conn, first_stream_uuid)
+    {:ok, ^second_stream_id, 2} = QueryStreamInfo.execute(conn, second_stream_uuid)
   end
 
   test "stream info for an unknown stream", %{conn: conn} do
     stream_uuid = UUID.uuid4
 
-    {:ok, nil, 0} = Stream.stream_info(conn, stream_uuid)
+    {:ok, nil, 0} = QueryStreamInfo.execute(conn, stream_uuid)
   end
 
   defp create_stream_with_events(conn, stream_uuid, number_of_events, initial_event_number \\ 1) do
-    {:ok, stream_id} = Stream.create_stream(conn, stream_uuid)
+    {:ok, stream_id} = CreateStream.execute(conn, stream_uuid)
 
     recorded_events = EventFactory.create_recorded_events(number_of_events, stream_uuid, initial_event_number)
     expected_event_numbers = Enum.map(recorded_events, fn event -> event.event_number end)
