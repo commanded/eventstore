@@ -29,16 +29,9 @@ defmodule EventStore.Mixfile do
       extra_applications: [
         :logger,
         :poolboy,
-      ] ++ registry_applications(),
+      ],
       mod: {EventStore.Application, []}
     ]
-  end
-
-  defp registry_applications do
-    case Application.get_env(:eventstore, :registry) do
-      :distributed -> [:swarm]
-      _ -> []
-    end
   end
 
   defp elixirc_paths(:bench),       do: ["lib", "test/support"]
@@ -60,7 +53,7 @@ defmodule EventStore.Mixfile do
       {:poison, "~> 2.2 or ~> 3.0", optional: true},
       {:poolboy, "~> 1.5"},
       {:postgrex, "~> 0.13"},
-      {:swarm, "~> 3.1", optional: true},
+      {:singleton, "~> 1.2"},
       {:uuid, "~> 1.1"},
     ]
   end

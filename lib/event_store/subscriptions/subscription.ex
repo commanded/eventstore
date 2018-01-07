@@ -10,7 +10,7 @@ defmodule EventStore.Subscriptions.Subscription do
   use GenServer
   require Logger
 
-  alias EventStore.RecordedEvent
+  alias EventStore.{RecordedEvent,Registration}
   alias EventStore.Subscriptions.{StreamSubscription,Subscription}
 
   defstruct [
@@ -184,7 +184,7 @@ defmodule EventStore.Subscriptions.Subscription do
   defp handle_subscription_state(_state), do: :ok
 
   defp subscribe_to_events(%Subscription{stream_uuid: stream_uuid}) do
-    {:ok, _} = Registry.register(EventStore.Subscriptions.PubSub, stream_uuid, [])
+    Registration.subscribe(stream_uuid)
   end
 
   # Get the delay between subscription attempts, in milliseconds, from app

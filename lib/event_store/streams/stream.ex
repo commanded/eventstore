@@ -1,7 +1,7 @@
 defmodule EventStore.Streams.Stream do
   @moduledoc false
 
-  alias EventStore.{EventData,RecordedEvent,Storage,Subscriptions,Writer}
+  alias EventStore.{EventData,RecordedEvent,Storage,Subscriptions}
   alias EventStore.Streams.Stream
 
   defstruct [
@@ -164,7 +164,6 @@ defmodule EventStore.Streams.Stream do
     else
       reply -> reply
     end
-    # Writer.append_to_stream(prepared_events, stream_id, stream_uuid)
   end
 
   defp read_storage_forward(_start_version, _count, %Stream{stream_id: stream_id})

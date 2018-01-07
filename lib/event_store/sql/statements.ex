@@ -107,8 +107,7 @@ $$ LANGUAGE plpgsql;
 """
 CREATE TRIGGER event_notification
 AFTER UPDATE ON event_counter
-FOR EACH ROW
-EXECUTE PROCEDURE notify_events();
+FOR EACH ROW EXECUTE PROCEDURE notify_events();
 """
   end
 

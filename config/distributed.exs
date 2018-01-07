@@ -1,12 +1,12 @@
 use Mix.Config
 
 # Print only warnings and errors during test
-config :logger, :console, level: :debug, format: "[$level] $message\n"
+config :logger, :console, level: :warn, format: "[$level] $message\n"
 
 config :ex_unit,
   capture_log: true,
-  assert_receive_timeout: 5_000,
-  refute_receive_timeout: 5_000
+  assert_receive_timeout: 2_000,
+  refute_receive_timeout: 2_000
 
 config :eventstore, EventStore.Storage,
   serializer: EventStore.JsonSerializer,
@@ -21,11 +21,3 @@ config :eventstore,
   registry: :distributed,
   restart_stream_timeout: 1_000,
   subscription_retry_interval: 1_000
-
-config :swarm,
-  nodes: [:"node1@127.0.0.1", :"node2@127.0.0.1", :"node3@127.0.0.1"],
-  node_blacklist: [~r/^primary@.+$/],
-  distribution_strategy: Swarm.Distribution.StaticQuorumRing,
-  static_quorum_size: 2,
-  sync_nodes_timeout: 0,
-  debug: false

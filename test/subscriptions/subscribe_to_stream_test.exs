@@ -15,6 +15,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   describe "single stream subscription" do
     setup [:append_events_to_another_stream]
 
+    @tag :wip
     test "subscribe to single stream from origin should receive all its events", %{subscription_name: subscription_name} do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(3)
