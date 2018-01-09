@@ -1,13 +1,13 @@
 defmodule EventStore.Registration.LocalRegistry do
   @moduledoc """
-  Pub/sub using Elixir's [Registry](https://hexdocs.pm/elixir/Registry.html)
-  module, restricted to running on a single node only.
+  Pub/sub using Elixir's local `Registry` module, restricted to running on a
+  single node only.
   """
 
   @behaviour EventStore.Registration
 
   @doc """
-  Return the local supervisor child spec
+  Return the local supervisor child spec.
   """
   @spec child_spec() :: [:supervisor.child_spec()]
   @impl EventStore.Registration

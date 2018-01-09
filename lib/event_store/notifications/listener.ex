@@ -5,40 +5,35 @@ defmodule EventStore.Notifications.Listener do
   # command. Whenever events are appended to storage a `NOTIFY` command is
   # executed by a trigger. The notification payload contains the first and last
   # event number of the appended events. These events are then read from storage
-  # and published to interested subscriptions.
+  # and published to interested subscribers.
   #
-  # Erlang's global module is used, via the singleton library, to ensure a
-  # single instance of the listener process is kept running on a cluster of
-  # nodes. This minimises connections to the event store database.
+  # Erlang's global module is used to ensure only a single instance of the
+  # listener process is kept running on a cluster of nodes. This minimises
+  # connections to the event store database. There will be at most one `LISTEN`
+  # connection per cluster.
 
-  use GenServer
+  use GenStage
 
   require Logger
 
   alias EventStore.Notifications.Listener
-  alias EventStore.Registration
 
-  defstruct [:ref, :serializer]
+  defstruct [
+    demand: 0,
+    queue: :queue.new(),
+    ref: nil,
+  ]
 
-  @all_stream "$all"
-
-  def start_link(serializer) do
-    Singleton.start_child(__MODULE__, %Listener{serializer: serializer}, Listener)
+  def start_link(_args) do
+    GenStage.start_link(__MODULE__, %Listener{}, name: __MODULE__)
   end
 
   def init(%Listener{} = state) do
-    GenServer.cast(self(), :listen_for_events)
-
-    {:ok, state}
+    {:producer, listen_for_events(state)}
   end
 
-  def handle_cast(:listen_for_events, %Listener{} = state) do
-    {:ok, ref} = Postgrex.Notifications.listen(EventStore.Notifications, "events")
-
-    {:noreply, %Listener{state | ref: ref}}
-  end
-
-  def handle_info({:notification, _connection_pid, ref, channel, payload}, %Listener{ref: ref} = state) do
+  # Notification received from PostgreSQL's `NOTIFY`
+  def handle_info({:notification, _connection_pid, ref, channel, payload}, %Listener{ref: ref, queue: queue} = state) do
     Logger.debug(fn -> "Listener received notification on channel #{inspect channel} with payload: #{inspect payload}" end)
 
     [first, last] = String.split(payload, ",")
@@ -46,32 +41,39 @@ defmodule EventStore.Notifications.Listener do
     {first_event_number, ""} = Integer.parse(first)
     {last_event_number, ""} = Integer.parse(last)
 
-    {:ok, events} = read_events(first_event_number, last_event_number)
+    state = %Listener{state |
+      queue: :queue.in({first_event_number, last_event_number}, queue)
+    }
 
-    :ok = broadcast(events)
-
-    {:noreply, state}
+    dispatch_events([], state)
   end
 
-  defp read_events(first_event_number, last_event_number) do
-    count = last_event_number - first_event_number + 1
-
-    EventStore.read_all_streams_forward(first_event_number, count)
+  def handle_demand(incoming_demand, %Listener{demand: pending_demand} = state) do
+    dispatch_events([], %Listener{state | demand: incoming_demand + pending_demand})
   end
 
-  defp broadcast(events) do
-    events
-    |> Stream.chunk_by(fn event -> event.stream_uuid end)
-    |> Stream.map(fn [first_event | _] = batch ->
-      {first_event.stream_uuid, batch}
-    end)
-    |> Enum.each(fn {stream_uuid, events} ->
-      :ok = broadcast(@all_stream, events)
-      :ok = broadcast(stream_uuid, events)
-    end)
+  defp listen_for_events(%Listener{} = state) do
+    {:ok, ref} = Postgrex.Notifications.listen(EventStore.Notifications, "events")
+
+    %Listener{state | ref: ref}
   end
 
-  defp broadcast(stream_uuid, events) do
-    Registration.broadcast(stream_uuid, {:notify_events, events})
+  defp dispatch_events(events, %Listener{demand: 0} = state) do
+    {:noreply, Enum.reverse(events), state}
+  end
+
+  defp dispatch_events(events, %Listener{} = state) do
+    %Listener{
+      demand: demand,
+      queue: queue
+    } = state
+
+    case :queue.out(queue) do
+      {{:value, event}, queue} ->
+        state = %Listener{state | demand: demand - 1, queue: queue}
+        dispatch_events([event | events], state)
+      {:empty, queue} ->
+        {:noreply, Enum.reverse(events), state}
+    end
   end
 end

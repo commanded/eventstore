@@ -8,7 +8,7 @@ defmodule EventStore.Registration.PG2Registry do
   @behaviour EventStore.Registration
 
   @doc """
-  Return an optional supervisor spec for the registry
+  Return an optional supervisor spec for the registry.
   """
   @spec child_spec() :: [:supervisor.child_spec()]
   @impl EventStore.Registration

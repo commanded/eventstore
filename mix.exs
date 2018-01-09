@@ -48,12 +48,12 @@ defmodule EventStore.Mixfile do
       {:dialyxir, "~> 0.5", only: :dev},
       {:ex_doc, "~> 0.18", only: :dev},
       {:fsm, "~> 0.3"},
+      {:gen_stage, "~> 0.12.2"},
       {:markdown, github: "devinus/markdown", only: :dev},
       {:mix_test_watch, "~> 0.5", only: :dev},
       {:poison, "~> 2.2 or ~> 3.0", optional: true},
       {:poolboy, "~> 1.5"},
       {:postgrex, "~> 0.13"},
-      {:singleton, "~> 1.2"},
       {:uuid, "~> 1.1"},
     ]
   end
