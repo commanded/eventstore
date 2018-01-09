@@ -6,11 +6,6 @@ defmodule EventStore.Notifications.Listener do
   # executed by a trigger. The notification payload contains the first and last
   # event number of the appended events. These events are then read from storage
   # and published to interested subscribers.
-  #
-  # Erlang's global module is used to ensure only a single instance of the
-  # listener process is kept running on a cluster of nodes. This minimises
-  # connections to the event store database. There will be at most one `LISTEN`
-  # connection per cluster.
 
   use GenStage
 
@@ -72,7 +67,7 @@ defmodule EventStore.Notifications.Listener do
       {{:value, event}, queue} ->
         state = %Listener{state | demand: demand - 1, queue: queue}
         dispatch_events([event | events], state)
-      {:empty, queue} ->
+      {:empty, _queue} ->
         {:noreply, Enum.reverse(events), state}
     end
   end

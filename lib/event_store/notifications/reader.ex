@@ -16,13 +16,13 @@ defmodule EventStore.Notifications.Reader do
   def init(_args) do
     opts = [
       dispatcher: GenStage.BroadcastDispatcher,
-      subscribe_to: [{Listener, max_demand: 1}],      
+      subscribe_to: [{Listener, max_demand: 1}],
     ]
 
     {:producer_consumer, :ok, opts}
   end
 
-  # Fecth events from storage and pass onwards to subscibers
+  # Fetch events from storage and pass onwards to subscibers
   def handle_events(events, _from, state) do
     events = Enum.map(events, fn {first_event_number, last_event_number} ->
       read_events(first_event_number, last_event_number)

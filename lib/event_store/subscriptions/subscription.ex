@@ -162,7 +162,8 @@ defmodule EventStore.Subscriptions.Subscription do
   defp handle_subscription_state(%Subscription{subscription: %{state: :initial}, subscription_name: subscription_name}) do
     retry_interval = subscription_retry_interval()
 
-    Logger.debug(fn -> "Failed to subscribe to #{subscription_name}, will retry in #{retry_interval}ms" end)
+    _ = Logger.debug(fn -> "Subscription #{subscription_name} failed to subscribe, will retry in #{retry_interval}ms" end)
+
     Process.send_after(self(), :subscribe_to_stream, retry_interval)
     :ok
   end

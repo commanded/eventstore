@@ -15,7 +15,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   describe "single stream subscription" do
     setup [:append_events_to_another_stream]
 
-    @tag :wip
     test "subscribe to single stream from origin should receive all its events", %{subscription_name: subscription_name} do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(3)
@@ -161,15 +160,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       Subscription.ack(subscription, 2)
 
       assert_receive {:DOWN, ^ref, _, _, _}
-    end
-
-    # append events to another stream so that for single stream subscription tests the
-    # event id does not match the stream version
-    def append_events_to_another_stream(_context) do
-      stream_uuid = UUID.uuid4()
-      events = EventFactory.create_events(3)
-
-      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
     end
   end
 
@@ -326,7 +316,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream1_events = EventFactory.create_events(1)
       stream2_events = EventFactory.create_events(1)
 
-      {:ok, subscription} = Subscriptions.subscribe_to_all_streams(subscription_name, self())
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
 
       :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_events)
       :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)
@@ -454,6 +444,38 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     end
   end
 
+  describe "both single and all stream subscriptions" do
+    setup [:append_events_to_another_stream]
+
+    test "should receive events from both subscriptions", %{subscription_name: subscription_name} do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
+
+      {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name <> "-single", self())
+      {:ok, _subscription} = subscribe_to_all_streams(subscription_name <> "-all", self(), start_from_event_number: 3)
+
+      :ok = Stream.append_to_stream(stream_uuid, 0, events)
+
+      # should receive events twice
+      assert_receive_events(stream_uuid, events)
+      assert_receive_events(stream_uuid, events)
+      refute_receive {:events, _received_events}
+    end
+
+    defp assert_receive_events(stream_uuid, expected_events) do
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :event_number) == [4, 5, 6]
+      assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
+      assert pluck(received_events, :stream_version) == [1, 2, 3]
+      assert pluck(received_events, :correlation_id) == pluck(expected_events, :correlation_id)
+      assert pluck(received_events, :causation_id) == pluck(expected_events, :causation_id)
+      assert pluck(received_events, :event_type) == pluck(expected_events, :event_type)
+      assert pluck(received_events, :data) == pluck(expected_events, :data)
+      assert pluck(received_events, :metadata) == pluck(expected_events, :metadata)
+      refute pluck(received_events, :created_at) |> Enum.any?(&is_nil/1)
+    end
+  end
+
   describe "duplicate subscriptions" do
     setup [:create_two_duplicate_subscriptions]
 
@@ -557,6 +579,15 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       CollectingSubscriber.unsubscribe(subscriber3)
       CollectingSubscriber.unsubscribe(subscriber4)
     end
+  end
+
+  # append events to another stream so that for single stream subscription tests the
+  # event id does not match the stream version
+  def append_events_to_another_stream(_context) do
+    stream_uuid = UUID.uuid4()
+    events = EventFactory.create_events(3)
+
+    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
   end
 
   # subscribe to a single stream and wait for the subscription to be subscribed
