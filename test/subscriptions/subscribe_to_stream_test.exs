@@ -80,6 +80,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       # received events should not include events from the other stream
       assert_receive {:events, received_events}
       assert pluck(received_events, :data) == pluck(interested_events, :data)
+      refute_receive {:events, _received_events}
     end
 
     test "subscribe to single stream with mapper function should receive all its mapped events", %{subscription_name: subscription_name} do

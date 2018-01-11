@@ -4,7 +4,7 @@ CQRS event store implemented in Elixir. Uses [PostgreSQL](http://www.postgresql.
 
 Requires Elixir v1.5 and PostgreSQL v9.5 or newer.
 
-EventStore supports [running on a cluster of nodes](guides/Cluster.md) (since v0.11). Stream processes will be distributed amongst all available nodes, events are published to subscribers running on any node.
+EventStore supports [running on a cluster of nodes](guides/Cluster.md).
 
 [Changelog](CHANGELOG.md)
 
