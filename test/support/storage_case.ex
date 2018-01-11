@@ -7,8 +7,6 @@ defmodule EventStore.StorageCase do
     config = Config.parsed()
     registry = Application.get_env(:eventstore, :registry, :local)
 
-    before_reset(registry)
-
     {:ok, conn} = Postgrex.start_link(config)
 
     EventStore.Storage.Initializer.reset!(conn)
@@ -16,17 +14,19 @@ defmodule EventStore.StorageCase do
     after_reset(registry)
 
     on_exit(fn ->
+      after_exit(registry)
+
       ProcessHelper.shutdown(conn)
     end)
 
     {:ok, %{conn: conn}}
   end
 
-  defp before_reset(:local) do
+  defp after_exit(:local) do
     Application.stop(:eventstore)
   end
 
-  defp before_reset(:distributed) do
+  defp after_exit(:distributed) do
     _ = :rpc.multicall(Application, :stop, [:eventstore])
   end
 
