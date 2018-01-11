@@ -12,6 +12,11 @@ defmodule EventStore.Registration do
   Subscribes the caller to the given topic.
   """
   @callback subscribe(binary) :: :ok | {:error, term}
+  
+  @doc """
+  Is the caller subscribed to the given topic?
+  """
+  @callback subscribed?(binary) :: true | false
 
   @doc """
   Broadcasts message on given topic.
@@ -29,6 +34,12 @@ defmodule EventStore.Registration do
   """
   @spec subscribe(binary) :: :ok | {:error, term}
   def subscribe(topic), do: registry_provider().subscribe(topic)
+
+  @doc """
+  Is the caller subscribed to the given topic?
+  """
+  @spec subscribed?(binary) :: true | false
+  def subscribed?(topic), do: registry_provider().subscribed?(topic)
 
   @doc """
   Broadcasts message on given topic.

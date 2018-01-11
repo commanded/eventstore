@@ -125,8 +125,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     end
 
     defevent caught_up(last_seen), data: %SubscriptionState{last_received: last_received} = data do
-      Logger.debug(fn -> describe(data) <> " caught up to: #{inspect last_seen} (last received: #{inspect last_received})" end)
-
       data = %SubscriptionState{data |
         last_seen: last_seen,
         catch_up_pid: nil,
@@ -330,8 +328,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   # Fetch unseen events from the stream, transition to `subscribed` state when
   # stream ends
   defp catch_up_from_stream(%SubscriptionState{stream_uuid: stream_uuid, last_seen: last_seen} = data) do
-    Logger.debug(fn -> describe(data) <> " catching up from: #{inspect last_seen}" end)
-
     reply_to = self()
 
     case subscription_provider(stream_uuid).unseen_event_stream(stream_uuid, last_seen, @max_buffer_size) do

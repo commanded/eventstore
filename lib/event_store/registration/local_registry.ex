@@ -35,6 +35,21 @@ defmodule EventStore.Registration.LocalRegistry do
   end
 
   @doc """
+  Is the caller subscribed to the given topic?
+  """
+  @spec subscribed?(binary) :: true | false
+  @impl EventStore.Registration
+  def subscribed?(topic) do
+    subscriptions = Registry.lookup(EventStore.PubSub, topic)
+    caller = self()
+
+    Enum.any?(subscriptions, fn
+      {^caller, _} -> true
+      _ -> false
+    end)
+  end
+
+  @doc """
   Broadcasts message on given topic.
   """
   @spec broadcast(binary, term) :: :ok | {:error, term}
