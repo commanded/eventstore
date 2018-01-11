@@ -45,7 +45,7 @@ config :libcluster,
   ]
 ```
 
-Please refer to the [libcluster documentation](https://hexdocs.pm/libcluster/) for more detail.
+Please refer to the [`libcluster` documentation](https://hexdocs.pm/libcluster/) for more detail.
 
 ### Starting a cluster
 

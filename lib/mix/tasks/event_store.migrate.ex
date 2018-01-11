@@ -33,6 +33,7 @@ defmodule Mix.Tasks.EventStore.Migrate do
 
   @available_migrations [
     "0.13.0",
+    "0.14.0",
   ]
 
   defp migrate_database(config, opts) do
