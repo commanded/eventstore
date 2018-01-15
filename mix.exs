@@ -84,6 +84,7 @@ EventStore using PostgreSQL for persistence.
         "guides/Cluster.md",
         "guides/Event Serialization.md",
         "guides/Upgrades.md",
+        "CHANGELOG.md",
       ],
     ]
   end
