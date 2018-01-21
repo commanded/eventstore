@@ -69,13 +69,6 @@ defmodule EventStore.Storage do
   end
 
   @doc """
-  Get the event number of the last event persisted to storage.
-  """
-  def latest_event_number do
-    QueryLatestEventNumber.execute(@event_store)
-  end
-
-  @doc """
   Create, or locate an existing, persistent subscription to a stream using a
   unique name and starting position (event number or stream version).
   """

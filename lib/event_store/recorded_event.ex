@@ -8,8 +8,6 @@ defmodule EventStore.RecordedEvent do
   ## Recorded event fields
 
     - `event_id` - a globally unique UUID to identify the event.
-    - `event_number` - a globally unique, monotonically incrementing and gapless
-      integer used to order the event amongst all events.
     - `stream_uuid` - the stream identity for the event.
     - `stream_version` - the version of the stream for the event.
     - `correlation_id` - an optional UUID identifier used to correlate related
@@ -25,24 +23,22 @@ defmodule EventStore.RecordedEvent do
 
   alias EventStore.RecordedEvent
 
-  @type uuid :: String.t
+  @type uuid :: String.t()
 
   @type t :: %RecordedEvent{
-    event_id: uuid(),
-    event_number: non_neg_integer(),
-    stream_uuid: String.t,
-    stream_version: non_neg_integer(),
-    correlation_id: uuid() | nil,
-    causation_id: uuid() | nil,
-    event_type: String.t,
-    data: binary(),
-    metadata: binary() | nil,
-    created_at: NaiveDateTime.t,
-  }
+          event_id: uuid(),
+          stream_uuid: String.t(),
+          stream_version: non_neg_integer(),
+          correlation_id: uuid() | nil,
+          causation_id: uuid() | nil,
+          event_type: String.t(),
+          data: binary(),
+          metadata: binary() | nil,
+          created_at: NaiveDateTime.t()
+        }
 
   defstruct [
     :event_id,
-    :event_number,
     :stream_uuid,
     :stream_version,
     :correlation_id,
@@ -50,13 +46,16 @@ defmodule EventStore.RecordedEvent do
     :event_type,
     :data,
     :metadata,
-    :created_at,
+    :created_at
   ]
 
-  def deserialize(%RecordedEvent{data: data, metadata: metadata, event_type: event_type} = recorded_event, serializer) do
-    %RecordedEvent{recorded_event |
-      data: serializer.deserialize(data, type: event_type),
-      metadata: serializer.deserialize(metadata, [])
+  def deserialize(%RecordedEvent{} = recorded_event, serializer) do
+    %RecordedEvent{data: data, metadata: metadata, event_type: event_type} = recorded_event
+
+    %RecordedEvent{
+      recorded_event
+      | data: serializer.deserialize(data, type: event_type),
+        metadata: serializer.deserialize(metadata, [])
     }
   end
 

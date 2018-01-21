@@ -9,7 +9,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
 
   setup do
     config = Config.parsed() |> Config.subscription_postgrex_opts()
-    
+
     {:ok, conn} = Postgrex.start_link(config)
 
     on_exit fn ->
@@ -281,8 +281,8 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
     ack(subscription, List.last(events))
   end
 
-  def ack(subscription, %RecordedEvent{event_number: event_number, stream_version: stream_version}) do
-    StreamSubscription.ack(subscription, {event_number, stream_version})
+  def ack(subscription, %RecordedEvent{stream_version: stream_version}) do
+    StreamSubscription.ack(subscription, stream_version)
   end
 
   defp assert_receive_caught_up(to) do

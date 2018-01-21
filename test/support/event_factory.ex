@@ -36,7 +36,7 @@ defmodule EventStore.EventFactory do
 
       %RecordedEvent{
         event_id: UUID.uuid4(),
-        event_number: event_number,
+        # event_number: event_number,
         stream_uuid: stream_uuid,
         stream_version: stream_version,
         correlation_id: correlation_id,

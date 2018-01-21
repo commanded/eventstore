@@ -411,8 +411,8 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     ack(subscription, List.last(events))
   end
 
-  def ack(subscription, %RecordedEvent{event_number: event_number, stream_version: stream_version}) do
-    StreamSubscription.ack(subscription, {event_number, stream_version})
+  def ack(subscription, %RecordedEvent{stream_version: stream_version}) do
+    StreamSubscription.ack(subscription, stream_version)
   end
 
   defp assert_receive_caught_up(to) do

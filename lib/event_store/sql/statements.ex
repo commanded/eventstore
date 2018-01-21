@@ -7,20 +7,18 @@ defmodule EventStore.Sql.Statements do
 
   def initializers do
     [
-      create_event_counter_table(),
-      seed_event_counter(),
-      prevent_event_counter_insert(),
-      prevent_event_counter_delete(),
-      create_notify_events_function(),
-      create_event_notification_trigger(),
       create_streams_table(),
       create_stream_uuid_index(),
+      seed_all_stream(),
       create_events_table(),
       prevent_event_update(),
       prevent_event_delete(),
-      create_event_number_index(),
-      create_event_stream_id_index(),
-      create_event_stream_id_and_version_index(),
+      create_stream_events_table(),
+      create_stream_events_index(),
+      prevent_stream_events_update(),
+      prevent_stream_events_delete(),
+      # create_notify_events_function(),
+      # create_event_notification_trigger(),
       create_subscriptions_table(),
       create_subscription_index(),
       create_snapshots_table(),
@@ -31,16 +29,16 @@ defmodule EventStore.Sql.Statements do
 
   def reset do
     [
-      drop_rule("no_insert_event_counter", "event_counter"),
-      drop_rule("no_delete_event_counter", "event_counter"),
+      drop_rule("no_update_stream_events", "stream_events"),
+      drop_rule("no_delete_stream_events", "stream_events"),
       drop_rule("no_update_events", "events"),
       drop_rule("no_delete_events", "events"),
       truncate_tables(),
-      seed_event_counter(),
-      prevent_event_counter_insert(),
-      prevent_event_counter_delete(),
+      seed_all_stream(),
       prevent_event_update(),
       prevent_event_delete(),
+      prevent_stream_events_update(),
+      prevent_stream_events_delete()
     ]
   end
 
@@ -50,37 +48,94 @@ defmodule EventStore.Sql.Statements do
 
   defp truncate_tables do
 """
-TRUNCATE TABLE snapshots, subscriptions, streams, event_counter, events
+TRUNCATE TABLE snapshots, subscriptions, stream_events, streams, events
 RESTART IDENTITY;
 """
   end
 
-  defp create_event_counter_table do
+  defp create_streams_table do
 """
-CREATE TABLE event_counter
+CREATE TABLE streams
 (
-    event_number bigint PRIMARY KEY NOT NULL
+    stream_id bigserial PRIMARY KEY NOT NULL,
+    stream_uuid text NOT NULL,
+    stream_version bigint default 0 NOT NULL,
+    created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
 );
 """
   end
 
-  defp seed_event_counter do
+  defp create_stream_uuid_index do
 """
-INSERT INTO event_counter (event_number) VALUES (0);
-"""
-  end
-
-  # Disallow further insertions to event counter table
-  defp prevent_event_counter_insert do
-"""
-CREATE RULE no_insert_event_counter AS ON INSERT TO event_counter DO INSTEAD NOTHING;
+CREATE UNIQUE INDEX ix_streams_stream_uuid ON streams (stream_uuid);
 """
   end
 
-  # Disallow deletions from event counter table
-  defp prevent_event_counter_delete do
+  # create `$all` stream
+  defp seed_all_stream do
 """
-CREATE RULE no_delete_event_counter AS ON DELETE TO event_counter DO INSTEAD NOTHING;
+INSERT INTO streams (stream_id, stream_uuid, stream_version) VALUES (0, '$all', 0);
+"""
+  end
+
+  defp create_events_table do
+"""
+CREATE TABLE events
+(
+    event_id uuid PRIMARY KEY NOT NULL,
+    event_type text NOT NULL,
+    causation_id uuid NULL,
+    correlation_id uuid NULL,
+    data #{column_data_type()} NOT NULL,
+    metadata #{column_data_type()} NULL,
+    created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
+);
+"""
+  end
+
+  # prevent updates to `events` table
+  defp prevent_event_update do
+"""
+CREATE RULE no_update_events AS ON UPDATE TO events DO INSTEAD NOTHING;
+"""
+  end
+
+  # prevent deletion from `events` table
+  defp prevent_event_delete do
+"""
+CREATE RULE no_delete_events AS ON DELETE TO events DO INSTEAD NOTHING;
+"""
+  end
+
+  defp create_stream_events_table do
+"""
+CREATE TABLE stream_events
+(
+  stream_id bigint NOT NULL REFERENCES streams (stream_id),
+  stream_version bigint NOT NULL,
+  event_id uuid NOT NULL REFERENCES events (event_id),
+  PRIMARY KEY(stream_id, event_id)
+);
+"""
+  end
+
+  defp create_stream_events_index do
+"""
+CREATE UNIQUE INDEX ix_stream_events ON stream_events (stream_id, stream_version);
+"""
+  end
+
+  # prevent updates to `stream_events` table
+  defp prevent_stream_events_update do
+"""
+CREATE RULE no_update_stream_events AS ON UPDATE TO stream_events DO INSTEAD NOTHING;
+"""
+  end
+
+  # prevent deletion from `stream_events` table
+  defp prevent_stream_events_delete do
+"""
+CREATE RULE no_delete_stream_events AS ON DELETE TO stream_events DO INSTEAD NOTHING;
 """
   end
 
@@ -106,76 +161,8 @@ $$ LANGUAGE plpgsql;
   defp create_event_notification_trigger do
 """
 CREATE TRIGGER event_notification
-AFTER UPDATE ON event_counter
+AFTER UPDATE ON streams
 FOR EACH ROW EXECUTE PROCEDURE notify_events();
-"""
-  end
-
-  defp create_streams_table do
-"""
-CREATE TABLE streams
-(
-    stream_id bigserial PRIMARY KEY NOT NULL,
-    stream_uuid text NOT NULL,
-    stream_version bigint default 0 NOT NULL,
-    created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
-);
-"""
-  end
-
-  defp create_stream_uuid_index do
-"""
-CREATE UNIQUE INDEX ix_streams_stream_uuid ON streams (stream_uuid);
-"""
-  end
-
-  defp create_events_table do
-"""
-CREATE TABLE events
-(
-    event_id uuid PRIMARY KEY NOT NULL,
-    event_number bigint NOT NULL,
-    stream_id bigint NOT NULL REFERENCES streams (stream_id),
-    stream_version bigint NOT NULL,
-    event_type text NOT NULL,
-    correlation_id uuid NULL,
-    causation_id uuid NULL,
-    data #{column_data_type()} NOT NULL,
-    metadata #{column_data_type()} NULL,
-    created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
-);
-"""
-  end
-
-  # prevent updates to events table
-  defp prevent_event_update do
-"""
-CREATE RULE no_update_events AS ON UPDATE TO events DO INSTEAD NOTHING;
-"""
-  end
-
-  # prevent deletion from events table
-  defp prevent_event_delete do
-"""
-CREATE RULE no_delete_events AS ON DELETE TO events DO INSTEAD NOTHING;
-"""
-  end
-
-  defp create_event_number_index do
-"""
-CREATE UNIQUE INDEX ix_events_event_number ON events (event_number);
-"""
-  end
-
-  defp create_event_stream_id_index do
-"""
-CREATE INDEX ix_events_stream_id ON events (stream_id);
-"""
-  end
-
-  defp create_event_stream_id_and_version_index do
-"""
-CREATE UNIQUE INDEX ix_events_stream_id_stream_version ON events (stream_id, stream_version DESC);
 """
   end
 
@@ -186,8 +173,7 @@ CREATE TABLE subscriptions
     subscription_id bigserial PRIMARY KEY NOT NULL,
     stream_uuid text NOT NULL,
     subscription_name text NOT NULL,
-    last_seen_event_number bigint NULL,
-    last_seen_stream_version bigint NULL,
+    last_seen bigint NULL,
     created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
 );
 """
@@ -244,33 +230,62 @@ RETURNING stream_id;
   end
 
   def create_events(number_of_events) do
-    column_data_type = column_data_type()
+    params =
+      1..number_of_events
+      |> Stream.map(fn event_number ->
+        index = (event_number - 1) * 7
+        params = [
+          Integer.to_string(index + 1),  # event_id
+          Integer.to_string(index + 2),  # event_type
+          Integer.to_string(index + 3),  # causation_id
+          Integer.to_string(index + 4),  # correlation_id
+          Integer.to_string(index + 5),  # data
+          Integer.to_string(index + 6),  # metadata
+          Integer.to_string(index + 7)   # created_at
+        ]
+
+        [
+          "($",
+          Enum.intersperse(params, ", $"),
+          ")"
+        ]
+      end)
+      |> Enum.intersperse(",")
+
+    [
+      """
+      INSERT INTO events
+        (
+          event_id,
+          event_type,
+          causation_id,
+          correlation_id,
+          data,
+          metadata,
+          created_at
+        )
+      VALUES
+      """,
+      params,
+      ";",
+    ]
+  end
+
+  def create_stream_events(number_of_events) do
     params =
       1..number_of_events
       |> Stream.map(fn
         1 ->
           # first row of values define their types
           [
-            "($4::bigint, $5::uuid, $6::bigint, $7::bigint, $8::uuid, $9::uuid, $10, $11::",
-            column_data_type,
-            ", $12::",
-            column_data_type,
-            ", $13::timestamp)"
+            "($3::bigint, $4::uuid)"
           ]
 
         event_number ->
-          index = (event_number - 1) * 10 + 3
+          index = (event_number - 1) * 2 + 2
           params = [
             Integer.to_string(index + 1),  # index
             Integer.to_string(index + 2),  # event_id
-            Integer.to_string(index + 3),  # stream_id
-            Integer.to_string(index + 4),  # stream_version
-            Integer.to_string(index + 5),  # correlation_id
-            Integer.to_string(index + 6),  # causation_id
-            Integer.to_string(index + 7),  # event_type
-            Integer.to_string(index + 8),  # data
-            Integer.to_string(index + 9),  # metadata
-            Integer.to_string(index + 10)  # created_at
           ]
 
           [
@@ -285,47 +300,28 @@ RETURNING stream_id;
       """
       WITH
         stream AS (
-          UPDATE streams SET stream_version = $3
-          WHERE stream_id = $2
+          UPDATE streams SET stream_version = stream_version + $2
+          WHERE stream_id = $1
+          RETURNING stream_id, stream_version - $2 as stream_version
         ),
-        event_counter AS (
-          UPDATE event_counter
-          SET event_number = event_number + $1
-          RETURNING event_number - $1 as event_number
-        ),
-        events (index, event_id, stream_id, stream_version, correlation_id, causation_id, event_type, data, metadata, created_at)
-        AS (
-          VALUES
-      """,
-      params,
-      """
-        )
-      INSERT INTO events
+      events (index, event_id)
+      AS (
+        VALUES
+    """,
+    params,
+    """
+      )
+      INSERT INTO stream_events
         (
-          event_id,
-          event_number,
           stream_id,
           stream_version,
-          correlation_id,
-          causation_id,
-          event_type,
-          data,
-          metadata,
-          created_at
+          event_id
         )
       SELECT
-        events.event_id,
-        event_counter.event_number + events.index,
-        events.stream_id,
-        events.stream_version,
-        events.correlation_id,
-        events.causation_id,
-        events.event_type,
-        events.data,
-        events.metadata,
-        events.created_at
-      FROM events, event_counter
-      RETURNING event_number;
+        stream.stream_id,
+        stream.stream_version + events.index,
+        events.event_id
+      FROM events, stream;
       """,
     ]
   end
@@ -406,24 +402,6 @@ FROM streams
 WHERE stream_uuid = $1;
 """
   end
-
-  def query_latest_version do
-"""
-SELECT stream_version
-FROM events
-WHERE stream_id = $1
-ORDER BY stream_version DESC
-LIMIT 1;
-"""
-  end
-
-  def query_latest_event_number do
-"""
-SELECT event_number
-FROM event_counter
-LIMIT 1;
-"""
-    end
 
   def query_get_snapshot do
 """

@@ -37,7 +37,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
       with {:ok, subscription} <- create_subscription(data, opts),
             :ok <- try_acquire_exclusive_lock(conn, subscription) do
 
-        last_ack = subscription_provider(stream_uuid).last_ack(subscription) || 0
+        last_ack = subscription.last_seen || 0
 
         data = %SubscriptionState{data |
           subscription_id: subscription.subscription_id,
@@ -155,8 +155,8 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     defevent notify_events(events), data: %SubscriptionState{last_seen: last_seen, last_ack: last_ack, pending_events: pending_events, max_size: max_size} = data do
       expected_event = last_seen + 1
       next_ack = last_ack + 1
-      first_event_number = first_event_number(events, data)
-      last_event_number = last_event_number(events, data)
+      first_event_number = first_event_number(events)
+      last_event_number = last_event_number(events)
 
       case first_event_number do
         past when past < expected_event ->
@@ -279,9 +279,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     end
   end
 
-  defp subscription_provider(@all_stream), do: AllStreamsSubscription
-  defp subscription_provider(_stream_uuid), do: SingleStreamSubscription
-
   defp create_subscription(%SubscriptionState{} = data, opts) do
     %SubscriptionState{
       conn: conn,
@@ -311,26 +308,21 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
   defp track_last_received(events, %SubscriptionState{} = data) do
     %SubscriptionState{data |
-      last_received: last_event_number(events, data),
+      last_received: last_event_number(events),
     }
   end
 
-  defp first_event_number([first_event | _], %SubscriptionState{stream_uuid: stream_uuid}) do
-    first_event |> subscription_provider(stream_uuid).event_number()
-  end
+  defp first_event_number([%RecordedEvent{stream_version: stream_version} | _]), do: stream_version
 
-  defp last_event_number(events, %SubscriptionState{stream_uuid: stream_uuid}) do
-    events
-    |> List.last()
-    |> subscription_provider(stream_uuid).event_number()
-  end
+  defp last_event_number([%RecordedEvent{stream_version: stream_version}]), do: stream_version
+  defp last_event_number([_event | events]), do: last_event_number(events)
 
   # Fetch unseen events from the stream, transition to `subscribed` state when
   # stream ends
   defp catch_up_from_stream(%SubscriptionState{stream_uuid: stream_uuid, last_seen: last_seen} = data) do
     reply_to = self()
 
-    case subscription_provider(stream_uuid).unseen_event_stream(stream_uuid, last_seen, @max_buffer_size) do
+    case unseen_event_stream(stream_uuid, last_seen, @max_buffer_size) do
       {:error, :stream_not_found} ->
         Subscription.caught_up(reply_to, last_seen)
         data
@@ -351,7 +343,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
           last_seen = case last_event do
             nil -> last_seen
-            event -> subscription_provider(stream_uuid).event_number(event)
+            %RecordedEvent{stream_version: stream_version} -> stream_version
           end
 
           # notify subscription caught up to given last seen event
@@ -362,10 +354,19 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     end
   end
 
+  defp unseen_event_stream(@all_stream, last_seen, read_batch_size) do
+    AllStream.stream_forward(last_seen + 1, read_batch_size)
+  end
+
+  defp unseen_event_stream(stream_uuid, last_seen, read_batch_size) do
+    Stream.stream_forward(stream_uuid, last_seen + 1, read_batch_size)
+  end
+
+
   # wait until the subscriber ack's the last sent event
   defp wait_for_ack(events, %SubscriptionState{} = data) when is_list(events) do
     events
-    |> last_event_number(data)
+    |> last_event_number()
     |> wait_for_ack()
   end
 
@@ -386,8 +387,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
   # send the catch-up process an acknowledgement of receipt, allowing it to continue stream events to subscriber
   defp ack_catch_up(%SubscriptionState{stream_uuid: stream_uuid, catch_up_pid: catch_up_pid} = data, ack) do
-    ack = extract_ack(stream_uuid, ack)
-
     send(catch_up_pid, {:ack, ack})
 
     data
@@ -395,10 +394,12 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
   # send pending events to subscriber if ready to receive them
   defp notify_pending_events(%SubscriptionState{pending_events: []} = data), do: data
-  defp notify_pending_events(%SubscriptionState{pending_events: [first_pending_event | _] = pending_events, stream_uuid: stream_uuid, last_ack: last_ack} = data) do
+  defp notify_pending_events(%SubscriptionState{pending_events: pending_events, last_ack: last_ack} = data) do
+    [%RecordedEvent{stream_version: stream_version} | _events] = pending_events
+
     next_ack = last_ack + 1
 
-    case subscription_provider(stream_uuid).event_number(first_pending_event) do
+    case stream_version do
       ^next_ack ->
         # subscriber has ack'd last received event, so send pending
         pending_events
@@ -431,23 +432,11 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     do: send(subscriber, {:events, events})
 
   defp ack_events(%SubscriptionState{stream_uuid: stream_uuid, subscription_name: subscription_name} = data, ack) do
-    ack = extract_ack(stream_uuid, ack)
-
-    :ok = subscription_provider(stream_uuid).ack_last_seen_event(stream_uuid, subscription_name, ack)
+    :ok = Storage.ack_last_seen_event(stream_uuid, subscription_name, ack, nil)
 
     %SubscriptionState{data| last_ack: ack}
   end
 
   defp describe(%SubscriptionState{stream_uuid: stream_uuid, subscription_name: name}),
     do: "Subscription #{inspect name}@#{inspect stream_uuid}"
-
-  # An `ack` can be a single integer, indicating an `event_number` or
-  # `stream_version`, or a tuple containing both, as `{event_number, stream_version}`.
-  # This function extracts the relevant value depending upon the type of
-  # subscription (all / single stream).
-  defp extract_ack(_stream_uuid, ack) when is_integer(ack),
-    do: ack
-
-  defp extract_ack(stream_uuid, ack) when is_tuple(ack),
-    do: subscription_provider(stream_uuid).extract_ack(ack)
 end

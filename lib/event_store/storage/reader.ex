@@ -55,7 +55,7 @@ defmodule EventStore.Storage.Reader do
 
     def to_event_data_from_row([
       event_id,
-      event_number,
+      # event_number,
       stream_uuid,
       stream_version,
       event_type,
@@ -67,7 +67,7 @@ defmodule EventStore.Storage.Reader do
     do
       %RecordedEvent{
         event_id: event_id |> from_uuid(),
-        event_number: event_number,
+        # event_number: event_number,
         stream_uuid: stream_uuid,
         stream_version: stream_version,
         event_type: event_type,

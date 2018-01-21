@@ -159,11 +159,7 @@ defmodule EventStore.Streams.Stream do
   defp utc_now, do: NaiveDateTime.utc_now()
 
   defp write_to_stream(prepared_events, %Stream{stream_id: stream_id}) do
-    with {:ok, _} <- Storage.append_to_stream(stream_id, prepared_events) do
-      :ok
-    else
-      reply -> reply
-    end
+    Storage.append_to_stream(stream_id, prepared_events)
   end
 
   defp read_storage_forward(_start_version, _count, %Stream{stream_id: stream_id})

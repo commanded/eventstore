@@ -5,6 +5,8 @@ defmodule EventStore.Streams.AllStream do
 
   alias EventStore.{Config,RecordedEvent,Storage,Subscriptions}
 
+  @all_stream "$all"
+
   def read_stream_forward(start_event_number, count) do
     read_storage_forward(start_event_number, count, Config.serializer())
   end
@@ -23,8 +25,8 @@ defmodule EventStore.Streams.AllStream do
 
   defp start_from_event_number(:origin), do: 0
   defp start_from_event_number(:current) do
-    with {:ok, event_number} <- Storage.latest_event_number() do
-      event_number
+    with {:ok, _stream_id, stream_version} <- Storage.stream_info(@all_stream) do
+      stream_version
     end
   end
   defp start_from_event_number(start_from) when is_integer(start_from), do: start_from

@@ -1,6 +1,5 @@
 defmodule EventStoreTest do
   use EventStore.StorageCase
-  doctest EventStore.Storage
 
   alias EventStore.EventFactory
   alias EventStore.Snapshots.SnapshotData
