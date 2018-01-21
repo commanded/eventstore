@@ -10,6 +10,10 @@ A single listener process will connect to the database to listen for events when
 
 Running EventStore on multiple nodes that are not connected together to form a cluster will result in one listener process and database connection per node.
 
+## Subscriptions
+
+PostgreSQL's [advisory locks](https://www.postgresql.org/docs/current/static/explicit-locking.html#ADVISORY-LOCKS) are used to limit each uniquely named subscription to run at most once. This prevents multiple instances of a subscription from running on different nodes. Advisory locks are faster than table locks, are stored in memory to avoid table bloat, and are automatically cleaned up by the server at the end of the session.
+
 ## Running on a cluster
 
 1. Configure the EventStore to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
@@ -127,11 +131,11 @@ The Erlang equivalent of the `:kernerl` mix config, as above, is:
 
 The node specific `<node>.sys.config` files ensure the cluster is formed before starting the `:eventstore` application, assuming this occurs within the 30 seconds timeout.
 
-Once the cluster has formed, you can use the EventStore API from any node. Stream processes will be distributed amongst the cluster and moved around on node up/down.
+Once the cluster has formed, you can use the EventStore API from any node.
 
 ## Usage
 
-Using the EventStore when run on a cluster of nodes is identical to single node usage. You can subscibe to a stream, or all streams, on one node and append events to the stream on another. The subscription will be notified of the appended events.
+Using the EventStore when run on a cluster of nodes is identical to single node usage. You can subscribe to a stream, or all streams, on one node and append events to the stream on another. The subscription will be notified of the appended events.
 
 ### Append events to a stream
 
