@@ -36,8 +36,32 @@ defmodule EventStore.Storage.Appender do
           end
         end)
         |> Enum.each(fn event_ids ->
-          with :ok <- insert_stream_events(transaction, stream_uuid, stream_id, event_ids),
-               :ok <- insert_stream_events(transaction, @all_stream, @all_stream_id, event_ids) do
+          event_count = length(event_ids)
+
+          parameters =
+            event_ids
+            |> Enum.with_index(1)
+            |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
+
+          with {:ok, query} = prepare_stream_events(transaction, event_ids),
+               :ok <-
+                 insert_stream_events(
+                   transaction,
+                   query,
+                   parameters,
+                   stream_uuid,
+                   stream_id,
+                   event_count
+                 ),
+               :ok <-
+                 insert_stream_events(
+                   transaction,
+                   query,
+                   parameters,
+                   @all_stream,
+                   @all_stream_id,
+                   event_count
+                 ) do
             :ok
           else
             {:error, reason} -> Postgrex.rollback(transaction, reason)
@@ -68,7 +92,7 @@ defmodule EventStore.Storage.Appender do
 
     conn
     |> Postgrex.query(statement, parameters, pool: DBConnection.Poolboy)
-    |> handle_response(stream_uuid, event_count)
+    |> handle_response(stream_uuid)
   end
 
   defp build_insert_parameters(events) do
@@ -86,47 +110,39 @@ defmodule EventStore.Storage.Appender do
     end)
   end
 
-  defp insert_stream_events(conn, stream_uuid, stream_id, event_ids) do
+  defp prepare_stream_events(conn, event_ids) do
     event_count = length(event_ids)
     statement = Statements.create_stream_events(event_count)
 
-    parameters =
-      event_ids
-      |> Enum.with_index(1)
-      |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
+    Postgrex.prepare(conn, "", statement, pool: DBConnection.Poolboy)
+  end
 
+  defp insert_stream_events(conn, query, parameters, stream_uuid, stream_id, event_count) do
     conn
-    |> Postgrex.query(
-      statement,
-      [stream_id, event_count] ++ parameters,
+    |> Postgrex.execute(
+      query,
+      [stream_id | [event_count | parameters]],
       pool: DBConnection.Poolboy
     )
-    |> handle_response(stream_uuid, event_count)
+    |> handle_response(stream_uuid)
   end
 
   defp uuid(nil), do: nil
   defp uuid(uuid), do: UUID.string_to_binary!(uuid)
 
-  defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}, stream_uuid, expected_count) do
-    Logger.warn(fn -> "Failed to append any events to stream #{inspect(stream_uuid)}" end)
-    :ok
-  end
-
-  defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}, stream_uuid, expected_count) do
+  defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}, stream_uuid) do
     Logger.warn(fn -> "Failed to append any events to stream #{inspect(stream_uuid)}" end)
     {:error, :failed_to_append_events}
   end
 
-  defp handle_response(
-         {:ok, %Postgrex.Result{num_rows: num_rows, rows: rows}},
-         stream_uuid,
-         expected_count
-       ) do
+  defp handle_response({:ok, %Postgrex.Result{} = result}, stream_uuid) do
+    %Postgrex.Result{num_rows: num_rows, rows: rows} = result
+
     Logger.debug(fn -> "Appended #{num_rows} event(s) to stream #{inspect(stream_uuid)}" end)
     :ok
   end
 
-  defp handle_response({:error, %Postgrex.Error{}} = error, stream_uuid, expected_count) do
+  defp handle_response({:error, %Postgrex.Error{}} = error, stream_uuid) do
     %Postgrex.Error{postgres: %{code: error_code}, message: message} = error
 
     Logger.warn(fn ->
@@ -139,7 +155,7 @@ defmodule EventStore.Storage.Appender do
     end
   end
 
-  defp handle_response({:error, reason}, stream_uuid, expected_count) do
+  defp handle_response({:error, reason}, stream_uuid) do
     Logger.warn(fn ->
       "Failed to append events to stream #{inspect(stream_uuid)} due to: #{inspect(reason)}"
     end)

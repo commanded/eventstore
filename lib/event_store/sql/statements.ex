@@ -229,29 +229,21 @@ RETURNING stream_id;
 """
   end
 
+  def build_params(count, chunk_size) do
+    1..(count * chunk_size)
+    |> Stream.map(&Integer.to_string/1)
+    |> Stream.chunk_every(chunk_size)
+    |> Stream.map(fn chunk ->
+      [
+        "($",
+        Enum.intersperse(chunk, ", $"),
+        ")"
+      ]
+    end)
+    |> Enum.intersperse(",")
+  end
+
   def create_events(number_of_events) do
-    params =
-      1..number_of_events
-      |> Stream.map(fn event_number ->
-        index = (event_number - 1) * 7
-        params = [
-          Integer.to_string(index + 1),  # event_id
-          Integer.to_string(index + 2),  # event_type
-          Integer.to_string(index + 3),  # causation_id
-          Integer.to_string(index + 4),  # correlation_id
-          Integer.to_string(index + 5),  # data
-          Integer.to_string(index + 6),  # metadata
-          Integer.to_string(index + 7)   # created_at
-        ]
-
-        [
-          "($",
-          Enum.intersperse(params, ", $"),
-          ")"
-        ]
-      end)
-      |> Enum.intersperse(",")
-
     [
       """
       INSERT INTO events
@@ -266,7 +258,7 @@ RETURNING stream_id;
         )
       VALUES
       """,
-      params,
+      build_params(number_of_events, 7),
       ";",
     ]
   end
@@ -302,7 +294,7 @@ RETURNING stream_id;
         stream AS (
           UPDATE streams SET stream_version = stream_version + $2
           WHERE stream_id = $1
-          RETURNING stream_id, stream_version - $2 as stream_version
+          RETURNING stream_version - $2 as initial_stream_version
         ),
       events (index, event_id)
       AS (
@@ -318,8 +310,8 @@ RETURNING stream_id;
           event_id
         )
       SELECT
-        stream.stream_id,
-        stream.stream_version + events.index,
+        $1,
+        stream.initial_stream_version + events.index,
         events.event_id
       FROM events, stream;
       """,
