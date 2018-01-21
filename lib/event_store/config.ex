@@ -107,7 +107,13 @@ defmodule EventStore.Config do
       :pool_size,
       :pool_overflow
     ])
-    |> Keyword.merge(name: :event_store)
+    |> Keyword.put(:name, :event_store)
+  end
+
+  def notification_postgrex_opts(config) do
+    config
+    |> Keyword.take(@default_postgrex_opts)
+    |> Keyword.put(:name, EventStore.Notifications)
   end
 
   def subscription_postgrex_opts(config) do

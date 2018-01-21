@@ -11,6 +11,7 @@
 - Publish events directly to subscriptions ([#93](https://github.com/commanded/eventstore/pull/93)).
 - Use PostgreSQL advisory locks to enforce only one subscription instance ([#98](https://github.com/commanded/eventstore/pull/98)).
 - Remove stream process ([#99](https://github.com/commanded/eventstore/pull/99)).
+- Use PostgreSQL's `NOTIFY` / `LISTEN` for event pub/sub ([#100](https://github.com/commanded/eventstore/pull/100)).
 
 ## v0.13.2
 

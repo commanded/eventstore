@@ -87,13 +87,13 @@ defmodule EventStore.Storage.AppendEventsTest do
       end)
       |> Enum.map(&Task.await/1)
 
-    assert [
+    assert results -- [
       ok: Enum.to_list(1..10),
       error: :wrong_expected_version,
       error: :wrong_expected_version,
       error: :wrong_expected_version,
       error: :wrong_expected_version
-    ] == results
+    ] == []
   end
 
   defp create_stream(conn) do

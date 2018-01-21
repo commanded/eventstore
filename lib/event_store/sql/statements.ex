@@ -11,6 +11,8 @@ defmodule EventStore.Sql.Statements do
       seed_event_counter(),
       prevent_event_counter_insert(),
       prevent_event_counter_delete(),
+      create_notify_events_function(),
+      create_event_notification_trigger(),
       create_streams_table(),
       create_stream_uuid_index(),
       create_events_table(),
@@ -79,6 +81,33 @@ CREATE RULE no_insert_event_counter AS ON INSERT TO event_counter DO INSTEAD NOT
   defp prevent_event_counter_delete do
 """
 CREATE RULE no_delete_event_counter AS ON DELETE TO event_counter DO INSTEAD NOTHING;
+"""
+  end
+
+  defp create_notify_events_function do
+"""
+CREATE OR REPLACE FUNCTION notify_events()
+  RETURNS trigger AS $$
+DECLARE
+  payload text;
+BEGIN
+    -- Payload text contains first and last event numbers separated by a comma (e.g. '1,5')
+    payload := (OLD.event_number + 1) || ',' || NEW.event_number;
+
+    -- Notify events to listeners
+    PERFORM pg_notify('events', payload);
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+"""
+  end
+
+  defp create_event_notification_trigger do
+"""
+CREATE TRIGGER event_notification
+AFTER UPDATE ON event_counter
+FOR EACH ROW EXECUTE PROCEDURE notify_events();
 """
   end
 

@@ -13,6 +13,8 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
   use Fsm, initial_state: :initial, initial_data: %SubscriptionState{}
 
+  require Logger
+
   @all_stream "$all"
   @max_buffer_size 1_000
 
@@ -158,14 +160,20 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
       case first_event_number do
         past when past < expected_event ->
+          Logger.debug(fn -> describe(data) <> " received past event(s), ignoring" end)
+
           # ignore already seen events
           next_state(:subscribed, data)
 
         future when future > expected_event ->
+          Logger.debug(fn -> describe(data) <> " received unexpected event(s), requesting catch up" end)
+
           # missed events, go back and catch-up with unseen
           next_state(:request_catch_up, data)
 
         ^next_ack ->
+          Logger.debug(fn -> describe(data) <> " is notifying subscriber with #{length(events)} event(s)" end)
+
           # subscriber is up-to-date, so send events
           notify_subscriber(data, events)
 
@@ -177,6 +185,8 @@ defmodule EventStore.Subscriptions.StreamSubscription do
           next_state(:subscribed, data)
 
         ^expected_event ->
+          Logger.debug(fn -> describe(data) <> " received event(s) but still waiting for subscriber to ack, queueing event(s)" end)
+
           # subscriber has not yet ack'd last seen event so store pending events
           # until subscriber ready to receive (back pressure)
           data = %SubscriptionState{data |
@@ -427,6 +437,9 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
     %SubscriptionState{data| last_ack: ack}
   end
+
+  defp describe(%SubscriptionState{stream_uuid: stream_uuid, subscription_name: name}),
+    do: "Subscription #{inspect name}@#{inspect stream_uuid}"
 
   # An `ack` can be a single integer, indicating an `event_number` or
   # `stream_version`, or a tuple containing both, as `{event_number, stream_version}`.

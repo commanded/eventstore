@@ -1,49 +1,27 @@
 # Cluster
 
-EventStore supports running on a cluster of nodes. It uses the [Swarm](https://hex.pm/packages/swarm) library for process distribution.
+EventStore supports running on multiple nodes as either a [distributed Erlang](http://erlang.org/doc/reference_manual/distributed.html) cluster or as multiple single instance nodes.
+
+## Event publication
+
+PostgreSQL `LISTEN` / `NOTIFY` is used to pub/sub event notifications.
+
+A single listener process will connect to the database to listen for events when using a distributed cluster. Events will be broadcast to all connected nodes using Erlang's [pg2](http://erlang.org/doc/man/pg2.html) process groups. This limits the number of database connections to at most the number of running clusters.
+
+Running EventStore on multiple nodes that are not connected together to form a cluster will result in one listener process and database connection per node.
 
 ## Running on a cluster
 
-1. Add `:swarm` as a dependency in your `mix.exs` file:
-
-      ```elixir
-      defp deps do
-        [
-          {:swarm, "~> 3.1"},
-        ]
-      end
-      ```
-
-2. Fetch the dependencies:
-
-      ```console
-      $ mix deps.get
-      ```
-
-3. Configure the EventStore to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
+1. Configure the EventStore to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
 
       ```elixir
       config :eventstore,
         registry: :distributed
       ```
 
-4. Swarm must be configured to use the `Swarm.Distribution.StaticQuorumRing` distribution strategy:
-
-      ```elixir
-      config :swarm,
-        nodes: [:"node1@127.0.0.1", :"node2@127.0.0.1", :"node3@127.0.0.1"],
-        node_blacklist: [~r/^primary@.+$/],
-        distribution_strategy: Swarm.Distribution.StaticQuorumRing,
-        static_quorum_size: 2,
-        sync_nodes_timeout: 0,
-        debug: false
-      ```
-
-    This is to ensure consistency during a network partition. The `static_quorum_size` setting defines the minimum number of nodes that must be connected in the cluster to allow process registration and distribution. If there are fewer nodes currently available than the quorum size, any calls to the `EventStore` will return `{:error, :no_node_available}`.
-
 ## Automatic cluster formation
 
-Swarm can be used with [libcluster](https://github.com/bitwalker/libcluster), a library that provides a mechanism for automatically forming clusters of Erlang nodes, with either static or dynamic node membership.
+You can use [libcluster](https://github.com/bitwalker/libcluster) to automatically form clusters of Erlang nodes, with either static or dynamic node membership.
 
 You will need to include `libcluster` as an additional dependency:
 
@@ -55,7 +33,7 @@ defp deps do
 end
 ```
 
-Then configure the cluster topology in the environment config (e.g. `config/config.exs`). An example is shown below using the standard Erlang `epmd` daemon strategy:
+Then configure your preferred cluster topology in the environment config (e.g. `config/config.exs`). An example is shown below using the standard Erlang `epmd` daemon strategy:
 
 ```elixir
 config :libcluster,
@@ -67,7 +45,7 @@ config :libcluster,
   ]
 ```
 
-Please refer to the [libcluster docs](https://hexdocs.pm/libcluster/) for more detail.
+Please refer to the [`libcluster` documentation](https://hexdocs.pm/libcluster/) for more detail.
 
 ### Starting a cluster
 
@@ -111,7 +89,7 @@ config :kernel,
 The `sync_nodes_timeout` can be configured as `:infinity` to wait indefinitely for all nodes to
 connect. All involved nodes must have the same value for `sync_nodes_timeout`.
 
-This approach will only work for Elixir releases. You will need to use [Erlang's `sys.config`](http://erlang.org/doc/man/config.html) file for development purposes.
+The above approach will *only work* for Elixir releases. You will need to use [Erlang's `sys.config`](http://erlang.org/doc/man/config.html) file for development purposes.
 
 The Erlang equivalent of the `:kernerl` mix config, as above, is:
 
@@ -153,6 +131,8 @@ Once the cluster has formed, you can use the EventStore API from any node. Strea
 
 ## Usage
 
+Using the EventStore when run on a cluster of nodes is identical to single node usage. You can subscibe to a stream, or all streams, on one node and append events to the stream on another. The subscription will be notified of the appended events.
+
 ### Append events to a stream
 
 ```elixir
@@ -181,18 +161,4 @@ receive do
   reply ->
     IO.puts reply
 end
-```
-
-## Cluster diagnostics
-
-Peek into the Swarm process registry:
-
-```elixir
-Swarm.Registry.registered()
-```
-
-Discover which node a stream process is running on:
-
-```elixir
-stream_uuid |> EventStore.Streams.Stream.name() |> Swarm.whereis_name() |> node()
 ```

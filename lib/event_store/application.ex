@@ -5,6 +5,6 @@ defmodule EventStore.Application do
   alias EventStore.Config
 
   def start(_, _) do
-    EventStore.Supervisor.start_link([Config.parsed(), Config.serializer()])
+    EventStore.Supervisor.start_link(Config.parsed())
   end
 end

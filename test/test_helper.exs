@@ -1,6 +1,10 @@
-ExUnit.start(exclude: [:distributed, :manual, :ignore])
+exclude = [:manual, :ignore]
 
 case Application.get_env(:eventstore, :registry) do
-  :distributed -> EventStore.Cluster.spawn()
-  _ -> :ok
+  :local ->
+    ExUnit.start(exclude: exclude)
+
+  :distributed ->
+    EventStore.Cluster.spawn()
+    ExUnit.start(exclude: exclude)
 end

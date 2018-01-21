@@ -6,8 +6,8 @@ defmodule EventStore.Subscriptions do
 
   require Logger
 
-  alias EventStore.{RecordedEvent,Subscriptions}
-
+  alias EventStore.Subscriptions
+  
   @all_stream "$all"
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
@@ -28,19 +28,10 @@ defmodule EventStore.Subscriptions do
     do_unsubscribe_from_stream(@all_stream, subscription_name)
   end
 
-  def notify_events(stream_uuid, events, serializer) do
-    events = Enum.map(events, &RecordedEvent.deserialize(&1, serializer))
-
-    Enum.each([
-      Task.async(fn -> notify_subscribers(@all_stream, events) end),
-      Task.async(fn -> notify_subscribers(stream_uuid, events) end),
-    ], &Task.await(&1))
-  end
-
   defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
     _ = Logger.debug(fn -> "Creating subscription process on stream #{inspect stream_uuid} named: #{inspect subscription_name}" end)
 
-    case EventStore.Subscriptions.Supervisor.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
+    case Subscriptions.Supervisor.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
       {:ok, subscription} -> {:ok, subscription}
       {:error, {:already_started, _subscription}} -> {:error, :subscription_already_exists}
     end
@@ -48,11 +39,5 @@ defmodule EventStore.Subscriptions do
 
   defp do_unsubscribe_from_stream(stream_uuid, subscription_name) do
     Subscriptions.Supervisor.unsubscribe_from_stream(stream_uuid, subscription_name)
-  end
-
-  defp notify_subscribers(stream_uuid, events) do
-    Registry.dispatch(EventStore.Subscriptions.PubSub, stream_uuid, fn subscribers ->
-      for {pid, _} <- subscribers, do: send(pid, {:notify_events, events})
-    end)
   end
 end

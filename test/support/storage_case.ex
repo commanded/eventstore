@@ -1,13 +1,11 @@
 defmodule EventStore.StorageCase do
   use ExUnit.CaseTemplate
 
-  alias EventStore.{Config,ProcessHelper,Registration}
+  alias EventStore.{Config, ProcessHelper}
 
   setup do
     config = Config.parsed()
-    registry = Registration.registry_provider()
-
-    before_reset(registry)
+    registry = Application.get_env(:eventstore, :registry, :local)
 
     {:ok, conn} = Postgrex.start_link(config)
 
@@ -15,39 +13,28 @@ defmodule EventStore.StorageCase do
 
     after_reset(registry)
 
-    on_exit fn ->
+    on_exit(fn ->
+      after_exit(registry)
+
       ProcessHelper.shutdown(conn)
-    end
+    end)
 
     {:ok, %{conn: conn}}
   end
 
-  defp before_reset(EventStore.Registration.Distributed) do
-    Application.stop(:swarm)
-
-    nodes()
-    |> Enum.map(&Task.async(fn ->
-      :ok = EventStore.Cluster.rpc(&1, Application, :stop, [:eventstore])
-    end))
-    |> Enum.map(&Task.await(&1, 5_000))
-  end
-
-  defp before_reset(_registry) do
+  defp after_exit(:local) do
     Application.stop(:eventstore)
   end
 
-  defp after_reset(EventStore.Registration.Distributed) do
-    nodes()
-    |> Enum.map(&Task.async(fn ->
-      {:ok, _} = EventStore.Cluster.rpc(&1, Application, :ensure_all_started, [:swarm])
-      {:ok, _} = EventStore.Cluster.rpc(&1, Application, :ensure_all_started, [:eventstore])
-    end))
-    |> Enum.map(&Task.await(&1, 5_000))
+  defp after_exit(:distributed) do
+    _ = :rpc.multicall(Application, :stop, [:eventstore])
   end
 
-  defp after_reset(_registry) do
+  defp after_reset(:local) do
     {:ok, _} = Application.ensure_all_started(:eventstore)
   end
 
-  defp nodes, do: [Node.self() | Node.list(:connected)]
+  defp after_reset(:distributed) do
+    _ = :rpc.multicall(Application, :ensure_all_started, [:eventstore])
+  end
 end

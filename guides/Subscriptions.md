@@ -2,13 +2,21 @@
 
 Subscriptions to a stream will guarantee *at least once* delivery of every persisted event. Each subscription may be independently paused, then later resumed from where it stopped.
 
-A subscription can be created to receive events published from a single logical stream or from all streams.
+A subscription can be created to receive events published from a single or all streams.
 
 Events are received in batches after being persisted to storage. Each batch contains events from a single stream and for the same correlation id.
 
 Subscriptions must be uniquely named and support a single subscriber. Attempting to connect two subscribers to the same subscription will return an error.
 
-By default subscriptions are created from the single stream, or all stream, origin. So it will receive all events from the single stream, or all streams. You can optionally specify a given start position:
+## Event pub/sub
+
+PostgreSQL's `LISTEN` and `NOTIFY` commands are used to pub/sub event notifications from the database. An after update trigger on the `event_counter` table is used to execute `NOTIFY` for each batch of inserted events. The notification payload contains the first and last event number (e.g. `1,5`).
+
+A single listener process will connect to the database to listen for these notifications. It fetches the event data and broadcasts to all interested subscriptions. This approach supports running the EventStore on multiple nodes, regardless of whether they are connected together to form a cluster. A single listener will be used when nodes form a cluster, otherwise one connection per node is used.
+
+## Subscription start from
+
+By default subscriptions are created from the stream origin; they will receive all events from the stream. You can optionally specify a given start position:
 
 - `:origin` - subscribe to events from the start of the stream (identical to using 0). This is the current behaviour and will remain the default.
 - `:current` - subscribe to events from the current version.
@@ -92,7 +100,11 @@ You can provide an event mapping function that runs in the subscription process,
 Subscribe to all streams and provide a `mapper` function that sends only the event data:
 
 ```elixir
-{:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), mapper: fn %EventStore.RecordedEvent{event_number: event_number: data: data} -> {event_number, data} end)
+mapper = fn %EventStore.RecordedEvent{event_number: event_number, data: data} ->
+  {event_number, data}
+end
+
+{:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), mapper: mapper)
 
 receive do
   {:events, mapped_events} ->

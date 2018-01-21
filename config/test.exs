@@ -1,7 +1,6 @@
 use Mix.Config
 
-# Print only warnings and errors during test
-config :logger, :console, level: :warn, format: "[$level] $message\n"
+config :logger, :console, level: :warn
 
 config :ex_unit,
   capture_log: true,

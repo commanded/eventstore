@@ -1,4 +1,6 @@
 defmodule EventStore.Cluster do
+  @nodes [:"node1@127.0.0.1", :"node2@127.0.0.1", :"node3@127.0.0.1"]
+
   def spawn do
     # Turn node into a distributed node with the given long name
     :net_kernel.start([:"primary@127.0.0.1"])
@@ -7,18 +9,11 @@ defmodule EventStore.Cluster do
     :erl_boot_server.start([])
     allow_boot to_charlist("127.0.0.1")
 
-    case Application.load(:swarm) do
-      :ok -> :ok
-      {:error, {:already_loaded, :swarm}} -> :ok
-    end
-
     spawn_nodes()
   end
 
   def spawn_nodes do
-    nodes = Application.get_env(:swarm, :nodes, [])
-
-    nodes
+    @nodes
     |> Enum.map(&Task.async(fn -> spawn_node(&1) end))
     |> Enum.map(&Task.await(&1, 30_000))
   end
