@@ -24,7 +24,7 @@ defmodule EventStore do
   alias EventStore.{Config,EventData,RecordedEvent,Subscriptions}
   alias EventStore.Snapshots.{SnapshotData,Snapshotter}
   alias EventStore.Subscriptions.Subscription
-  alias EventStore.Streams.{AllStream,Stream}
+  alias EventStore.Streams.Stream
 
   @all_stream "$all"
 
@@ -118,7 +118,7 @@ defmodule EventStore do
   """
   @spec read_all_streams_forward(non_neg_integer, non_neg_integer) :: {:ok, list(RecordedEvent.t)} | {:error, reason :: term}
   def read_all_streams_forward(start_event_number \\ 0, count \\ 1_000) do
-    AllStream.read_stream_forward(start_event_number, count)
+    Stream.read_stream_forward(@all_stream, start_event_number, count)
   end
 
   @doc """
@@ -132,7 +132,7 @@ defmodule EventStore do
   """
   @spec stream_all_forward(non_neg_integer, non_neg_integer) :: Enumerable.t
   def stream_all_forward(start_event_number \\ 0, read_batch_size \\ 1_000) do
-    AllStream.stream_forward(start_event_number, read_batch_size)
+    Stream.stream_forward(@all_stream, start_event_number, read_batch_size)
   end
 
   @doc """
@@ -184,7 +184,7 @@ defmodule EventStore do
     | {:error, reason :: term}
   def subscribe_to_all_streams(subscription_name, subscriber, opts \\ [])
   def subscribe_to_all_streams(subscription_name, subscriber, opts) do
-    AllStream.subscribe_to_stream(subscription_name, subscriber, opts)
+    Stream.subscribe_to_stream(@all_stream, subscription_name, subscriber, opts)
   end
 
   @doc """

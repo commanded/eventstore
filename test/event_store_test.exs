@@ -1,7 +1,7 @@
 defmodule EventStoreTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, RecordedEvent}
   alias EventStore.Snapshots.SnapshotData
 
   @all_stream "$all"
@@ -37,14 +37,7 @@ defmodule EventStoreTest do
     created_event = hd(events)
     recorded_event = hd(recorded_events)
 
-    assert_is_uuid(recorded_event.event_id)
-    assert is_integer(recorded_event.event_number)
-    assert recorded_event.event_number > 0
-    assert recorded_event.stream_uuid == stream_uuid
-    assert recorded_event.data == created_event.data
-    assert recorded_event.metadata == created_event.metadata
-    assert_is_uuid(recorded_event.causation_id)
-    assert_is_uuid(recorded_event.correlation_id)
+    assert_recorded_event(stream_uuid, created_event, recorded_event)
   end
 
   test "stream forward from event store" do
@@ -52,17 +45,12 @@ defmodule EventStoreTest do
     events = EventFactory.create_events(1)
 
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-    recorded_events = EventStore.stream_forward(stream_uuid) |> Enum.to_list
+    recorded_events = stream_uuid |> EventStore.stream_forward() |> Enum.to_list()
 
     created_event = hd(events)
     recorded_event = hd(recorded_events)
 
-    assert_is_uuid(recorded_event.event_id)
-    assert is_integer(recorded_event.event_number)
-    assert recorded_event.event_number > 0
-    assert recorded_event.stream_uuid == stream_uuid
-    assert recorded_event.data == created_event.data
-    assert recorded_event.metadata == created_event.metadata
+    assert_recorded_event(stream_uuid, created_event, recorded_event)
   end
 
   test "stream all forward from event store" do
@@ -70,17 +58,24 @@ defmodule EventStoreTest do
     events = EventFactory.create_events(1)
 
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-    recorded_events = EventStore.stream_all_forward() |> Enum.to_list
+    recorded_events = EventStore.stream_all_forward() |> Enum.to_list()
 
     created_event = hd(events)
     recorded_event = hd(recorded_events)
 
+    assert_recorded_event(stream_uuid, created_event, recorded_event)
+  end
+
+  defp assert_recorded_event(expected_stream_uuid, expected_event, %RecordedEvent{} = recorded_event) do
     assert_is_uuid(recorded_event.event_id)
-    assert is_integer(recorded_event.event_number)
-    assert recorded_event.event_number > 0
-    assert recorded_event.stream_uuid == stream_uuid
-    assert recorded_event.data == created_event.data
-    assert recorded_event.metadata == created_event.metadata
+    assert_is_uuid(recorded_event.causation_id)
+    assert_is_uuid(recorded_event.correlation_id)
+    assert recorded_event.stream_uuid == expected_stream_uuid
+    assert recorded_event.stream_version == 1
+    assert recorded_event.event_type == expected_event.event_type
+    assert recorded_event.data == expected_event.data
+    assert recorded_event.metadata == expected_event.metadata
+    assert %NaiveDateTime{} = recorded_event.created_at
   end
 
   test "unicode character support" do

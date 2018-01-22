@@ -111,10 +111,12 @@ CREATE RULE no_delete_events AS ON DELETE TO events DO INSTEAD NOTHING;
 """
 CREATE TABLE stream_events
 (
+  event_id uuid NOT NULL REFERENCES events (event_id),
   stream_id bigint NOT NULL REFERENCES streams (stream_id),
   stream_version bigint NOT NULL,
-  event_id uuid NOT NULL REFERENCES events (event_id),
-  PRIMARY KEY(stream_id, event_id)
+  original_stream_id bigint REFERENCES streams (stream_id),
+  original_stream_version bigint,
+  PRIMARY KEY(event_id, stream_id)
 );
 """
   end
@@ -296,24 +298,88 @@ RETURNING stream_id;
           WHERE stream_id = $1
           RETURNING stream_version - $2 as initial_stream_version
         ),
-      events (index, event_id)
-      AS (
-        VALUES
-    """,
-    params,
-    """
-      )
+        events (index, event_id) AS (
+          VALUES
+      """,
+      params,
+      """
+        )
+      INSERT INTO stream_events
+        (
+          event_id,
+          stream_id,
+          stream_version,
+          original_stream_id,
+          original_stream_version
+        )
+      SELECT
+        events.event_id,
+        $1,
+        stream.initial_stream_version + events.index,
+        $1,
+        stream.initial_stream_version + events.index
+      FROM events, stream;
+      """,
+    ]
+  end
+
+  def create_link_events(number_of_events) do
+    params =
+      1..number_of_events
+      |> Stream.map(fn
+        1 ->
+          # first row of values define their types
+          [
+            "($4::bigint, $5::uuid)"
+          ]
+
+        event_number ->
+          index = (event_number - 1) * 2 + 3
+          params = [
+            Integer.to_string(index + 1),  # index
+            Integer.to_string(index + 2),  # event_id
+          ]
+
+          [
+            "($",
+            Enum.intersperse(params, ", $"),
+            ")"
+          ]
+      end)
+      |> Enum.intersperse(",")
+
+    [
+      """
+      WITH
+        stream AS (
+          UPDATE streams SET stream_version = stream_version + $2
+          WHERE stream_id = $1
+          RETURNING stream_version - $2 as initial_stream_version
+        ),
+        events (index, event_id) AS (
+          VALUES
+      """,
+      params,
+      """
+        )
       INSERT INTO stream_events
         (
           stream_id,
           stream_version,
-          event_id
+          event_id,
+          original_stream_id,
+          original_stream_version
         )
       SELECT
         $1,
         stream.initial_stream_version + events.index,
-        events.event_id
-      FROM events, stream;
+        events.event_id,
+        $3,
+        original_stream_events.stream_version
+      FROM events
+      CROSS JOIN stream
+      INNER JOIN stream_events as original_stream_events
+        ON original_stream_events.event_id = events.event_id AND original_stream_events.stream_id = $3;
       """,
     ]
   end
@@ -406,20 +472,21 @@ WHERE source_uuid = $1;
   def read_events_forward do
 """
 SELECT
+  se.stream_version,
   e.event_id,
-  e.event_number,
   s.stream_uuid,
-  e.stream_version,
+  se.original_stream_version,
   e.event_type,
   e.correlation_id,
   e.causation_id,
   e.data,
   e.metadata,
   e.created_at
-FROM events e
-INNER JOIN streams s ON s.stream_id = e.stream_id
-WHERE e.stream_id = $1 and e.stream_version >= $2
-ORDER BY e.stream_version ASC
+FROM stream_events se
+INNER JOIN streams s ON s.stream_id = se.original_stream_id
+INNER JOIN events e ON se.event_id = e.event_id
+WHERE se.stream_id = $1 and se.stream_version >= $2
+ORDER BY se.stream_version ASC
 LIMIT $3;
 """
   end
@@ -428,7 +495,6 @@ LIMIT $3;
 """
 SELECT
   e.event_id,
-  e.event_number,
   s.stream_uuid,
   e.stream_version,
   e.event_type,

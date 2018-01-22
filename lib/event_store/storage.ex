@@ -54,14 +54,6 @@ defmodule EventStore.Storage do
   end
 
   @doc """
-  Read events for all streams forward from the starting event id, use zero for
-  all events for all streams.
-  """
-  def read_all_streams_forward(start_event_number, count) do
-    Reader.read_all_forward(@event_store, start_event_number, count)
-  end
-
-  @doc """
   Get the id and version of the stream with the given `stream_uuid`.
   """
   def stream_info(stream_uuid) do

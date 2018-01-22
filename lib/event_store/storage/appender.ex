@@ -40,27 +40,25 @@ defmodule EventStore.Storage.Appender do
 
           parameters =
             event_ids
-            |> Enum.with_index(1)
+            |> Stream.with_index(1)
             |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
-          with {:ok, query} = prepare_stream_events(transaction, event_ids),
-               :ok <-
+          with :ok <-
                  insert_stream_events(
                    transaction,
-                   query,
                    parameters,
                    stream_uuid,
                    stream_id,
                    event_count
                  ),
                :ok <-
-                 insert_stream_events(
+                 insert_link_events(
                    transaction,
-                   query,
                    parameters,
                    @all_stream,
                    @all_stream_id,
-                   event_count
+                   event_count,
+                   stream_id
                  ) do
             :ok
           else
@@ -110,20 +108,28 @@ defmodule EventStore.Storage.Appender do
     end)
   end
 
-  defp prepare_stream_events(conn, event_ids) do
-    event_count = length(event_ids)
+  defp insert_stream_events(conn, parameters, stream_uuid, stream_id, event_count) do
     statement = Statements.create_stream_events(event_count)
+    params = [stream_id | [event_count | parameters]]
 
-    Postgrex.prepare(conn, "", statement, pool: DBConnection.Poolboy)
+    conn
+    |> Postgrex.query(statement, params, pool: DBConnection.Poolboy)
+    |> handle_response(stream_uuid)
   end
 
-  defp insert_stream_events(conn, query, parameters, stream_uuid, stream_id, event_count) do
+  defp insert_link_events(
+         conn,
+         parameters,
+         stream_uuid,
+         stream_id,
+         event_count,
+         original_stream_id
+       ) do
+    statement = Statements.create_link_events(event_count)
+    params = [stream_id | [event_count | [original_stream_id | parameters]]]
+
     conn
-    |> Postgrex.execute(
-      query,
-      [stream_id | [event_count | parameters]],
-      pool: DBConnection.Poolboy
-    )
+    |> Postgrex.query(statement, params, pool: DBConnection.Poolboy)
     |> handle_response(stream_uuid)
   end
 

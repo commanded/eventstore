@@ -7,9 +7,13 @@ defmodule EventStore.RecordedEvent do
 
   ## Recorded event fields
 
+    - `event_number` - position of the event within the stream. This will be
+      identical to the `stream_version` when fetching events from a single
+      stream. For the `$all` stream it will be the globally unique and ordered
+      event number.
     - `event_id` - a globally unique UUID to identify the event.
-    - `stream_uuid` - the stream identity for the event.
-    - `stream_version` - the version of the stream for the event.
+    - `stream_uuid` - the original stream identity for the event.
+    - `stream_version` - the original version of the stream for the event.
     - `correlation_id` - an optional UUID identifier used to correlate related
       messages.
     - `causation_id` - an optional UUID identifier used to identify which
@@ -26,6 +30,7 @@ defmodule EventStore.RecordedEvent do
   @type uuid :: String.t()
 
   @type t :: %RecordedEvent{
+          event_number: non_neg_integer(),
           event_id: uuid(),
           stream_uuid: String.t(),
           stream_version: non_neg_integer(),
@@ -38,6 +43,7 @@ defmodule EventStore.RecordedEvent do
         }
 
   defstruct [
+    :event_number,
     :event_id,
     :stream_uuid,
     :stream_version,

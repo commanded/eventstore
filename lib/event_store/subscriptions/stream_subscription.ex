@@ -1,21 +1,13 @@
 defmodule EventStore.Subscriptions.StreamSubscription do
   @moduledoc false
-  alias EventStore.{
-    RecordedEvent,
-    Storage,
-  }
-  alias EventStore.Subscriptions.{
-    AllStreamsSubscription,
-    SingleStreamSubscription,
-    SubscriptionState,
-    Subscription,
-  }
+
+  alias EventStore.{RecordedEvent, Storage}
+  alias EventStore.Subscriptions.{SubscriptionState, Subscription}
 
   use Fsm, initial_state: :initial, initial_data: %SubscriptionState{}
 
   require Logger
 
-  @all_stream "$all"
   @max_buffer_size 1_000
 
   # The main flow between states in this finite state machine is:
@@ -336,7 +328,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
             |> Stream.chunk_by(&chunk_by(&1))
             |> Stream.each(fn events ->
               notify_subscriber(data, events)
-              wait_for_ack(events, data)
+              wait_for_ack(events)
             end)
             |> Stream.map(&Enum.at(&1, -1))
             |> Enum.at(-1)
@@ -354,17 +346,12 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     end
   end
 
-  defp unseen_event_stream(@all_stream, last_seen, read_batch_size) do
-    AllStream.stream_forward(last_seen + 1, read_batch_size)
-  end
-
   defp unseen_event_stream(stream_uuid, last_seen, read_batch_size) do
-    Stream.stream_forward(stream_uuid, last_seen + 1, read_batch_size)
+    EventStore.Streams.Stream.stream_forward(stream_uuid, last_seen + 1, read_batch_size)
   end
-
 
   # wait until the subscriber ack's the last sent event
-  defp wait_for_ack(events, %SubscriptionState{} = data) when is_list(events) do
+  defp wait_for_ack(events) when is_list(events) do
     events
     |> last_event_number()
     |> wait_for_ack()
@@ -386,7 +373,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   end
 
   # send the catch-up process an acknowledgement of receipt, allowing it to continue stream events to subscriber
-  defp ack_catch_up(%SubscriptionState{stream_uuid: stream_uuid, catch_up_pid: catch_up_pid} = data, ack) do
+  defp ack_catch_up(%SubscriptionState{catch_up_pid: catch_up_pid} = data, ack) do
     send(catch_up_pid, {:ack, ack})
 
     data
