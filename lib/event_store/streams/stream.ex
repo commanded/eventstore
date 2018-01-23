@@ -46,7 +46,7 @@ defmodule EventStore.Streams.Stream do
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
     {start_from, opts} = Keyword.pop(opts, :start_from, :origin)
 
-    opts = Keyword.merge([start_from_stream_version: start_from_stream_version(stream_uuid, start_from)], opts)
+    opts = Keyword.merge([start_from: start_from_stream_version(stream_uuid, start_from)], opts)
 
     Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
   end

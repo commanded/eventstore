@@ -386,9 +386,9 @@ RETURNING stream_id;
 
   def create_subscription do
 """
-INSERT INTO subscriptions (stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version)
-VALUES ($1, $2, $3, $4)
-RETURNING subscription_id, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, created_at;
+INSERT INTO subscriptions (stream_uuid, subscription_name, last_seen)
+VALUES ($1, $2, $3)
+RETURNING subscription_id, stream_uuid, subscription_name, last_seen, created_at;
 """
   end
 
@@ -408,7 +408,7 @@ SELECT pg_try_advisory_lock($1);
   def ack_last_seen_event do
 """
 UPDATE subscriptions
-SET last_seen_event_number = $3, last_seen_stream_version = $4
+SET last_seen = $3
 WHERE stream_uuid = $1 AND subscription_name = $2;
 """
   end
@@ -431,7 +431,7 @@ WHERE source_uuid = $1;
 
   def query_all_subscriptions do
 """
-SELECT subscription_id, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, created_at
+SELECT subscription_id, stream_uuid, subscription_name, last_seen, created_at
 FROM subscriptions
 ORDER BY created_at;
 """
@@ -439,7 +439,7 @@ ORDER BY created_at;
 
   def query_get_subscription do
 """
-SELECT subscription_id, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, created_at
+SELECT subscription_id, stream_uuid, subscription_name, last_seen, created_at
 FROM subscriptions
 WHERE stream_uuid = $1 AND subscription_name = $2;
 """
@@ -488,26 +488,6 @@ INNER JOIN events e ON se.event_id = e.event_id
 WHERE se.stream_id = $1 and se.stream_version >= $2
 ORDER BY se.stream_version ASC
 LIMIT $3;
-"""
-  end
-
-  def read_all_events_forward do
-"""
-SELECT
-  e.event_id,
-  s.stream_uuid,
-  e.stream_version,
-  e.event_type,
-  e.correlation_id,
-  e.causation_id,
-  e.data,
-  e.metadata,
-  e.created_at
-FROM events e
-INNER JOIN streams s ON s.stream_id = e.stream_id
-WHERE e.event_number >= $1
-ORDER BY e.event_number ASC
-LIMIT $2;
 """
   end
 

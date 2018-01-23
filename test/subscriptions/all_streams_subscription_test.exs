@@ -36,7 +36,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     end
 
     test "create subscription to all streams from starting event id", context do
-      subscription = create_subscription(context, start_from_event_number: 2)
+      subscription = create_subscription(context, start_from: 2)
 
       assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name

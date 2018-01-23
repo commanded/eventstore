@@ -66,18 +66,6 @@ defmodule EventStoreTest do
     assert_recorded_event(stream_uuid, created_event, recorded_event)
   end
 
-  defp assert_recorded_event(expected_stream_uuid, expected_event, %RecordedEvent{} = recorded_event) do
-    assert_is_uuid(recorded_event.event_id)
-    assert_is_uuid(recorded_event.causation_id)
-    assert_is_uuid(recorded_event.correlation_id)
-    assert recorded_event.stream_uuid == expected_stream_uuid
-    assert recorded_event.stream_version == 1
-    assert recorded_event.event_type == expected_event.event_type
-    assert recorded_event.data == expected_event.data
-    assert recorded_event.metadata == expected_event.metadata
-    assert %NaiveDateTime{} = recorded_event.created_at
-  end
-
   test "unicode character support" do
     unicode_text = "Unicode characters are supported ✅"
     stream_uuid = UUID.uuid4()
@@ -207,6 +195,18 @@ defmodule EventStoreTest do
     :ok = EventStore.record_snapshot(snapshot)
 
     snapshot
+  end
+
+  defp assert_recorded_event(expected_stream_uuid, expected_event, %RecordedEvent{} = recorded_event) do
+    assert_is_uuid(recorded_event.event_id)
+    assert_is_uuid(recorded_event.causation_id)
+    assert_is_uuid(recorded_event.correlation_id)
+    assert recorded_event.stream_uuid == expected_stream_uuid
+    assert recorded_event.stream_version == 1
+    assert recorded_event.event_type == expected_event.event_type
+    assert recorded_event.data == expected_event.data
+    assert recorded_event.metadata == expected_event.metadata
+    assert %NaiveDateTime{} = recorded_event.created_at
   end
 
   defp assert_is_uuid(uuid) do

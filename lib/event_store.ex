@@ -60,9 +60,10 @@ defmodule EventStore do
 
   """
   @spec append_to_stream(String.t, expected_version, list(EventData.t), timeout()) :: :ok |
-    {:error, :wrong_expected_version} |
+    {:error, :cannot_append_to_all_stream} |
     {:error, :stream_exists} |
     {:error, :stream_does_not_exist} |
+    {:error, :wrong_expected_version} |
     {:error, reason :: term}
   def append_to_stream(stream_uuid, expected_version, events, timeout \\ 5_000)
 

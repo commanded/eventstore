@@ -8,7 +8,6 @@ defmodule EventStore.Storage do
   alias EventStore.Storage.{
     Appender,
     CreateStream,
-    QueryLatestEventNumber,
     QueryStreamInfo,
     Reader,
     Snapshot,
@@ -64,8 +63,10 @@ defmodule EventStore.Storage do
   Create, or locate an existing, persistent subscription to a stream using a
   unique name and starting position (event number or stream version).
   """
-  def subscribe_to_stream(stream_uuid, subscription_name, start_from_event_number \\ nil, start_from_stream_version \\ nil) do
-    Subscription.subscribe_to_stream(@event_store, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version, pool: DBConnection.Poolboy)
+  def subscribe_to_stream(stream_uuid, subscription_name, start_from \\ nil)
+  
+  def subscribe_to_stream(stream_uuid, subscription_name, start_from) do
+    Subscription.subscribe_to_stream(@event_store, stream_uuid, subscription_name, start_from, pool: DBConnection.Poolboy)
   end
 
   @doc """
@@ -80,8 +81,8 @@ defmodule EventStore.Storage do
   @doc """
   Acknowledge receipt of an event by its number, for a single subscription.
   """
-  def ack_last_seen_event(stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version) do
-    Subscription.ack_last_seen_event(@event_store, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, pool: DBConnection.Poolboy)
+  def ack_last_seen_event(stream_uuid, subscription_name, last_seen) do
+    Subscription.ack_last_seen_event(@event_store, stream_uuid, subscription_name, last_seen, pool: DBConnection.Poolboy)
   end
 
   @doc """

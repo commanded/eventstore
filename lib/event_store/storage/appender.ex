@@ -8,7 +8,6 @@ defmodule EventStore.Storage.Appender do
   alias EventStore.RecordedEvent
   alias EventStore.Sql.Statements
 
-  @all_stream "$all"
   @all_stream_id 0
 
   @doc """
@@ -30,7 +29,7 @@ defmodule EventStore.Storage.Appender do
         |> Stream.map(&encode_uuids/1)
         |> Stream.chunk_every(1_000)
         |> Enum.map(fn batch ->
-          case insert_event_batch(transaction, stream_uuid, batch) do
+          case insert_event_batch(transaction, batch) do
             :ok -> Enum.map(batch, & &1.event_id)
             {:error, reason} -> Postgrex.rollback(transaction, reason)
           end
@@ -43,19 +42,11 @@ defmodule EventStore.Storage.Appender do
             |> Stream.with_index(1)
             |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
-          with :ok <-
-                 insert_stream_events(
-                   transaction,
-                   parameters,
-                   stream_uuid,
-                   stream_id,
-                   event_count
-                 ),
+          with :ok <- insert_stream_events(transaction, parameters, stream_id, event_count),
                :ok <-
                  insert_link_events(
                    transaction,
                    parameters,
-                   @all_stream,
                    @all_stream_id,
                    event_count,
                    stream_id
@@ -69,8 +60,17 @@ defmodule EventStore.Storage.Appender do
       pool: DBConnection.Poolboy
     )
     |> case do
-      {:ok, :ok} -> :ok
-      reply -> reply
+      {:ok, :ok} ->
+        Logger.debug(fn ->
+          "Appended #{length(events)} event(s) to stream #{inspect(stream_uuid)}"
+        end)
+
+        :ok
+
+      reply ->
+        Logger.warn(fn -> "Failed to append events to stream #{inspect(stream_uuid)}" end)
+
+        reply
     end
   end
 
@@ -83,14 +83,14 @@ defmodule EventStore.Storage.Appender do
     }
   end
 
-  defp insert_event_batch(conn, stream_uuid, events) do
+  defp insert_event_batch(conn, events) do
     event_count = length(events)
     statement = Statements.create_events(event_count)
     parameters = build_insert_parameters(events)
 
     conn
     |> Postgrex.query(statement, parameters, pool: DBConnection.Poolboy)
-    |> handle_response(stream_uuid)
+    |> handle_response()
   end
 
   defp build_insert_parameters(events) do
@@ -108,19 +108,18 @@ defmodule EventStore.Storage.Appender do
     end)
   end
 
-  defp insert_stream_events(conn, parameters, stream_uuid, stream_id, event_count) do
+  defp insert_stream_events(conn, parameters, stream_id, event_count) do
     statement = Statements.create_stream_events(event_count)
     params = [stream_id | [event_count | parameters]]
 
     conn
     |> Postgrex.query(statement, params, pool: DBConnection.Poolboy)
-    |> handle_response(stream_uuid)
+    |> handle_response()
   end
 
   defp insert_link_events(
          conn,
          parameters,
-         stream_uuid,
          stream_id,
          event_count,
          original_stream_id
@@ -130,29 +129,25 @@ defmodule EventStore.Storage.Appender do
 
     conn
     |> Postgrex.query(statement, params, pool: DBConnection.Poolboy)
-    |> handle_response(stream_uuid)
+    |> handle_response()
   end
 
   defp uuid(nil), do: nil
   defp uuid(uuid), do: UUID.string_to_binary!(uuid)
 
-  defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}, stream_uuid) do
-    Logger.warn(fn -> "Failed to append any events to stream #{inspect(stream_uuid)}" end)
-    {:error, :failed_to_append_events}
+  defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}) do
+    {:error, :stream_not_found}
   end
 
-  defp handle_response({:ok, %Postgrex.Result{} = result}, stream_uuid) do
-    %Postgrex.Result{num_rows: num_rows, rows: rows} = result
-
-    Logger.debug(fn -> "Appended #{num_rows} event(s) to stream #{inspect(stream_uuid)}" end)
+  defp handle_response({:ok, %Postgrex.Result{}}) do
     :ok
   end
 
-  defp handle_response({:error, %Postgrex.Error{}} = error, stream_uuid) do
+  defp handle_response({:error, %Postgrex.Error{} = error}) do
     %Postgrex.Error{postgres: %{code: error_code}, message: message} = error
 
     Logger.warn(fn ->
-      "Failed to append events to stream #{inspect(stream_uuid)} due to: #{inspect(message)}"
+      "Failed to append events to stream due to: #{inspect(message)}"
     end)
 
     case error_code do
@@ -161,9 +156,9 @@ defmodule EventStore.Storage.Appender do
     end
   end
 
-  defp handle_response({:error, reason}, stream_uuid) do
+  defp handle_response({:error, reason}) do
     Logger.warn(fn ->
-      "Failed to append events to stream #{inspect(stream_uuid)} due to: #{inspect(reason)}"
+      "Failed to append events to stream due to: #{inspect(reason)}"
     end)
 
     {:error, reason}

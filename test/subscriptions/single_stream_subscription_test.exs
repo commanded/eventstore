@@ -36,7 +36,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
     end
 
     test "create subscription to a single stream from starting stream version", context do
-      subscription = create_subscription(context, start_from_stream_version: 2)
+      subscription = create_subscription(context, start_from: 2)
 
       assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name

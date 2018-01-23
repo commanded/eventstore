@@ -42,7 +42,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
 
-      {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), start_from_stream_version: 1)
+      {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), start_from: 1)
 
       :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
 
@@ -214,7 +214,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_initial_events)
       :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_initial_events)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), start_from_event_number: 2)
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), start_from: 2)
 
       :ok = Stream.append_to_stream(stream1_uuid, 1, stream1_new_events)
       :ok = Stream.append_to_stream(stream2_uuid, 1, stream2_new_events)
@@ -453,7 +453,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       events = EventFactory.create_events(3)
 
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name <> "-single", self())
-      {:ok, _subscription} = subscribe_to_all_streams(subscription_name <> "-all", self(), start_from_event_number: 3)
+      {:ok, _subscription} = subscribe_to_all_streams(subscription_name <> "-all", self(), start_from: 3)
 
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
 
@@ -520,11 +520,11 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     defp create_two_duplicate_subscriptions(%{subscription_name: subscription_name}) do
       postgrex_config = Config.parsed() |> Config.subscription_postgrex_opts()
 
-      {:ok, subscription1} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from_event_number: 0)
+      {:ok, subscription1} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from: 0)
 
       wait_until_subscribed(subscription1)
 
-      {:ok, subscription2} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from_event_number: 0)
+      {:ok, subscription2} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from: 0)
 
       [
         subscription1: subscription1,

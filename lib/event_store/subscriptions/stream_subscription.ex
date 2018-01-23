@@ -278,10 +278,9 @@ defmodule EventStore.Subscriptions.StreamSubscription do
       subscription_name: subscription_name
     } = data
 
-    start_from_event_number = Keyword.get(opts, :start_from_event_number)
-    start_from_stream_version = Keyword.get(opts, :start_from_stream_version)
+    start_from = Keyword.get(opts, :start_from)
 
-    Storage.Subscription.subscribe_to_stream(conn, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version)
+    Storage.Subscription.subscribe_to_stream(conn, stream_uuid, subscription_name, start_from)
   end
 
   defp try_acquire_exclusive_lock(conn, %Storage.Subscription{subscription_id: subscription_id}) do
@@ -419,7 +418,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     do: send(subscriber, {:events, events})
 
   defp ack_events(%SubscriptionState{stream_uuid: stream_uuid, subscription_name: subscription_name} = data, ack) do
-    :ok = Storage.ack_last_seen_event(stream_uuid, subscription_name, ack, nil)
+    :ok = Storage.ack_last_seen_event(stream_uuid, subscription_name, ack)
 
     %SubscriptionState{data| last_ack: ack}
   end
