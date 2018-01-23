@@ -17,8 +17,8 @@ defmodule EventStore.Sql.Statements do
       create_stream_events_index(),
       prevent_stream_events_update(),
       prevent_stream_events_delete(),
-      # create_notify_events_function(),
-      # create_event_notification_trigger(),
+      create_notify_events_function(),
+      create_event_notification_trigger(),
       create_subscriptions_table(),
       create_subscription_index(),
       create_snapshots_table(),
@@ -148,8 +148,14 @@ CREATE OR REPLACE FUNCTION notify_events()
 DECLARE
   payload text;
 BEGIN
-    -- Payload text contains first and last event numbers separated by a comma (e.g. '1,5')
-    payload := (OLD.event_number + 1) || ',' || NEW.event_number;
+    -- Payload text contains:
+    --  * `stream_uuid`
+    --  * `stream_id`
+    --  * first `stream_version`
+    --  * last `stream_version`
+    -- Each separated by a comma (e.g. 'stream-12345,1,1,5')
+
+    payload := NEW.stream_uuid || ',' || NEW.stream_id || ',' || (OLD.stream_version + 1) || ',' || NEW.stream_version;
 
     -- Notify events to listeners
     PERFORM pg_notify('events', payload);

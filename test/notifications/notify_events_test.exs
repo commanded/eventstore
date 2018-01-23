@@ -23,16 +23,19 @@ defmodule EventStore.Notifications.NotifyEventsTest do
   end
 
   test "should notify events when appended", %{ref: ref} do
-    stream_uuid = UUID.uuid4()
+    stream_uuid = "example-stream"
 
     append_events(stream_uuid, 3)
-    assert_receive {:notification, _connection_pid, ^ref, @channel, "1,3"}
+    assert_receive {:notification, _connection_pid, ^ref, @channel, "example-stream,1,1,3"}
+    assert_receive {:notification, _connection_pid, ^ref, @channel, "$all,0,1,3"}
 
     append_events(stream_uuid, 2, 3)
-    assert_receive {:notification, _connection_pid, ^ref, @channel, "4,5"}
+    assert_receive {:notification, _connection_pid, ^ref, @channel, "example-stream,1,4,5"}
+    assert_receive {:notification, _connection_pid, ^ref, @channel, "$all,0,4,5"}
 
     append_events(stream_uuid, 1, 5)
-    assert_receive {:notification, _connection_pid, ^ref, @channel, "6,6"}
+    assert_receive {:notification, _connection_pid, ^ref, @channel, "example-stream,1,6,6"}
+    assert_receive {:notification, _connection_pid, ^ref, @channel, "$all,0,6,6"}
   end
 
   defp append_events(stream_uuid, count, expected_version \\ 0) do

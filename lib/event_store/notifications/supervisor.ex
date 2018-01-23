@@ -14,7 +14,6 @@ defmodule EventStore.Notifications.Supervisor do
   alias EventStore.Config
 
   alias EventStore.Notifications.{
-    AllStreamBroadcaster,
     Listener,
     Reader,
     StreamBroadcaster
@@ -54,7 +53,6 @@ defmodule EventStore.Notifications.Supervisor do
         },
         {Listener, []},
         {Reader, []},
-        {AllStreamBroadcaster, []},
         {StreamBroadcaster, []}
       ],
       strategy: :one_for_all

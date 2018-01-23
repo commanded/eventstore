@@ -303,9 +303,9 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     }
   end
 
-  defp first_event_number([%RecordedEvent{stream_version: stream_version} | _]), do: stream_version
+  defp first_event_number([%RecordedEvent{event_number: event_number} | _]), do: event_number
 
-  defp last_event_number([%RecordedEvent{stream_version: stream_version}]), do: stream_version
+  defp last_event_number([%RecordedEvent{event_number: event_number}]), do: event_number
   defp last_event_number([_event | events]), do: last_event_number(events)
 
   # Fetch unseen events from the stream, transition to `subscribed` state when
@@ -334,7 +334,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
           last_seen = case last_event do
             nil -> last_seen
-            %RecordedEvent{stream_version: stream_version} -> stream_version
+            %RecordedEvent{event_number: event_number} -> event_number
           end
 
           # notify subscription caught up to given last seen event
@@ -356,7 +356,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     |> wait_for_ack()
   end
 
-  # wait until the subscriber ack's the `event_number` or `stream_version`
+  # wait until the subscriber ack's the `event_number`
   defp wait_for_ack(ack) do
     receive do
       {:ack, ^ack} ->
@@ -381,11 +381,11 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   # send pending events to subscriber if ready to receive them
   defp notify_pending_events(%SubscriptionState{pending_events: []} = data), do: data
   defp notify_pending_events(%SubscriptionState{pending_events: pending_events, last_ack: last_ack} = data) do
-    [%RecordedEvent{stream_version: stream_version} | _events] = pending_events
+    [%RecordedEvent{event_number: event_number} | _events] = pending_events
 
     next_ack = last_ack + 1
 
-    case stream_version do
+    case event_number do
       ^next_ack ->
         # subscriber has ack'd last received event, so send pending
         pending_events

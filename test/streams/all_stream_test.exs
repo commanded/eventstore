@@ -2,16 +2,17 @@ defmodule EventStore.Streams.AllStreamTest do
   use EventStore.StorageCase
 
   alias EventStore.EventFactory
-  alias EventStore.Streams.{AllStream,Stream}
+  alias EventStore.Streams.Stream
   alias EventStore.Subscriptions.Subscription
 
+  @all_stream "$all"
   @subscription_name "test_subscription"
 
   describe "read stream forward" do
     setup [:append_events_to_streams]
 
     test "should fetch events from all streams" do
-      {:ok, read_events} = AllStream.read_stream_forward(0, 1_000)
+      {:ok, read_events} = Stream.read_stream_forward(@all_stream, 0, 1_000)
 
       assert length(read_events) == 6
     end
@@ -21,19 +22,19 @@ defmodule EventStore.Streams.AllStreamTest do
     setup [:append_events_to_streams]
 
     test "should stream events from all streams using single event batch size" do
-      read_events = AllStream.stream_forward(0, 1) |> Enum.to_list()
+      read_events = Stream.stream_forward(@all_stream, 0, 1) |> Enum.to_list()
 
       assert length(read_events) == 6
     end
 
     test "should stream events from all streams using two event batch size" do
-      read_events = AllStream.stream_forward(0, 2) |> Enum.to_list()
+      read_events = Stream.stream_forward(@all_stream, 0, 2) |> Enum.to_list()
 
       assert length(read_events) == 6
     end
 
     test "should stream events from all streams uisng large batch size" do
-      read_events = AllStream.stream_forward(0, 1_000) |> Enum.to_list()
+      read_events = Stream.stream_forward(@all_stream, 0, 1_000) |> Enum.to_list()
 
       assert length(read_events) == 6
     end
@@ -43,7 +44,7 @@ defmodule EventStore.Streams.AllStreamTest do
     setup [:append_events_to_streams]
 
     test "from origin should receive all events" do
-      {:ok, subscription} = AllStream.subscribe_to_stream(@subscription_name, self(), start_from: :origin)
+      {:ok, subscription} = Stream.subscribe_to_stream(@all_stream, @subscription_name, self(), start_from: :origin)
 
       assert_receive {:events, received_events1}
       Subscription.ack(subscription, received_events1)
@@ -57,7 +58,7 @@ defmodule EventStore.Streams.AllStreamTest do
     end
 
     test "from current should receive only new events", context do
-      {:ok, _subscription} = AllStream.subscribe_to_stream(@subscription_name, self(), start_from: :current)
+      {:ok, _subscription} = Stream.subscribe_to_stream(@all_stream, @subscription_name, self(), start_from: :current)
 
       refute_receive {:events, _received_events}
 
@@ -69,7 +70,7 @@ defmodule EventStore.Streams.AllStreamTest do
     end
 
     test "from given event id should receive only later events" do
-      {:ok, subscription} = AllStream.subscribe_to_stream(@subscription_name, self(), start_from: 2)
+      {:ok, subscription} = Stream.subscribe_to_stream(@all_stream, @subscription_name, self(), start_from: 2)
 
       assert_receive {:events, received_events1}
       Subscription.ack(subscription, received_events1)
