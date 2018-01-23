@@ -55,8 +55,8 @@ defmodule EventStore.Subscriptions.Subscription do
   @doc """
   Confirm receipt of the given event
   """
-  def ack(subscription, %RecordedEvent{stream_version: stream_version}) do
-    GenServer.cast(subscription, {:ack, stream_version})
+  def ack(subscription, %RecordedEvent{event_number: event_number}) do
+    GenServer.cast(subscription, {:ack, event_number})
   end
 
   @doc false

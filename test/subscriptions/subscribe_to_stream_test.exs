@@ -24,7 +24,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
 
       assert_receive {:events, received_events}
-      assert pluck(received_events, :event_number) == [4, 5, 6]
+      assert pluck(received_events, :event_number) == [1, 2, 3]
       assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
       assert pluck(received_events, :stream_version) == [1, 2, 3]
       assert pluck(received_events, :correlation_id) == pluck(events, :correlation_id)
@@ -47,7 +47,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
 
       assert_receive {:events, received_events}
-      assert pluck(received_events, :event_number) == [5]
+      assert pluck(received_events, :event_number) == [2]
       assert pluck(received_events, :stream_uuid) == [stream_uuid]
       assert pluck(received_events, :stream_version) == [2]
       assert pluck(received_events, :correlation_id) == pluck(new_events, :correlation_id)
@@ -92,7 +92,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
 
       assert_receive {:events, received_mapped_events}
-      assert received_mapped_events == [4, 5, 6]
+      assert received_mapped_events == [1, 2, 3]
     end
 
     test "subscribe to single stream should continue receiving events after ack", %{subscription_name: subscription_name} do
@@ -458,14 +458,14 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = Stream.append_to_stream(stream_uuid, 0, events)
 
       # should receive events twice
-      assert_receive_events(stream_uuid, events)
-      assert_receive_events(stream_uuid, events)
+      assert_receive_events(stream_uuid, events, [1, 2, 3])
+      assert_receive_events(stream_uuid, events, [4, 5, 6])
       refute_receive {:events, _received_events}
     end
 
-    defp assert_receive_events(stream_uuid, expected_events) do
+    defp assert_receive_events(stream_uuid, expected_events, expected_event_numbers) do
       assert_receive {:events, received_events}
-      assert pluck(received_events, :event_number) == [4, 5, 6]
+      assert pluck(received_events, :event_number) == expected_event_numbers
       assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
       assert pluck(received_events, :stream_version) == [1, 2, 3]
       assert pluck(received_events, :correlation_id) == pluck(expected_events, :correlation_id)

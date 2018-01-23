@@ -145,7 +145,7 @@ defmodule EventStore.Storage.Appender do
 
   defp handle_response({:error, %Postgrex.Error{} = error}) do
     %Postgrex.Error{postgres: %{code: error_code}, message: message} = error
-IO.inspect error
+
     Logger.warn(fn ->
       "Failed to append events to stream due to: #{inspect(message)}"
     end)
