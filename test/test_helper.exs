@@ -1,4 +1,4 @@
-exclude = [:manual, :ignore]
+exclude = [:ignore, :manual, :slow]
 
 case Application.get_env(:eventstore, :registry) do
   :local ->

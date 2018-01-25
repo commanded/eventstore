@@ -99,7 +99,7 @@ EventStore using PostgreSQL for persistence.
       "es.setup":           ["event_store.setup"],
       "es.reset":           ["event_store.reset"],
       "benchmark":          ["es.reset", "app.start", "bench"],
-      "test.all":           ["test.registries", "test.jsonb", "test --only manual"],
+      "test.all":           ["test.registries", "test.jsonb", "test --only slow"],
       "test.jsonb":         &test_jsonb/1,
       "test.registries":    &test_registries/1,
       "test.distributed":   &test_distributed/1,
