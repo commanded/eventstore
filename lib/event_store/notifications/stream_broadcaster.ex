@@ -5,7 +5,7 @@ defmodule EventStore.Notifications.StreamBroadcaster do
 
   use GenStage
 
-  alias EventStore.{RecordedEvent,Registration}
+  alias EventStore.Registration
   alias EventStore.Notifications.Reader
 
   def start_link(args) do

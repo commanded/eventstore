@@ -3,15 +3,41 @@ defmodule EventStore.MigrateEventStoreTest do
 
   defmodule(ExampleData, do: defstruct([:data]))
 
-  alias EventStore.{EventFactory, ProcessHelper}
+  alias EventStore.{EventFactory, ProcessHelper, Wait}
   alias EventStore.Snapshots.SnapshotData
   alias EventStore.Storage.Database
+
+  defmodule Subscriber do
+    use GenServer
+
+    def start_link do
+      GenServer.start_link(__MODULE__, [])
+    end
+
+    def pop_events(server) do
+      GenServer.call(server, :pop_events)
+    end
+
+    def init(state) do
+      {:ok, state}
+    end
+
+    def handle_info({:events, events}, state) do
+      {:noreply, [events | state]}
+    end
+
+    def handle_call(:pop_events, _from, state) do
+      {events, state} = List.pop_at(state, -1, [])
+
+      {:reply, events, state}
+    end
+  end
 
   setup [
     :append_events_to_first_stream,
     :append_events_to_second_stream,
-    :create_all_stream_subscription,
     :create_single_stream_subscription,
+    :create_all_stream_subscription,
     :ack_first_event_in_subscriptions,
     :create_snapshot
   ]
@@ -26,7 +52,7 @@ defmodule EventStore.MigrateEventStoreTest do
   test "should read single stream events", %{second_stream_uuid: stream_uuid} = context do
     {:ok, events} = EventStore.read_stream_forward(stream_uuid)
 
-    assert_second_stream_events(events, context)
+    assert_second_stream_events(events, context, [1, 2, 3])
   end
 
   test "should read all events", context do
@@ -55,54 +81,62 @@ defmodule EventStore.MigrateEventStoreTest do
 
   test "should receive events from single stream subscription", context do
     %{
+      single_stream_subscriber: subscriber,
       second_stream_uuid: stream_uuid,
       second_stream_events: expected_events
     } = context
 
-    # ignore all stream events
-    assert_receive({:events, _events})
+    Wait.until(fn ->
+      events = Subscriber.pop_events(subscriber)
 
-    assert_receive({:events, events})
-    assert length(events) == 3
-    assert pluck(events, :event_number) == [1, 2, 3]
-    assert pluck(events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
-    assert pluck(events, :stream_version) == [1, 2, 3]
-    assert pluck(events, :correlation_id) == pluck(expected_events, :correlation_id)
-    assert pluck(events, :causation_id) == pluck(expected_events, :causation_id)
-    assert pluck(events, :event_type) == pluck(expected_events, :event_type)
-    assert pluck(events, :data) == pluck(expected_events, :data)
-    assert pluck(events, :metadata) == pluck(expected_events, :metadata)
-    refute pluck(events, :created_at) |> Enum.any?(&is_nil/1)
+      assert length(events) == 3
+      assert pluck(events, :event_number) == [1, 2, 3]
+      assert pluck(events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
+      assert pluck(events, :stream_version) == [1, 2, 3]
+      assert pluck(events, :correlation_id) == pluck(expected_events, :correlation_id)
+      assert pluck(events, :causation_id) == pluck(expected_events, :causation_id)
+      assert pluck(events, :event_type) == pluck(expected_events, :event_type)
+      assert pluck(events, :data) == pluck(expected_events, :data)
+      assert pluck(events, :metadata) == pluck(expected_events, :metadata)
+      refute pluck(events, :created_at) |> Enum.any?(&is_nil/1)
+    end)
   end
 
   test "should receive events from all stream subscription", context do
-    %{all_stream_subscription: all_stream_subscription} = context
+    %{
+      all_stream_subscriber: subscriber,
+      all_stream_subscription: subscription
+    } = context
 
-    assert_receive({:events, events})
-    assert_first_stream_events(events, context)
+    Wait.until(fn ->
+      events = Subscriber.pop_events(subscriber)
+      assert_first_stream_events(events, context)
+    end)
 
-    # ignore single stream events
-    assert_receive({:events, _events})
+    EventStore.ack(subscription, 3)
 
-    EventStore.ack(all_stream_subscription, 3)
-
-    assert_receive({:events, events})
-    assert_second_stream_events(events, context)
+    Wait.until(fn ->
+      events = Subscriber.pop_events(subscriber)
+      assert_second_stream_events(events, context, [4, 5, 6])
+    end)
   end
 
   describe "restart subscriptions" do
     setup context do
       %{
+        all_stream_subscriber: all_stream_subscriber,
         all_stream_subscription: all_stream_subscription,
-        single_stream_subscription: single_stream_subscription
+        single_stream_subscription: single_stream_subscription,
+        single_stream_subscriber: single_stream_subscriber
       } = context
 
-      # ignore all and single stream events already sent by subscriptions
-      assert_receive({:events, _events})
-      assert_receive({:events, _events})
+      Process.unlink(all_stream_subscriber)
+      Process.unlink(single_stream_subscriber)
 
       ProcessHelper.shutdown(all_stream_subscription)
       ProcessHelper.shutdown(single_stream_subscription)
+      ProcessHelper.shutdown(all_stream_subscriber)
+      ProcessHelper.shutdown(single_stream_subscriber)
 
       :ok
     end
@@ -115,20 +149,25 @@ defmodule EventStore.MigrateEventStoreTest do
 
       expected_events = Enum.drop(expected_events, 1)
 
-      create_single_stream_subscription(context)
+      [
+        single_stream_subscriber: subscriber,
+        single_stream_subscription: _subscription
+      ] = create_single_stream_subscription(context)
 
       # subscription already ack'd first event
-      assert_receive({:events, events})
-      assert length(events) == 2
-      assert pluck(events, :event_number) == [5, 6]
-      assert pluck(events, :stream_uuid) == [stream_uuid, stream_uuid]
-      assert pluck(events, :stream_version) == [2, 3]
-      assert pluck(events, :correlation_id) == pluck(expected_events, :correlation_id)
-      assert pluck(events, :causation_id) == pluck(expected_events, :causation_id)
-      assert pluck(events, :event_type) == pluck(expected_events, :event_type)
-      assert pluck(events, :data) == pluck(expected_events, :data)
-      assert pluck(events, :metadata) == pluck(expected_events, :metadata)
-      refute pluck(events, :created_at) |> Enum.any?(&is_nil/1)
+      Wait.until(fn ->
+        events = Subscriber.pop_events(subscriber)
+        assert length(events) == 2
+        assert pluck(events, :event_number) == [2, 3]
+        assert pluck(events, :stream_uuid) == [stream_uuid, stream_uuid]
+        assert pluck(events, :stream_version) == [2, 3]
+        assert pluck(events, :correlation_id) == pluck(expected_events, :correlation_id)
+        assert pluck(events, :causation_id) == pluck(expected_events, :causation_id)
+        assert pluck(events, :event_type) == pluck(expected_events, :event_type)
+        assert pluck(events, :data) == pluck(expected_events, :data)
+        assert pluck(events, :metadata) == pluck(expected_events, :metadata)
+        refute pluck(events, :created_at) |> Enum.any?(&is_nil/1)
+      end)
     end
 
     test "should restart all stream subscription from last ack", context do
@@ -137,20 +176,25 @@ defmodule EventStore.MigrateEventStoreTest do
       } = context
 
       [
-        all_stream_subscription: all_stream_subscription
+        all_stream_subscriber: subscriber,
+        all_stream_subscription: subscription
       ] = create_all_stream_subscription(context)
 
       # subscription already ack'd first two events
-      assert_receive({:events, events})
-      assert length(events) == 1
-      assert pluck(events, :event_number) == [3]
-      assert pluck(events, :stream_uuid) == [first_stream_uuid]
-      assert pluck(events, :stream_version) == [3]
+      Wait.until(fn ->
+        events = Subscriber.pop_events(subscriber)
+        assert length(events) == 1
+        assert pluck(events, :event_number) == [3]
+        assert pluck(events, :stream_uuid) == [first_stream_uuid]
+        assert pluck(events, :stream_version) == [3]
+      end)
 
-      EventStore.ack(all_stream_subscription, 3)
+      EventStore.ack(subscription, 3)
 
-      assert_receive({:events, events})
-      assert_second_stream_events(events, context)
+      Wait.until(fn ->
+        events = Subscriber.pop_events(subscriber)
+        assert_second_stream_events(events, context, [4, 5, 6])
+      end)
     end
   end
 
@@ -181,14 +225,14 @@ defmodule EventStore.MigrateEventStoreTest do
     refute pluck(events, :created_at) |> Enum.any?(&is_nil/1)
   end
 
-  defp assert_second_stream_events(events, context) do
+  defp assert_second_stream_events(events, context, expected_event_numbers) do
     %{
       second_stream_uuid: stream_uuid,
       second_stream_events: expected_events
     } = context
 
     assert length(events) == 3
-    assert pluck(events, :event_number) == [4, 5, 6]
+    assert pluck(events, :event_number) == expected_event_numbers
     assert pluck(events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
     assert pluck(events, :stream_version) == [1, 2, 3]
     assert pluck(events, :correlation_id) == pluck(expected_events, :correlation_id)
@@ -227,18 +271,25 @@ defmodule EventStore.MigrateEventStoreTest do
   end
 
   defp create_all_stream_subscription(_context) do
-    {:ok, subscription} = EventStore.subscribe_to_all_streams("all-stream-subscription", self())
+    {:ok, subscriber} = Subscriber.start_link()
+
+    {:ok, subscription} =
+      EventStore.subscribe_to_all_streams("all-stream-subscription", subscriber)
 
     [
+      all_stream_subscriber: subscriber,
       all_stream_subscription: subscription
     ]
   end
 
   defp create_single_stream_subscription(%{second_stream_uuid: stream_uuid}) do
+    {:ok, subscriber} = Subscriber.start_link()
+
     {:ok, subscription} =
-      EventStore.subscribe_to_stream(stream_uuid, "single-stream-subscription", self())
+      EventStore.subscribe_to_stream(stream_uuid, "single-stream-subscription", subscriber)
 
     [
+      single_stream_subscriber: subscriber,
       single_stream_subscription: subscription
     ]
   end
@@ -249,7 +300,7 @@ defmodule EventStore.MigrateEventStoreTest do
       single_stream_subscription: single_stream_subscription
     } = context
 
-    :timer.sleep 500
+    :timer.sleep(100)
 
     EventStore.ack(all_stream_subscription, 2)
     EventStore.ack(single_stream_subscription, 1)
