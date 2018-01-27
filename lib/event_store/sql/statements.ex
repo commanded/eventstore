@@ -231,7 +231,7 @@ CREATE TABLE schema_migrations
   defp record_event_store_schema_version do
 """
 INSERT INTO schema_migrations (major_version, minor_version, patch_version)
-VALUES (0, 13, 0);
+VALUES (0, 14, 0);
 """
   end
 

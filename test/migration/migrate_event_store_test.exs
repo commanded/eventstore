@@ -64,7 +64,7 @@ defmodule EventStore.MigrateEventStoreTest do
 
     assert_receive({:events, events})
     assert length(events) == 3
-    assert pluck(events, :event_number) == [4, 5, 6]
+    assert pluck(events, :event_number) == [1, 2, 3]
     assert pluck(events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
     assert pluck(events, :stream_version) == [1, 2, 3]
     assert pluck(events, :correlation_id) == pluck(expected_events, :correlation_id)
@@ -248,6 +248,8 @@ defmodule EventStore.MigrateEventStoreTest do
       all_stream_subscription: all_stream_subscription,
       single_stream_subscription: single_stream_subscription
     } = context
+
+    :timer.sleep 500
 
     EventStore.ack(all_stream_subscription, 2)
     EventStore.ack(single_stream_subscription, 1)
