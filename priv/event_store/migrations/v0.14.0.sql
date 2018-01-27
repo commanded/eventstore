@@ -1,7 +1,9 @@
 BEGIN;
 
-  -- seed all stream
-  INSERT INTO streams (stream_id, stream_uuid, stream_version) VALUES (0, '$all', 0);
+  -- seed `$all` stream using event counter as its stream version
+  INSERT INTO streams (stream_id, stream_uuid, stream_version)
+  SELECT 0, '$all', event_number
+  FROM event_counter;
 
   -- create `stream_events` table
   CREATE TABLE stream_events
@@ -23,7 +25,7 @@ BEGIN;
   SELECT event_id, stream_id, stream_version, stream_id, stream_version
   FROM events;
 
-  -- seed $all stream events
+  -- seed `$all` stream events
   INSERT INTO stream_events (event_id, stream_id, stream_version, original_stream_id, original_stream_version)
   SELECT event_id, 0, event_number, stream_id, stream_version
   FROM events;
@@ -37,18 +39,15 @@ BEGIN;
     DROP COLUMN stream_id,
     DROP COLUMN stream_version;
 
-  -- reclaim space in events table used by dropped columns
-  UPDATE events SET event_id = event_id;
-  VACUUM FULL events;
-
   -- subscriptions now use single `last_seen` pointer
   ALTER TABLE subscriptions ADD COLUMN last_seen bigint;
 
   UPDATE subscriptions
   SET last_seen = COALESCE(last_seen_event_number, last_seen_stream_version);
 
-  -- record schema migration
-  INSERT INTO schema_migrations (major_version, minor_version, patch_version) VALUES (0, 14, 0);
+  ALTER TABLE subscriptions
+    DROP COLUMN last_seen_event_number,
+    DROP COLUMN last_seen_stream_version;
 
   -- event pub/sub notification function
   CREATE OR REPLACE FUNCTION notify_events()
@@ -70,5 +69,10 @@ BEGIN;
   AFTER UPDATE ON streams
   FOR EACH ROW EXECUTE PROCEDURE notify_events();
 
+  -- stream version of `$all` stream events are used instead of event counter
   DROP TABLE event_counter;
+
+  -- record schema migration
+  INSERT INTO schema_migrations (major_version, minor_version, patch_version) VALUES (0, 14, 0);
+
 COMMIT;

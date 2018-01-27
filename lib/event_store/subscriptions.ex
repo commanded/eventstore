@@ -7,7 +7,7 @@ defmodule EventStore.Subscriptions do
   require Logger
 
   alias EventStore.Subscriptions
-  
+
   @all_stream "$all"
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
@@ -29,7 +29,7 @@ defmodule EventStore.Subscriptions do
   end
 
   defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    _ = Logger.debug(fn -> "Creating subscription process on stream #{inspect stream_uuid} named: #{inspect subscription_name}" end)
+    _ = Logger.debug(fn -> "Subscribing to stream #{inspect stream_uuid} named #{inspect subscription_name} with opts: #{inspect opts}" end)
 
     case Subscriptions.Supervisor.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
       {:ok, subscription} -> {:ok, subscription}

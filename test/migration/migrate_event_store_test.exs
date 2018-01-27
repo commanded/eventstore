@@ -1,6 +1,8 @@
 defmodule EventStore.MigrateEventStoreTest do
   use EventStore.StorageCase
 
+  @moduletag :manual
+
   defmodule(ExampleData, do: defstruct([:data]))
 
   alias EventStore.{EventFactory, ProcessHelper, Wait}
@@ -41,6 +43,15 @@ defmodule EventStore.MigrateEventStoreTest do
     :ack_first_event_in_subscriptions,
     :create_snapshot
   ]
+
+  # setup do
+  #   [
+  #     first_stream_events: EventFactory.create_events(3),
+  #     first_stream_uuid: "86035e26-bd00-4bf2-988a-65e2b0a73830",
+  #     second_stream_events: EventFactory.create_events(3),
+  #     second_stream_uuid: "06a6806b-8cd4-4d58-8020-6b03d35ae1bd"
+  #   ]
+  # end
 
   @tag :manual
   test "should dump database to SQL statement" do
