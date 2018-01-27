@@ -1,7 +1,5 @@
 defmodule EventStore.Storage.Appender do
-  @moduledoc """
-  Append-only storage of events to a stream
-  """
+  @moduledoc false
 
   require Logger
 
@@ -43,14 +41,7 @@ defmodule EventStore.Storage.Appender do
             |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
           with :ok <- insert_stream_events(transaction, parameters, stream_id, event_count),
-               :ok <-
-                 insert_link_events(
-                   transaction,
-                   parameters,
-                   @all_stream_id,
-                   event_count,
-                   stream_id
-                 ) do
+               :ok <- insert_link_events(transaction, parameters, @all_stream_id, event_count) do
             :ok
           else
             {:error, reason} -> Postgrex.rollback(transaction, reason)
@@ -76,6 +67,52 @@ defmodule EventStore.Storage.Appender do
     end
   end
 
+  @doc """
+  Link the given list of existing event ids to another stream in storage.
+
+  Returns `:ok` on success, `{:error, reason}` on failure.
+  """
+  def link(conn, stream_id, event_ids) do
+    Postgrex.transaction(
+      conn,
+      fn transaction ->
+        event_ids
+        |> Stream.map(&encode_uuid/1)
+        |> Stream.chunk_every(1_000)
+        |> Enum.each(fn batch ->
+          count = length(batch)
+
+          parameters =
+            batch
+            |> Stream.with_index(1)
+            |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
+
+          with :ok <- insert_link_events(transaction, parameters, stream_id, count) do
+            :ok
+          else
+            {:error, reason} -> Postgrex.rollback(transaction, reason)
+          end
+        end)
+      end,
+      pool: DBConnection.Poolboy
+    )
+    |> case do
+      {:ok, :ok} ->
+        Logger.debug(fn ->
+          "Linked #{length(event_ids)} event(s) to stream"
+        end)
+
+        :ok
+
+      {:error, reason} = reply ->
+        Logger.warn(fn ->
+          "Failed to link events to stream due to: #{inspect(reason)}"
+        end)
+
+        reply
+    end
+  end
+
   defp encode_uuids(%RecordedEvent{} = event) do
     %RecordedEvent{
       event
@@ -83,6 +120,10 @@ defmodule EventStore.Storage.Appender do
         causation_id: event.causation_id |> uuid(),
         correlation_id: event.correlation_id |> uuid()
     }
+  end
+
+  defp encode_uuid(event_id) when is_bitstring(event_id) do
+    event_id |> uuid()
   end
 
   defp insert_event_batch(conn, events) do
@@ -119,15 +160,9 @@ defmodule EventStore.Storage.Appender do
     |> handle_response()
   end
 
-  defp insert_link_events(
-         conn,
-         parameters,
-         stream_id,
-         event_count,
-         original_stream_id
-       ) do
+  defp insert_link_events(conn, parameters, stream_id, event_count) do
     statement = Statements.create_link_events(event_count)
-    params = [stream_id | [event_count | [original_stream_id | parameters]]]
+    params = [stream_id | [event_count | parameters]]
 
     conn
     |> Postgrex.query(statement, params, pool: DBConnection.Poolboy)
@@ -137,25 +172,31 @@ defmodule EventStore.Storage.Appender do
   defp uuid(nil), do: nil
   defp uuid(uuid), do: UUID.string_to_binary!(uuid)
 
-  defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}) do
-    {:error, :stream_not_found}
-  end
-
-  defp handle_response({:ok, %Postgrex.Result{}}) do
-    :ok
+  defp handle_response({:ok, %Postgrex.Result{num_rows: rows}}) do
+    case rows do
+      0 -> {:error, :not_found}
+      _ -> :ok
+    end
   end
 
   defp handle_response({:error, %Postgrex.Error{} = error}) do
-    %Postgrex.Error{postgres: %{code: error_code}, message: message} = error
+    %Postgrex.Error{
+      postgres: %{
+        code: error_code,
+        constraint: constraint,
+        message: message
+      }
+    } = error
 
     Logger.warn(fn ->
       "Failed to append events to stream due to: #{inspect(message)}"
     end)
 
-    case error_code do
-      :foreign_key_violation -> {:error, :stream_not_found}
-      :unique_violation -> {:error, :wrong_expected_version}
-      reason -> {:error, reason}
+    case {error_code, constraint} do
+      {:foreign_key_violation, _} -> {:error, :not_found}
+      {:unique_violation, "stream_events_pkey"} -> {:error, :duplicate_event}
+      {:unique_violation, _} -> {:error, :wrong_expected_version}
+      {reason, _} -> {:error, reason}
     end
   end
 

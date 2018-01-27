@@ -7,24 +7,73 @@ defmodule EventStoreTest do
   @all_stream "$all"
   @subscription_name "test_subscription"
 
-  test "append single event to event store" do
-    stream_uuid = UUID.uuid4()
-    events = EventFactory.create_events(1)
+  describe "append to event store" do
+    test "should append single event" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(1)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+      assert :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+    end
+
+    test "should append multiple events" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
+
+      assert :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+    end
+
+    test "should fail attempting to append to `$all` stream" do
+      events = EventFactory.create_events(1)
+
+      assert {:error, :cannot_append_to_all_stream} = EventStore.append_to_stream(@all_stream, 0, events)
+    end
   end
 
-  test "append multiple event to event store" do
-    stream_uuid = UUID.uuid4()
-    events = EventFactory.create_events(3)
+  describe "link to event store" do
+    setup do
+      source_stream_uuid = UUID.uuid4()
+      target_stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-  end
+      :ok = EventStore.append_to_stream(source_stream_uuid, 0, events)
 
-  test "attempt to append to `$all` stream should fail" do
-    events = EventFactory.create_events(1)
+      {:ok, events} = EventStore.read_stream_forward(source_stream_uuid)
+      event_ids =  Enum.map(events, &(&1.event_id))
 
-    {:error, :cannot_append_to_all_stream} = EventStore.append_to_stream(@all_stream, 0, events)
+      [
+        source_stream_uuid: source_stream_uuid,
+        target_stream_uuid: target_stream_uuid,
+        events: events,
+        event_ids: event_ids,
+      ]
+    end
+
+    test "should link multiple events", context do
+      %{
+        target_stream_uuid: target_stream_uuid,
+        event_ids: event_ids
+      } = context
+
+      assert :ok = EventStore.link_to_stream(target_stream_uuid, 0, event_ids)
+    end
+
+    test "should read linked events", context do
+      %{
+        source_stream_uuid: source_stream_uuid,
+        target_stream_uuid: target_stream_uuid,
+        event_ids: event_ids
+      } = context
+
+      :ok = EventStore.link_to_stream(target_stream_uuid, 0, event_ids)
+
+      assert {:ok, source_events} = EventStore.read_stream_forward(source_stream_uuid)
+      assert {:ok, linked_events} = EventStore.read_stream_forward(target_stream_uuid)
+      assert source_events == linked_events
+    end
+
+    test "should fail attempting to link to `$all` stream", %{event_ids: event_ids} do
+      assert {:error, :cannot_append_to_all_stream} = EventStore.link_to_stream(@all_stream, 0, event_ids)
+    end
   end
 
   test "read stream forward from event store" do

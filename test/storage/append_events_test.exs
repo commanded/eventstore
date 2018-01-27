@@ -63,7 +63,7 @@ defmodule EventStore.Storage.AppendEventsTest do
     stream_id = 1
     events = EventFactory.create_recorded_events(1, stream_uuid)
 
-    assert {:error, :stream_not_found} = Appender.append(conn, stream_id, events)
+    assert {:error, :not_found} = Appender.append(conn, stream_id, events)
   end
 
   test "append to existing stream, but wrong expected version", %{conn: conn} do

@@ -97,3 +97,27 @@ all_events = EventStore.stream_all_forward() |> Enum.to_list()
 ```
 
 This will read *all* events into memory, it is for illustration only. Use the `Stream` functions to process the events in a memory efficient way.
+
+## Linking events between streams
+
+Event linking allows you to include events in multiple streams, such as copying an event from one stream to another, but only a reference to the original event is stored.
+
+An event may be present in a stream only once, but may be linked into as many streams as required.
+
+Linked events are used to build the `$all` stream containing every persisted event, globally ordered.
+
+Use each recorded event's `event_number` field for the position of the event within the read/received stream. The `stream_uuid` and `stream_version` fields refer to the event's original stream.
+
+Read source events:
+
+```elixir
+{:ok, events} = EventStore.read_stream_forward(source_stream_uuid)
+```
+
+Link read events to another stream:
+
+```elixir
+:ok = EventStore.link_to_stream(target_stream_uuid, 0, events)
+```
+
+You can also pass a list of `event_ids` instead of recorded event structs to link events.

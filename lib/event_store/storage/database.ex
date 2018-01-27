@@ -1,5 +1,6 @@
 defmodule EventStore.Storage.Database do
   @moduledoc false
+  
   require Logger
 
   def create(config) do

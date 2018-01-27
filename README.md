@@ -22,6 +22,7 @@ MIT License
   - [Reading from a stream](guides/Usage.md#reading-from-a-stream)
   - [Reading from all streams](guides/Usage.md#reading-from-all-streams)
   - [Stream from all streams](guides/Usage.md#stream-from-all-streams)
+  - [Linking events between streams](guides/Usage.md#linking-events-between-streams)
   - [Subscribe to streams](guides/Subscriptions.md)
     - [Ack received events](guides/Subscriptions.md#ack-received-events)
     - [Example subscriber](guides/Subscriptions.md#example-subscriber)

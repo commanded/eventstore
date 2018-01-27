@@ -1,7 +1,5 @@
 defmodule EventStore.Storage.Snapshot do
-  @moduledoc """
-  Record serialized snapshot data.
-  """
+  @moduledoc false
 
   require Logger
 

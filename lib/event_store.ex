@@ -4,9 +4,11 @@ defmodule EventStore do
 
   It uses PostgreSQL (v9.5 or later) as the underlying storage engine.
 
-  The `EventStore` module provides the public API to read and write events to an event stream, and subscribe to event notifications.
+  The `EventStore` module provides the public API to read and write events to an
+  event stream, and subscribe to event notifications.
 
-  Please check the [getting started](getting-started.html) and [usage](usage.html) guides to learn more.
+  Please check the [getting started](getting-started.html) and
+  [usage](usage.html) guides to learn more.
 
   ## Example usage
 
@@ -59,23 +61,74 @@ defmodule EventStore do
       expected version was `:stream_exists`.
 
   """
-  @spec append_to_stream(String.t, expected_version, list(EventData.t), timeout()) :: :ok |
+  @spec append_to_stream(String.t, expected_version, list(EventData.t)) :: :ok |
     {:error, :cannot_append_to_all_stream} |
     {:error, :stream_exists} |
     {:error, :stream_does_not_exist} |
     {:error, :wrong_expected_version} |
     {:error, reason :: term}
-  def append_to_stream(stream_uuid, expected_version, events, timeout \\ 5_000)
+  def append_to_stream(stream_uuid, expected_version, events)
 
-  def append_to_stream(@all_stream, _expected_version, _events, _timeout),
+  def append_to_stream(@all_stream, _expected_version, _events),
     do: {:error, :cannot_append_to_all_stream}
 
-  def append_to_stream(stream_uuid, expected_version, events, timeout) do
-    Stream.append_to_stream(stream_uuid, expected_version, events, timeout)
+  def append_to_stream(stream_uuid, expected_version, events) do
+    Stream.append_to_stream(stream_uuid, expected_version, events)
   end
 
   @doc """
-  Reads the requested number of events from the given stream, in the order in which they were originally written.
+  Link one or more existing events to another stream.
+
+  Allows you to construct streams containing events already appended to any
+  other stream. This is more efficient than copying events between streams since
+  only a reference to the existing event is created.
+
+    - `stream_uuid` is used to uniquely identify the target stream.
+
+    - `expected_version` is used for optimistic concurrency checks.
+      You can provide a non-negative integer to specify the expected stream
+      version. This is used to ensure you can only append to the stream if it is
+      at exactly that version.
+
+      You can also provide one of the following values to affect the concurrency
+      check behaviour:
+
+      - `:any_version` - No concurrency checking; allow any stream version
+        (including no stream).
+      - `:no_stream` - Ensure the stream does not exist.
+      - `:stream_exists` - Ensure the stream exists.
+
+    - `events` is a list of `%EventStore.EventData{}` structs.
+
+  Returns `:ok` on success, or an `{:error, reason}` tagged tuple. The returned
+  error may be due to one of the following reasons:
+
+    - `{:error, :wrong_expected_version}` when the actual stream version differs
+      from the provided expected version.
+    - `{:error, :stream_exists}` when the stream exists, but expected version
+      was `:no_stream`.
+    - `{:error, :stream_does_not_exist}` when the stream does not exist, but
+      expected version was `:stream_exists`.
+
+  """
+  @spec link_to_stream(String.t, expected_version, list(RecordedEvent.t) | list(non_neg_integer)) :: :ok |
+    {:error, :cannot_append_to_all_stream} |
+    {:error, :stream_exists} |
+    {:error, :stream_does_not_exist} |
+    {:error, :wrong_expected_version} |
+    {:error, reason :: term}
+  def link_to_stream(stream_uuid, expected_version, events_or_event_ids)
+
+  def link_to_stream(@all_stream, _expected_version, _events_or_event_ids),
+    do: {:error, :cannot_append_to_all_stream}
+
+  def link_to_stream(stream_uuid, expected_version, events_or_event_ids) do
+    Stream.link_to_stream(stream_uuid, expected_version, events_or_event_ids)
+  end
+
+  @doc """
+  Reads the requested number of events from the given stream, in the order in
+  which they were originally written.
 
     - `stream_uuid` is used to uniquely identify a stream.
 
@@ -85,15 +138,18 @@ defmodule EventStore do
     - `count` optionally, the maximum number of events to read.
       If not set it will be limited to returning 1,000 events from the stream.
   """
-  @spec read_stream_forward(String.t, non_neg_integer, non_neg_integer) :: {:ok, list(RecordedEvent.t)} | {:error, reason :: term}
-  def read_stream_forward(stream_uuid, start_version \\ 0, count \\ 1_000, timeout \\ 5_000)
+  @spec read_stream_forward(String.t, non_neg_integer, non_neg_integer) :: {:ok, list(RecordedEvent.t)}
+    | {:error, reason :: term}
 
-  def read_stream_forward(stream_uuid, start_version, count, timeout) do
-    Stream.read_stream_forward(stream_uuid, start_version, count, timeout)
+  def read_stream_forward(stream_uuid, start_version \\ 0, count \\ 1_000)
+
+  def read_stream_forward(stream_uuid, start_version, count) do
+    Stream.read_stream_forward(stream_uuid, start_version, count)
   end
 
   @doc """
-  Streams events from the given stream, in the order in which they were originally written.
+  Streams events from the given stream, in the order in which they were
+  originally written.
 
     - `start_version` optionally, the version number of the first event to read.
       Defaults to the beginning of the stream if not set.
@@ -109,7 +165,8 @@ defmodule EventStore do
   end
 
   @doc """
-  Reads the requested number of events from all streams, in the order in which they were originally written.
+  Reads the requested number of events from all streams, in the order in which
+  they were originally written.
 
     - `start_event_number` optionally, the number of the first event to read.
       Defaults to the beginning of the stream if not set.
@@ -123,13 +180,14 @@ defmodule EventStore do
   end
 
   @doc """
-  Streams events from all streams, in the order in which they were originally written.
+  Streams events from all streams, in the order in which they were originally
+  written.
 
     - `start_event_number` optionally, the number of the first event to read.
       Defaults to the beginning of the stream if not set.
 
-    - `read_batch_size` optionally, the number of events to read at a time from storage.
-      Defaults to reading 1,000 events per batch.
+    - `read_batch_size` optionally, the number of events to read at a time from
+      storage. Defaults to reading 1,000 events per batch.
   """
   @spec stream_all_forward(non_neg_integer, non_neg_integer) :: Enumerable.t
   def stream_all_forward(start_event_number \\ 0, read_batch_size \\ 1_000) do
@@ -137,21 +195,25 @@ defmodule EventStore do
   end
 
   @doc """
-  Subscriber will be notified of each batch of events persisted to a single stream.
+  Subscriber will be notified of each batch of events persisted to a single
+  stream.
 
     - `stream_uuid` is the stream to subscribe to.
       Use the `$all` identifier to subscribe to events from all streams.
 
     - `subscription_name` is used to uniquely identify the subscription.
 
-    - `subscriber` is a process that will be sent `{:events, events}` notification messages.
+    - `subscriber` is a process that will be sent `{:events, events}`
+      notification messages.
 
     - `opts` is an optional map providing additional subscription configuration:
       - `start_from` is a pointer to the first event to receive. It must be one of:
           - `:origin` for all events from the start of the stream (default).
-          - `:current` for any new events appended to the stream after the subscription has been created.
+          - `:current` for any new events appended to the stream after the
+            subscription has been created.
           - any positive integer for a stream version to receive events after.
-      - `mapper` to define a function to map each recorded event before sending to the subscriber.
+      - `mapper` to define a function to map each recorded event before sending
+        to the subscriber.
 
   Returns `{:ok, subscription}` when subscription succeeds.
   """
@@ -169,14 +231,18 @@ defmodule EventStore do
 
     - `subscription_name` is used to uniquely identify the subscription.
 
-    - `subscriber` is a process that will be sent `{:events, events}` notification messages.
+    - `subscriber` is a process that will be sent `{:events, events}`
+      notification messages.
 
     - `opts` is an optional map providing additional subscription configuration:
       - `start_from` is a pointer to the first event to receive. It must be one of:
           - `:origin` for all events from the start of the stream (default).
-          - `:current` for any new events appended to the stream after the subscription has been created.
-          - any positive integer for an event id to receive events after that exact event.
-      - `mapper` to define a function to map each recorded event before sending to the subscriber.
+          - `:current` for any new events appended to the stream after the
+            subscription has been created.
+          - any positive integer for an event id to receive events after that
+            exact event.
+      - `mapper` to define a function to map each recorded event before sending
+        to the subscriber.
 
   Returns `{:ok, subscription}` when subscription succeeds.
   """
@@ -189,7 +255,8 @@ defmodule EventStore do
   end
 
   @doc """
-  Acknowledge receipt of the given events received from a single stream, or all streams, subscription.
+  Acknowledge receipt of the given events received from a single stream, or all
+  streams, subscription.
   """
   @spec ack(pid, RecordedEvent.t | list(RecordedEvent.t) | non_neg_integer()) :: :ok | {:error, reason :: term}
   def ack(subscription, ack) do
@@ -201,7 +268,8 @@ defmodule EventStore do
 
     - `stream_uuid` is the stream to unsubscribe from.
 
-    - `subscription_name` is used to identify the existing subscription to remove.
+    - `subscription_name` is used to identify the existing subscription to
+      remove.
 
   Returns `:ok` on success.
   """
@@ -213,7 +281,8 @@ defmodule EventStore do
   @doc """
   Unsubscribe an existing subscriber from all event notifications.
 
-    - `subscription_name` is used to identify the existing subscription to remove.
+    - `subscription_name` is used to identify the existing subscription to
+      remove.
 
   Returns `:ok` on success.
   """
@@ -225,7 +294,8 @@ defmodule EventStore do
   @doc """
   Read a snapshot, if available, for a given source.
 
-  Returns `{:ok, %EventStore.Snapshots.SnapshotData{}}` on success, or `{:error, :snapshot_not_found}` when unavailable.
+  Returns `{:ok, %EventStore.Snapshots.SnapshotData{}}` on success, or
+  `{:error, :snapshot_not_found}` when unavailable.
   """
   @spec read_snapshot(String.t) :: {:ok, SnapshotData.t} | {:error, :snapshot_not_found}
   def read_snapshot(source_uuid) do

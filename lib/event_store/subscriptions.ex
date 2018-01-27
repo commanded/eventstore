@@ -1,8 +1,5 @@
 defmodule EventStore.Subscriptions do
-  @moduledoc """
-  Pub/sub for subscribers interested in events appended to either a single
-  stream or all streams.
-  """
+  @moduledoc false
 
   require Logger
 

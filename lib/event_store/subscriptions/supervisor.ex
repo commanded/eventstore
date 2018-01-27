@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.Supervisor do
-  @moduledoc """
-  Supervise zero, one or more subscriptions to an event stream.
-  """
+  @moduledoc false
+  
+  # Supervise zero, one or more subscriptions to an event stream.
 
   use Supervisor
 

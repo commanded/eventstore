@@ -1,7 +1,5 @@
 defmodule EventStore.Storage.Subscription do
-  @moduledoc """
-  Support persistent subscriptions to an event stream
-  """
+  @moduledoc false
 
   require Logger
 

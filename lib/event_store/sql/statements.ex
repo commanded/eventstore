@@ -1,7 +1,7 @@
 defmodule EventStore.Sql.Statements do
-  @moduledoc """
-  PostgreSQL statements to intialize the event store schema and read/write streams and events.
-  """
+  @moduledoc false
+
+  # PostgreSQL statements to intialize the event store schema and read/write streams and events.
 
   alias EventStore.Config
 
@@ -237,20 +237,6 @@ RETURNING stream_id;
 """
   end
 
-  def build_params(count, chunk_size) do
-    1..(count * chunk_size)
-    |> Stream.map(&Integer.to_string/1)
-    |> Stream.chunk_every(chunk_size)
-    |> Stream.map(fn chunk ->
-      [
-        "($",
-        Enum.intersperse(chunk, ", $"),
-        ")"
-      ]
-    end)
-    |> Enum.intersperse(",")
-  end
-
   def create_events(number_of_events) do
     [
       """
@@ -336,11 +322,11 @@ RETURNING stream_id;
         1 ->
           # first row of values define their types
           [
-            "($4::bigint, $5::uuid)"
+            "($3::bigint, $4::uuid)"
           ]
 
         event_number ->
-          index = (event_number - 1) * 2 + 3
+          index = (event_number - 1) * 2 + 2
           params = [
             Integer.to_string(index + 1),  # index
             Integer.to_string(index + 2),  # event_id
@@ -380,12 +366,13 @@ RETURNING stream_id;
         $1,
         stream.initial_stream_version + events.index,
         events.event_id,
-        $3,
+        original_stream_events.original_stream_id,
         original_stream_events.stream_version
       FROM events
       CROSS JOIN stream
       INNER JOIN stream_events as original_stream_events
-        ON original_stream_events.event_id = events.event_id AND original_stream_events.stream_id = $3;
+        ON original_stream_events.event_id = events.event_id
+          AND original_stream_events.stream_id = original_stream_events.original_stream_id;
       """,
     ]
   end
@@ -495,6 +482,20 @@ WHERE se.stream_id = $1 and se.stream_version >= $2
 ORDER BY se.stream_version ASC
 LIMIT $3;
 """
+  end
+
+  defp build_params(count, chunk_size) do
+    1..(count * chunk_size)
+    |> Stream.map(&Integer.to_string/1)
+    |> Stream.chunk_every(chunk_size)
+    |> Stream.map(fn chunk ->
+      [
+        "($",
+        Enum.intersperse(chunk, ", $"),
+        ")"
+      ]
+    end)
+    |> Enum.intersperse(",")
   end
 
   defp column_data_type, do: Config.column_data_type()

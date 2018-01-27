@@ -1,7 +1,5 @@
 defmodule EventStore.Storage do
-  @moduledoc """
-  Storage of events to a PostgreSQL database.
-  """
+  @moduledoc false
 
   alias EventStore.Snapshots.SnapshotData
   alias EventStore.Storage
@@ -45,6 +43,13 @@ defmodule EventStore.Storage do
   end
 
   @doc """
+  Link the existing event ids already present in a stream to the given stream.
+  """
+  def link_to_stream(stream_id, event_ids) do
+    Appender.link(@event_store, stream_id, event_ids)
+  end
+
+  @doc """
   Read events for the given stream forward from the starting version, use zero
   for all events for the stream.
   """
@@ -64,7 +69,7 @@ defmodule EventStore.Storage do
   unique name and starting position (event number or stream version).
   """
   def subscribe_to_stream(stream_uuid, subscription_name, start_from \\ nil)
-  
+
   def subscribe_to_stream(stream_uuid, subscription_name, start_from) do
     Subscription.subscribe_to_stream(@event_store, stream_uuid, subscription_name, start_from, pool: DBConnection.Poolboy)
   end

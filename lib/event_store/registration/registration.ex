@@ -1,6 +1,6 @@
 defmodule EventStore.Registration do
   @moduledoc """
-  Registry specification for pub/sub.
+  Registration specification for EventStore pub/sub.
   """
 
   @doc """
@@ -12,7 +12,7 @@ defmodule EventStore.Registration do
   Subscribes the caller to the given topic.
   """
   @callback subscribe(binary) :: :ok | {:error, term}
-  
+
   @doc """
   Is the caller subscribed to the given topic?
   """

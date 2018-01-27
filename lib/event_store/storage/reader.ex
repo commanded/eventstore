@@ -1,7 +1,5 @@
 defmodule EventStore.Storage.Reader do
-  @moduledoc """
-  Reads events for a given stream identity
-  """
+  @moduledoc false
 
   require Logger
 

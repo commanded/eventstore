@@ -1,5 +1,6 @@
 defmodule EventStore.Storage.QueryStreamInfo do
   @moduledoc false
+  
   alias EventStore.Sql.Statements
 
   def execute(conn, stream_uuid) do
