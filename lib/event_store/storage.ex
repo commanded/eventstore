@@ -38,23 +38,23 @@ defmodule EventStore.Storage do
   @doc """
   Append the given list of recorded events to storage.
   """
-  def append_to_stream(stream_id, events) do
-    Appender.append(@event_store, stream_id, events)
+  def append_to_stream(stream_id, events, opts \\ []) do
+    Appender.append(@event_store, stream_id, events, opts)
   end
 
   @doc """
   Link the existing event ids already present in a stream to the given stream.
   """
-  def link_to_stream(stream_id, event_ids) do
-    Appender.link(@event_store, stream_id, event_ids)
+  def link_to_stream(stream_id, event_ids, opts \\ []) do
+    Appender.link(@event_store, stream_id, event_ids, opts)
   end
 
   @doc """
   Read events for the given stream forward from the starting version, use zero
   for all events for the stream.
   """
-  def read_stream_forward(stream_id, start_version, count) do
-    Reader.read_forward(@event_store, stream_id, start_version, count)
+  def read_stream_forward(stream_id, start_version, count, opts \\ []) do
+    Reader.read_forward(@event_store, stream_id, start_version, count, opts)
   end
 
   @doc """

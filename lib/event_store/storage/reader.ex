@@ -10,8 +10,10 @@ defmodule EventStore.Storage.Reader do
   @doc """
   Read events appended to a single stream forward from the given starting version
   """
-  def read_forward(conn, stream_id, start_version, count) do
-    case Reader.Query.read_events_forward(conn, stream_id, start_version, count) do
+  def read_forward(conn, stream_id, start_version, count, opts \\ [])
+
+  def read_forward(conn, stream_id, start_version, count, opts) do
+    case Reader.Query.read_events_forward(conn, stream_id, start_version, count, opts) do
       {:ok, []} = reply -> reply
       {:ok, rows} -> map_rows_to_event_data(rows)
       {:error, reason} -> failed_to_read(stream_id, reason)
@@ -87,12 +89,14 @@ defmodule EventStore.Storage.Reader do
   end
 
   defmodule Query do
-    def read_events_forward(conn, stream_id, start_version, count) do
+    @moduledoc false
+    
+    def read_events_forward(conn, stream_id, start_version, count, opts) do
       conn
       |> Postgrex.query(
         Statements.read_events_forward(),
         [stream_id, start_version, count],
-        pool: DBConnection.Poolboy
+        Keyword.put(opts, :pool, DBConnection.Poolboy)
       )
       |> handle_response()
     end

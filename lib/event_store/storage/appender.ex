@@ -17,7 +17,9 @@ defmodule EventStore.Storage.Appender do
 
   Returns `:ok` on success, `{:error, reason}` on failure.
   """
-  def append(conn, stream_id, events) do
+  def append(conn, stream_id, events, opts \\ [])
+
+  def append(conn, stream_id, events, opts) do
     stream_uuid = stream_uuid(events)
 
     Postgrex.transaction(
@@ -48,7 +50,7 @@ defmodule EventStore.Storage.Appender do
           end
         end)
       end,
-      pool: DBConnection.Poolboy
+      Keyword.put(opts, :pool, DBConnection.Poolboy)
     )
     |> case do
       {:ok, :ok} ->
@@ -72,7 +74,9 @@ defmodule EventStore.Storage.Appender do
 
   Returns `:ok` on success, `{:error, reason}` on failure.
   """
-  def link(conn, stream_id, event_ids) do
+  def link(conn, stream_id, event_ids, opts \\ [])
+
+  def link(conn, stream_id, event_ids, opts) do
     Postgrex.transaction(
       conn,
       fn transaction ->
@@ -94,7 +98,7 @@ defmodule EventStore.Storage.Appender do
           end
         end)
       end,
-      pool: DBConnection.Poolboy
+      Keyword.put(opts, :pool, DBConnection.Poolboy)
     )
     |> case do
       {:ok, :ok} ->

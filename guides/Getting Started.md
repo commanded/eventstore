@@ -4,35 +4,35 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
   1. Add eventstore to your list of dependencies in `mix.exs`:
 
-      ```elixir    
-      def deps do
-        [{:eventstore, "~> 0.13"}]
-      end
-      ```
+    ```elixir    
+    def deps do
+      [{:eventstore, "~> 0.13"}]
+    end
+    ```
 
   2. Add an `eventstore` config entry containing the PostgreSQL database connection details to each environment's mix config file (e.g. `config/dev.exs`):
 
-      ```elixir
-      config :eventstore, EventStore.Storage,
-        serializer: EventStore.TermSerializer,
-        username: "postgres",
-        password: "postgres",
-        database: "eventstore_dev",
-        hostname: "localhost",
-        pool_size: 10,
-        pool_overflow: 5
-      ```
+    ```elixir
+    config :eventstore, EventStore.Storage,
+      serializer: EventStore.TermSerializer,
+      username: "postgres",
+      password: "postgres",
+      database: "eventstore_dev",
+      hostname: "localhost",
+      pool_size: 10,
+      pool_overflow: 5
+    ```
 
   The database connection pool configuration options are:
 
-  - `:pool_size` - The number of connections (default: `10`).
-  - `:pool_overflow` - The maximum number of overflow connections to start if all connections are checked out (default: `0`).
+    - `:pool_size` - The number of connections (default: `10`).
+    - `:pool_overflow` - The maximum number of overflow connections to start if all connections are checked out (default: `0`).
 
   3. Create the EventStore database and tables using the `mix` task:
 
-      ```console
-      $ mix do event_store.create, event_store.init
-      ```
+    ```console
+    $ mix do event_store.create, event_store.init
+    ```
 
 ## Initialize an existing database
 
@@ -44,10 +44,10 @@ $ mix event_store.init
 
 ## Reset an existing database
 
-To drop an existing EventStore database and recreate it you can run the `mix` task:
+To drop an existing EventStore database and recreate it you can run the following `mix` tasks:
 
 ```console
-$ mix event_store.reset
+$ mix do event_store.drop, event_store.create, event_store.init
 ```
 
 *Warning* this will delete all EventStore data.

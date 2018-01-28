@@ -53,6 +53,8 @@ defmodule EventStore.Storage.Subscription do
     do: Subscription.Unsubscribe.execute(conn, stream_uuid, subscription_name, opts)
 
   defmodule All do
+    @moduledoc false
+    
     def execute(conn, opts) do
       conn
       |> Postgrex.query(Statements.query_all_subscriptions, [], opts)
@@ -67,6 +69,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Query do
+    @moduledoc false
+
     def execute(conn, stream_uuid, subscription_name, opts) do
       conn
       |> Postgrex.query(Statements.query_get_subscription, [stream_uuid, subscription_name], opts)
@@ -81,6 +85,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Subscribe do
+    @moduledoc false
+
     def execute(conn, stream_uuid, subscription_name, start_from, opts) do
       _ = Logger.debug(fn -> "Attempting to create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\"" end)
 
@@ -106,6 +112,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule TryAdvisoryLock do
+    @moduledoc false
+
     def execute(conn, subscription_id, opts) do
       conn
       |> Postgrex.query(Statements.try_advisory_lock(), [subscription_id], opts)
@@ -126,6 +134,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Ack do
+    @moduledoc false
+
     def execute(conn, stream_uuid, subscription_name, last_seen, opts) do
       conn
       |> Postgrex.query(Statements.ack_last_seen_event, [stream_uuid, subscription_name, last_seen], opts)
@@ -143,6 +153,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Unsubscribe do
+    @moduledoc false
+
     def execute(conn, stream_uuid, subscription_name, opts) do
       _ = Logger.debug(fn -> "Attempting to unsubscribe from stream \"#{stream_uuid}\" named \"#{subscription_name}\"" end)
 
@@ -163,6 +175,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Adapter do
+    @moduledoc false
+
     def to_subscriptions(rows), do: Enum.map(rows, &to_subscription_from_row/1)
 
     def to_subscription([row | _]), do: to_subscription_from_row(row)

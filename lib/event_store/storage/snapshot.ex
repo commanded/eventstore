@@ -20,6 +20,8 @@ defmodule EventStore.Storage.Snapshot do
   end
 
   defmodule QuerySnapshot do
+    @moduledoc false
+
     def execute(conn, source_uuid) do
       conn
       |> Postgrex.query(Statements.query_get_snapshot, [source_uuid], pool: DBConnection.Poolboy)
@@ -47,6 +49,8 @@ defmodule EventStore.Storage.Snapshot do
   end
 
   defmodule RecordSnapshot do
+    @moduledoc false
+
     def execute(conn, %SnapshotData{source_uuid: source_uuid, source_version: source_version, source_type: source_type, data: data, metadata: metadata}) do
       conn
       |> Postgrex.query(Statements.record_snapshot, [source_uuid, source_version, source_type, data, metadata], pool: DBConnection.Poolboy)
@@ -64,6 +68,8 @@ defmodule EventStore.Storage.Snapshot do
   end
 
   defmodule DeleteSnapshot do
+    @moduledoc false
+    
     def execute(conn, source_uuid) do
       conn
       |> Postgrex.query(Statements.delete_snapshot, [source_uuid], pool: DBConnection.Poolboy)
