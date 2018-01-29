@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory,Subscriptions,Wait}
+  alias EventStore.{EventFactory, Subscriptions}
   alias EventStore.Streams.Stream
   alias EventStore.Subscriptions.Subscription
 
@@ -80,16 +80,10 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
 
   # subscribe to all streams and wait for the subscription to be subscribed
   defp subscribe_to_all_streams(subscription_name, subscriber, opts) do
-    with {:ok, subscription} <- Subscriptions.subscribe_to_all_streams(subscription_name, subscriber, opts) do
-      wait_until_subscribed(subscription)
+    {:ok, subscription} = Subscriptions.subscribe_to_all_streams(subscription_name, subscriber, opts)
 
-      {:ok, subscription}
-    end
-  end
+    assert_receive {:subscribed, ^subscription}
 
-  defp wait_until_subscribed(subscription) do
-    Wait.until(fn ->
-      assert Subscription.subscribed?(subscription)
-    end)
+    {:ok, subscription}
   end
 end

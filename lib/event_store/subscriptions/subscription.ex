@@ -70,11 +70,6 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc false
-  def subscribed?(subscription) do
-    GenServer.call(subscription, :subscribed?)
-  end
-
-  @doc false
   def init(%Subscription{subscriber: subscriber, postgrex_config: postgrex_config} = state) do
     Process.link(subscriber)
 
@@ -110,7 +105,8 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def handle_cast(:subscribe_to_events, %Subscription{subscription: subscription} = state) do
-    subscribe_to_events(state)
+    :ok = subscribe_to_events(state)
+    :ok = notify_subscribed(state)
 
     subscription = StreamSubscription.subscribed(subscription)
 
@@ -141,21 +137,6 @@ defmodule EventStore.Subscriptions.Subscription do
     subscription = StreamSubscription.unsubscribe(subscription)
 
     {:reply, :ok, apply_subscription_to_state(subscription, state)}
-  end
-
-  def handle_call(:subscribed?, _from, %Subscription{} = state) do
-    %Subscription{
-      stream_uuid: stream_uuid,
-      subscription: %{state: subscription_state}
-    } = state
-
-    reply =
-      case subscription_state do
-        :subscribed -> Registration.subscribed?(stream_uuid)
-        _ -> false
-      end
-
-    {:reply, reply, state}
   end
 
   defp apply_subscription_to_state(%StreamSubscription{} = subscription, %Subscription{} = state) do
@@ -198,6 +179,13 @@ defmodule EventStore.Subscriptions.Subscription do
 
   defp subscribe_to_events(%Subscription{stream_uuid: stream_uuid}) do
     Registration.subscribe(stream_uuid)
+  end
+
+  # notify the subscriber that this subscription has successfully subscribed to events
+  defp notify_subscribed(%Subscription{subscriber: subscriber}) do
+    send(subscriber, {:subscribed, self()})
+
+    :ok
   end
 
   # Get the delay between subscription attempts, in milliseconds, from app
