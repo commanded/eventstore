@@ -72,7 +72,7 @@ Subscribe to events appended to all streams:
 ```elixir
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self())
 
-# receive notification once subscription has successfully subscribed
+# wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
     IO.puts "Successfully subscribed to all streams"

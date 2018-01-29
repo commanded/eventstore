@@ -2,11 +2,11 @@
 
 Subscriptions to a stream will guarantee *at least once* delivery of every persisted event. Each subscription may be independently paused, then later resumed from where it stopped.
 
-A subscription can be created to receive events published from a single or all streams.
+A subscription can be created to receive events appended to a single or all streams.
 
-Events are received in batches after being persisted to storage. Each batch contains events from a single stream and for the same correlation id.
+Events are received in batches after being persisted to storage. A batch contains the events appended to a single stream using `EventStore.append_to_stream/4`.
 
-Subscriptions must be uniquely named and support a single subscriber. Attempting to connect two subscribers to the same subscription will return an error.
+Subscriptions must be uniquely named and support a single subscriber. Attempting to connect two subscribers to the same subscription will return an `{:error, :subscription_already_exists}` error.
 
 ## Event pub/sub
 
@@ -53,6 +53,7 @@ Subscribe to events appended to all streams:
 ```elixir
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_all_subscription", self())
 
+# wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
     IO.puts "Successfully subscribed to all streams"
@@ -81,6 +82,7 @@ Subscribe to events appended to a *single* stream:
 stream_uuid = UUID.uuid4()
 {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, "example_single_subscription", self())
 
+# wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
     IO.puts "Successfully subscribed to single stream"
@@ -128,6 +130,7 @@ end
 
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), mapper: mapper)
 
+# wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
     IO.puts "Successfully subscribed to all streams"
