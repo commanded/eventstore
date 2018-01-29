@@ -1,11 +1,11 @@
 defmodule EventStore.Subscriptions.Subscription do
-  @moduledoc """
-  Subscription to a single, or all, event streams.
+  @moduledoc false
 
-  A subscription is persistent so that resuming the subscription will continue
-  from the last acknowledged event. This guarantees at least once delivery of
-  every event appended to storage.
-  """
+  # Subscription to a single, or all, event streams.
+  #
+  # A subscription is persistent so that resuming the subscription will continue
+  # from the last acknowledged event. This guarantees at least once delivery of
+  # every event appended to storage.
 
   use GenServer
   require Logger
@@ -39,7 +39,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc """
-  Confirm receipt of the given event by its `event_number` or `stream_version`
+  Confirm receipt of the given event by its `stream_version`
   """
   def ack(subscription, ack) when is_integer(ack) do
     GenServer.cast(subscription, {:ack, ack})
@@ -55,8 +55,8 @@ defmodule EventStore.Subscriptions.Subscription do
   @doc """
   Confirm receipt of the given event
   """
-  def ack(subscription, %RecordedEvent{event_number: event_number, stream_version: stream_version}) do
-    GenServer.cast(subscription, {:ack, {event_number, stream_version}})
+  def ack(subscription, %RecordedEvent{event_number: event_number}) do
+    GenServer.cast(subscription, {:ack, event_number})
   end
 
   @doc false

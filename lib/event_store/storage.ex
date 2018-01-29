@@ -1,14 +1,11 @@
 defmodule EventStore.Storage do
-  @moduledoc """
-  Storage of events to a PostgreSQL database.
-  """
+  @moduledoc false
 
   alias EventStore.Snapshots.SnapshotData
   alias EventStore.Storage
   alias EventStore.Storage.{
     Appender,
     CreateStream,
-    QueryLatestEventNumber,
     QueryStreamInfo,
     Reader,
     Snapshot,
@@ -41,24 +38,23 @@ defmodule EventStore.Storage do
   @doc """
   Append the given list of recorded events to storage.
   """
-  def append_to_stream(stream_id, events) do
-    Appender.append(@event_store, stream_id, events)
+  def append_to_stream(stream_id, events, opts \\ []) do
+    Appender.append(@event_store, stream_id, events, opts)
+  end
+
+  @doc """
+  Link the existing event ids already present in a stream to the given stream.
+  """
+  def link_to_stream(stream_id, event_ids, opts \\ []) do
+    Appender.link(@event_store, stream_id, event_ids, opts)
   end
 
   @doc """
   Read events for the given stream forward from the starting version, use zero
   for all events for the stream.
   """
-  def read_stream_forward(stream_id, start_version, count) do
-    Reader.read_forward(@event_store, stream_id, start_version, count)
-  end
-
-  @doc """
-  Read events for all streams forward from the starting event id, use zero for
-  all events for all streams.
-  """
-  def read_all_streams_forward(start_event_number, count) do
-    Reader.read_all_forward(@event_store, start_event_number, count)
+  def read_stream_forward(stream_id, start_version, count, opts \\ []) do
+    Reader.read_forward(@event_store, stream_id, start_version, count, opts)
   end
 
   @doc """
@@ -69,18 +65,13 @@ defmodule EventStore.Storage do
   end
 
   @doc """
-  Get the event number of the last event persisted to storage.
-  """
-  def latest_event_number do
-    QueryLatestEventNumber.execute(@event_store)
-  end
-
-  @doc """
   Create, or locate an existing, persistent subscription to a stream using a
   unique name and starting position (event number or stream version).
   """
-  def subscribe_to_stream(stream_uuid, subscription_name, start_from_event_number \\ nil, start_from_stream_version \\ nil) do
-    Subscription.subscribe_to_stream(@event_store, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version, pool: DBConnection.Poolboy)
+  def subscribe_to_stream(stream_uuid, subscription_name, start_from \\ nil)
+
+  def subscribe_to_stream(stream_uuid, subscription_name, start_from) do
+    Subscription.subscribe_to_stream(@event_store, stream_uuid, subscription_name, start_from, pool: DBConnection.Poolboy)
   end
 
   @doc """
@@ -95,8 +86,8 @@ defmodule EventStore.Storage do
   @doc """
   Acknowledge receipt of an event by its number, for a single subscription.
   """
-  def ack_last_seen_event(stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version) do
-    Subscription.ack_last_seen_event(@event_store, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, pool: DBConnection.Poolboy)
+  def ack_last_seen_event(stream_uuid, subscription_name, last_seen) do
+    Subscription.ack_last_seen_event(@event_store, stream_uuid, subscription_name, last_seen, pool: DBConnection.Poolboy)
   end
 
   @doc """

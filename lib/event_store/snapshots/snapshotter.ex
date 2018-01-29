@@ -1,7 +1,5 @@
 defmodule EventStore.Snapshots.Snapshotter do
-  @moduledoc """
-  Record and read snapshots of process state
-  """
+  @moduledoc false
 
   alias EventStore.Snapshots.SnapshotData
   alias EventStore.Storage

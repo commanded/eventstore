@@ -36,7 +36,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     end
 
     test "create subscription to all streams from starting event id", context do
-      subscription = create_subscription(context, start_from_event_number: 2)
+      subscription = create_subscription(context, start_from: 2)
 
       assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
@@ -383,7 +383,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     {:ok, stream_id} = CreateStream.execute(conn, stream_uuid)
 
     recorded_events = EventFactory.create_recorded_events(3, stream_uuid)
-    {:ok, [1, 2, 3]} = Appender.append(conn, stream_id, recorded_events)
+    :ok = Appender.append(conn, stream_id, recorded_events)
 
     [recorded_events: recorded_events]
   end
@@ -411,8 +411,8 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     ack(subscription, List.last(events))
   end
 
-  def ack(subscription, %RecordedEvent{event_number: event_number, stream_version: stream_version}) do
-    StreamSubscription.ack(subscription, {event_number, stream_version})
+  def ack(subscription, %RecordedEvent{event_number: event_number}) do
+    StreamSubscription.ack(subscription, event_number)
   end
 
   defp assert_receive_caught_up(to) do

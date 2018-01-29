@@ -14,7 +14,6 @@ defmodule EventStore.Notifications.Supervisor do
   alias EventStore.Config
 
   alias EventStore.Notifications.{
-    AllStreamBroadcaster,
     Listener,
     Reader,
     StreamBroadcaster
@@ -26,8 +25,8 @@ defmodule EventStore.Notifications.Supervisor do
   This is to ensure only a single instance of the supervisor, and its
   supervised children, is kept running on a cluster of nodes.
   """
-  def start_link(args) do
-    case Supervisor.start_link(__MODULE__, args, name: {:global, __MODULE__}) do
+  def start_link(config) do
+    case Supervisor.start_link(__MODULE__, config, name: {:global, __MODULE__}) do
       {:ok, pid} ->
         {:ok, pid}
 
@@ -53,8 +52,7 @@ defmodule EventStore.Notifications.Supervisor do
           type: :worker
         },
         {Listener, []},
-        {Reader, []},
-        {AllStreamBroadcaster, []},
+        {Reader, Config.serializer()},
         {StreamBroadcaster, []}
       ],
       strategy: :one_for_all

@@ -9,7 +9,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
 
   setup do
     config = Config.parsed() |> Config.subscription_postgrex_opts()
-    
+
     {:ok, conn} = Postgrex.start_link(config)
 
     on_exit fn ->
@@ -36,7 +36,7 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
     end
 
     test "create subscription to a single stream from starting stream version", context do
-      subscription = create_subscription(context, start_from_stream_version: 2)
+      subscription = create_subscription(context, start_from: 2)
 
       assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
@@ -201,8 +201,8 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
   defp create_stream(%{conn: conn, stream_uuid: stream_uuid}) do
     {:ok, stream_id} = CreateStream.execute(conn, stream_uuid)
 
-    recorded_events = EventFactory.create_recorded_events(3, stream_uuid, 4)
-    {:ok, [4, 5, 6]} = Appender.append(conn, stream_id, recorded_events)
+    recorded_events = EventFactory.create_recorded_events(3, stream_uuid, 1)
+    :ok = Appender.append(conn, stream_id, recorded_events)
 
     [
       recorded_events: recorded_events,
@@ -281,8 +281,8 @@ defmodule EventStore.Subscriptions.SingleStreamSubscriptionTest do
     ack(subscription, List.last(events))
   end
 
-  def ack(subscription, %RecordedEvent{event_number: event_number, stream_version: stream_version}) do
-    StreamSubscription.ack(subscription, {event_number, stream_version})
+  def ack(subscription, %RecordedEvent{event_number: event_number}) do
+    StreamSubscription.ack(subscription, event_number)
   end
 
   defp assert_receive_caught_up(to) do

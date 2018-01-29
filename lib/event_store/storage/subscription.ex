@@ -1,7 +1,5 @@
 defmodule EventStore.Storage.Subscription do
-  @moduledoc """
-  Support persistent subscriptions to an event stream
-  """
+  @moduledoc false
 
   require Logger
 
@@ -12,8 +10,7 @@ defmodule EventStore.Storage.Subscription do
     subscription_id: non_neg_integer(),
     stream_uuid: String.t,
     subscription_name: String.t,
-    last_seen_event_number: nil | non_neg_integer(),
-    last_seen_stream_version: nil | non_neg_integer(),
+    last_seen: non_neg_integer(),
     created_at: NaiveDateTime.t,
   }
 
@@ -21,8 +18,7 @@ defmodule EventStore.Storage.Subscription do
     subscription_id: nil,
     stream_uuid: nil,
     subscription_name: nil,
-    last_seen_event_number: nil,
-    last_seen_stream_version: nil,
+    last_seen: nil,
     created_at: nil,
   ]
 
@@ -32,26 +28,43 @@ defmodule EventStore.Storage.Subscription do
   def subscriptions(conn, opts \\ []),
     do: Subscription.All.execute(conn, opts)
 
-  def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version, opts \\ []) do
+  def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from, opts \\ [])
+
+  def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from, opts) do
     with {:ok, subscription} <- Subscription.Query.execute(conn, stream_uuid, subscription_name, opts) do
       {:ok, subscription}
     else
       {:error, :subscription_not_found} ->
-        Subscription.Subscribe.execute(conn, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version, opts)
+        create_subscription(conn, stream_uuid, subscription_name, start_from, opts)
+
+      reply ->
+        reply
     end
   end
 
   def try_acquire_exclusive_lock(conn, subscription_id, opts \\ []),
     do: Subscription.TryAdvisoryLock.execute(conn, subscription_id, opts)
 
-  def ack_last_seen_event(conn, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, opts \\ []) do
-    Subscription.Ack.execute(conn, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, opts)
+  def ack_last_seen_event(conn, stream_uuid, subscription_name, last_seen, opts \\ []) do
+    Subscription.Ack.execute(conn, stream_uuid, subscription_name, last_seen, opts)
   end
 
   def unsubscribe_from_stream(conn, stream_uuid, subscription_name, opts \\ []),
     do: Subscription.Unsubscribe.execute(conn, stream_uuid, subscription_name, opts)
 
+  defp create_subscription(conn, stream_uuid, subscription_name, start_from, opts) do
+    case Subscription.Subscribe.execute(conn, stream_uuid, subscription_name, start_from, opts) do
+      {:error, :subscription_already_exists} ->
+        Subscription.Query.execute(conn, stream_uuid, subscription_name, opts)
+
+      reply ->
+        reply
+    end
+  end
+
   defmodule All do
+    @moduledoc false
+
     def execute(conn, opts) do
       conn
       |> Postgrex.query(Statements.query_all_subscriptions, [], opts)
@@ -66,6 +79,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Query do
+    @moduledoc false
+
     def execute(conn, stream_uuid, subscription_name, opts) do
       conn
       |> Postgrex.query(Statements.query_get_subscription, [stream_uuid, subscription_name], opts)
@@ -80,11 +95,13 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Subscribe do
-    def execute(conn, stream_uuid, subscription_name, start_from_event_number, start_from_stream_version, opts) do
+    @moduledoc false
+
+    def execute(conn, stream_uuid, subscription_name, start_from, opts) do
       _ = Logger.debug(fn -> "Attempting to create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\"" end)
 
       conn
-      |> Postgrex.query(Statements.create_subscription, [stream_uuid, subscription_name, start_from_event_number, start_from_stream_version], opts)
+      |> Postgrex.query(Statements.create_subscription(), [stream_uuid, subscription_name, start_from], opts)
       |> handle_response(stream_uuid, subscription_name)
     end
 
@@ -105,6 +122,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule TryAdvisoryLock do
+    @moduledoc false
+
     def execute(conn, subscription_id, opts) do
       conn
       |> Postgrex.query(Statements.try_advisory_lock(), [subscription_id], opts)
@@ -125,9 +144,11 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Ack do
-    def execute(conn, stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version, opts) do
+    @moduledoc false
+
+    def execute(conn, stream_uuid, subscription_name, last_seen, opts) do
       conn
-      |> Postgrex.query(Statements.ack_last_seen_event, [stream_uuid, subscription_name, last_seen_event_number, last_seen_stream_version], opts)
+      |> Postgrex.query(Statements.ack_last_seen_event, [stream_uuid, subscription_name, last_seen], opts)
       |> handle_response(stream_uuid, subscription_name)
     end
 
@@ -142,6 +163,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Unsubscribe do
+    @moduledoc false
+
     def execute(conn, stream_uuid, subscription_name, opts) do
       _ = Logger.debug(fn -> "Attempting to unsubscribe from stream \"#{stream_uuid}\" named \"#{subscription_name}\"" end)
 
@@ -162,6 +185,8 @@ defmodule EventStore.Storage.Subscription do
   end
 
   defmodule Adapter do
+    @moduledoc false
+
     def to_subscriptions(rows), do: Enum.map(rows, &to_subscription_from_row/1)
 
     def to_subscription([row | _]), do: to_subscription_from_row(row)
@@ -171,8 +196,7 @@ defmodule EventStore.Storage.Subscription do
         subscription_id,
         stream_uuid,
         subscription_name,
-        last_seen_event_number,
-        last_seen_stream_version,
+        last_seen,
         created_at,
       ] = row
 
@@ -180,8 +204,7 @@ defmodule EventStore.Storage.Subscription do
         subscription_id: subscription_id,
         stream_uuid: stream_uuid,
         subscription_name: subscription_name,
-        last_seen_event_number: last_seen_event_number,
-        last_seen_stream_version: last_seen_stream_version,
+        last_seen: last_seen,
         created_at: created_at
       }
     end

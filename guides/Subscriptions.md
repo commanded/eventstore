@@ -10,7 +10,7 @@ Subscriptions must be uniquely named and support a single subscriber. Attempting
 
 ## Event pub/sub
 
-PostgreSQL's `LISTEN` and `NOTIFY` commands are used to pub/sub event notifications from the database. An after update trigger on the `event_counter` table is used to execute `NOTIFY` for each batch of inserted events. The notification payload contains the first and last event number (e.g. `1,5`).
+PostgreSQL's `LISTEN` and `NOTIFY` commands are used to pub/sub event notifications from the database. An after update trigger on the `streams` table is used to execute `NOTIFY` for each batch of inserted events. The notification payload contains the stream uuid, stream id, and first / last stream versions (e.g. `stream-12345,1,1,5`).
 
 A single listener process will connect to the database to listen for these notifications. It fetches the event data and broadcasts to all interested subscriptions. This approach supports running the EventStore on multiple nodes, regardless of whether they are connected together to form a cluster. A single listener will be used when nodes form a cluster, otherwise one connection per node is used.
 
@@ -18,9 +18,9 @@ A single listener process will connect to the database to listen for these notif
 
 By default subscriptions are created from the stream origin; they will receive all events from the stream. You can optionally specify a given start position:
 
-- `:origin` - subscribe to events from the start of the stream (identical to using 0). This is the current behaviour and will remain the default.
+- `:origin` - subscribe to events from the start of the stream (identical to using `0`). This is the default behaviour.
 - `:current` - subscribe to events from the current version.
-- `stream_version` or `event_number` (integer) - specify an exact stream version to subscribe from for a single stream subscription. You provide an event id for an all stream subscription.
+- `event_number` (integer) - specify an exact event number to subscribe from. This will be the same as the stream version for single stream subscriptions.
 
 ## Ack received events
 
@@ -85,9 +85,9 @@ The supported options are:
 
   - `:origin` - Start receiving events from the beginning of the stream or all streams.
   - `:current` - Subscribe to newly appended events only, skipping already persisted events.
-  - `event_number` or `stream_version` - Provide the event id (all streams) of stream version (single stream) to begin receiving events from.
+  - `event_number` (integer) - Specify an exact event number to subscribe from. This will be the same as the stream version for single stream subscriptions.
 
-Example all stream subscription that will receive events appended after the subscription has been created:
+Example all stream subscription that will receive new events appended after the subscription has been created:
 
 ```elixir
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), start_from: :current)

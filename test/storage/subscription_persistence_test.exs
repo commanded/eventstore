@@ -76,7 +76,7 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
   test "ack last seen event by id" do
     {:ok, _subscription} = Storage.subscribe_to_stream(@all_stream, @subscription_name)
 
-    :ok = Storage.ack_last_seen_event(@all_stream, @subscription_name, 1, nil)
+    :ok = Storage.ack_last_seen_event(@all_stream, @subscription_name, 1)
 
     {:ok, subscriptions} = Storage.subscriptions
 
@@ -88,21 +88,22 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
   test "ack last seen event by stream version" do
     {:ok, _subscription} = Storage.subscribe_to_stream(@all_stream, @subscription_name)
 
-    :ok = Storage.ack_last_seen_event(@all_stream, @subscription_name, nil, 1)
+    :ok = Storage.ack_last_seen_event(@all_stream, @subscription_name, 1)
 
     {:ok, subscriptions} = Storage.subscriptions
 
     subscription = subscriptions |> Enum.reverse |> hd
 
-    verify_subscription(subscription, nil, 1)
+    verify_subscription(subscription, 1)
   end
 
-  defp verify_subscription(subscription, last_seen_event_number \\ nil, last_seen_stream_version \\ nil) do
+  defp verify_subscription(subscription, last_seen \\ nil)
+
+  defp verify_subscription(subscription, last_seen) do
     assert subscription.subscription_id > 0
     assert subscription.stream_uuid == @all_stream
     assert subscription.subscription_name == @subscription_name
-    assert subscription.last_seen_event_number == last_seen_event_number
-    assert subscription.last_seen_stream_version == last_seen_stream_version
+    assert subscription.last_seen == last_seen
     assert subscription.created_at != nil
   end
 end

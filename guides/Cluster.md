@@ -4,7 +4,7 @@ EventStore supports running on multiple nodes as either a [distributed Erlang](h
 
 ## Event publication
 
-PostgreSQL `LISTEN` / `NOTIFY` is used to pub/sub event notifications.
+PostgreSQL's `LISTEN` / `NOTIFY` is used to pub/sub event notifications.
 
 A single listener process will connect to the database to listen for events when using a distributed cluster. Events will be broadcast to all connected nodes using Erlang's [pg2](http://erlang.org/doc/man/pg2.html) process groups. This limits the number of database connections to at most the number of running clusters.
 
@@ -73,7 +73,7 @@ Please refer to the [`libcluster` documentation](https://hexdocs.pm/libcluster/)
       $ MIX_ENV=distributed iex --name node3@127.0.0.1 -S mix
       ```
 
-The cluster will be automatically formed as soon as the nodes start.     
+The cluster will be automatically formed as soon as the nodes start.
 
 ## Static cluster topology and formation
 

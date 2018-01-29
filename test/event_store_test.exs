@@ -1,31 +1,79 @@
 defmodule EventStoreTest do
   use EventStore.StorageCase
-  doctest EventStore.Storage
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, RecordedEvent}
   alias EventStore.Snapshots.SnapshotData
 
   @all_stream "$all"
   @subscription_name "test_subscription"
 
-  test "append single event to event store" do
-    stream_uuid = UUID.uuid4()
-    events = EventFactory.create_events(1)
+  describe "append to event store" do
+    test "should append single event" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(1)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+      assert :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+    end
+
+    test "should append multiple events" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
+
+      assert :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+    end
+
+    test "should fail attempting to append to `$all` stream" do
+      events = EventFactory.create_events(1)
+
+      assert {:error, :cannot_append_to_all_stream} = EventStore.append_to_stream(@all_stream, 0, events)
+    end
   end
 
-  test "append multiple event to event store" do
-    stream_uuid = UUID.uuid4()
-    events = EventFactory.create_events(3)
+  describe "link to event store" do
+    setup do
+      source_stream_uuid = UUID.uuid4()
+      target_stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-  end
+      :ok = EventStore.append_to_stream(source_stream_uuid, 0, events)
 
-  test "attempt to append to `$all` stream should fail" do
-    events = EventFactory.create_events(1)
+      {:ok, events} = EventStore.read_stream_forward(source_stream_uuid)
+      event_ids =  Enum.map(events, &(&1.event_id))
 
-    {:error, :cannot_append_to_all_stream} = EventStore.append_to_stream(@all_stream, 0, events)
+      [
+        source_stream_uuid: source_stream_uuid,
+        target_stream_uuid: target_stream_uuid,
+        events: events,
+        event_ids: event_ids,
+      ]
+    end
+
+    test "should link multiple events", context do
+      %{
+        target_stream_uuid: target_stream_uuid,
+        event_ids: event_ids
+      } = context
+
+      assert :ok = EventStore.link_to_stream(target_stream_uuid, 0, event_ids)
+    end
+
+    test "should read linked events", context do
+      %{
+        source_stream_uuid: source_stream_uuid,
+        target_stream_uuid: target_stream_uuid,
+        event_ids: event_ids
+      } = context
+
+      :ok = EventStore.link_to_stream(target_stream_uuid, 0, event_ids)
+
+      assert {:ok, source_events} = EventStore.read_stream_forward(source_stream_uuid)
+      assert {:ok, linked_events} = EventStore.read_stream_forward(target_stream_uuid)
+      assert source_events == linked_events
+    end
+
+    test "should fail attempting to link to `$all` stream", %{event_ids: event_ids} do
+      assert {:error, :cannot_append_to_all_stream} = EventStore.link_to_stream(@all_stream, 0, event_ids)
+    end
   end
 
   test "read stream forward from event store" do
@@ -38,14 +86,7 @@ defmodule EventStoreTest do
     created_event = hd(events)
     recorded_event = hd(recorded_events)
 
-    assert_is_uuid(recorded_event.event_id)
-    assert is_integer(recorded_event.event_number)
-    assert recorded_event.event_number > 0
-    assert recorded_event.stream_uuid == stream_uuid
-    assert recorded_event.data == created_event.data
-    assert recorded_event.metadata == created_event.metadata
-    assert_is_uuid(recorded_event.causation_id)
-    assert_is_uuid(recorded_event.correlation_id)
+    assert_recorded_event(stream_uuid, created_event, recorded_event)
   end
 
   test "stream forward from event store" do
@@ -53,17 +94,12 @@ defmodule EventStoreTest do
     events = EventFactory.create_events(1)
 
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-    recorded_events = EventStore.stream_forward(stream_uuid) |> Enum.to_list
+    recorded_events = stream_uuid |> EventStore.stream_forward() |> Enum.to_list()
 
     created_event = hd(events)
     recorded_event = hd(recorded_events)
 
-    assert_is_uuid(recorded_event.event_id)
-    assert is_integer(recorded_event.event_number)
-    assert recorded_event.event_number > 0
-    assert recorded_event.stream_uuid == stream_uuid
-    assert recorded_event.data == created_event.data
-    assert recorded_event.metadata == created_event.metadata
+    assert_recorded_event(stream_uuid, created_event, recorded_event)
   end
 
   test "stream all forward from event store" do
@@ -71,17 +107,12 @@ defmodule EventStoreTest do
     events = EventFactory.create_events(1)
 
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-    recorded_events = EventStore.stream_all_forward() |> Enum.to_list
+    recorded_events = EventStore.stream_all_forward() |> Enum.to_list()
 
     created_event = hd(events)
     recorded_event = hd(recorded_events)
 
-    assert_is_uuid(recorded_event.event_id)
-    assert is_integer(recorded_event.event_number)
-    assert recorded_event.event_number > 0
-    assert recorded_event.stream_uuid == stream_uuid
-    assert recorded_event.data == created_event.data
-    assert recorded_event.metadata == created_event.metadata
+    assert_recorded_event(stream_uuid, created_event, recorded_event)
   end
 
   test "unicode character support" do
@@ -213,6 +244,18 @@ defmodule EventStoreTest do
     :ok = EventStore.record_snapshot(snapshot)
 
     snapshot
+  end
+
+  defp assert_recorded_event(expected_stream_uuid, expected_event, %RecordedEvent{} = recorded_event) do
+    assert_is_uuid(recorded_event.event_id)
+    assert_is_uuid(recorded_event.causation_id)
+    assert_is_uuid(recorded_event.correlation_id)
+    assert recorded_event.stream_uuid == expected_stream_uuid
+    assert recorded_event.stream_version == 1
+    assert recorded_event.event_type == expected_event.event_type
+    assert recorded_event.data == expected_event.data
+    assert recorded_event.metadata == expected_event.metadata
+    assert %NaiveDateTime{} = recorded_event.created_at
   end
 
   defp assert_is_uuid(uuid) do

@@ -44,10 +44,10 @@ $ mix event_store.init
 
 ## Reset an existing database
 
-To drop an existing EventStore database and recreate it you can run the `mix` task:
+To drop an existing EventStore database and recreate it you can run the following `mix` tasks:
 
 ```console
-$ mix event_store.reset
+$ mix do event_store.drop, event_store.create, event_store.init
 ```
 
 *Warning* this will delete all EventStore data.

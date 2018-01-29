@@ -5,7 +5,7 @@ defmodule EventStore.Notifications.StreamBroadcaster do
 
   use GenStage
 
-  alias EventStore.{RecordedEvent,Registration}
+  alias EventStore.Registration
   alias EventStore.Notifications.Reader
 
   def start_link(args) do
@@ -17,25 +17,14 @@ defmodule EventStore.Notifications.StreamBroadcaster do
   end
 
   def handle_events(events, _from, serializer) do
-    for batch <- events do
-      broadcast!(batch)
+    for {stream_uuid, batch} <- events do
+      :ok = broadcast(stream_uuid, batch)
     end
 
     {:noreply, [], serializer}
   end
 
-  defp broadcast!(events) do
-    events
-    |> Stream.chunk_by(&chunk_by/1)
-    |> Enum.each(fn events ->
-      :ok = broadcast(events)
-    end)
-  end
-
-  defp broadcast([%RecordedEvent{stream_uuid: stream_uuid} | _] = events) do
+  defp broadcast(stream_uuid, events) do
     Registration.broadcast(stream_uuid, {:notify_events, events})
   end
-
-  defp chunk_by(%RecordedEvent{stream_uuid: stream_uuid, correlation_id: correlation_id}),
-    do: {stream_uuid, correlation_id}
 end

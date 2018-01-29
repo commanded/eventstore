@@ -11,33 +11,35 @@ defmodule EventStore.Streams.Stream do
     stream_version: 0,
   ]
 
-  @doc """
-  Append a list of events to the stream, expected version is used for optimistic
-  concurrency.
-
-  Returns `:ok` on success.
-  """
-  def append_to_stream(stream_uuid, expected_version, events, timeout \\ 5_000)
-  def append_to_stream(stream_uuid, expected_version, events, _timeout) do
-    with {:ok, stream} <- stream_info(stream_uuid) do
-      append_to_storage(expected_version, events, stream)
+  def append_to_stream(stream_uuid, expected_version, events, opts \\ []) do
+    with {:ok, stream} <- stream_info(stream_uuid),
+         {:ok, stream} <- prepare_stream(expected_version, stream) do
+      do_append_to_storage(events, opts, stream)
     else
       reply -> reply
     end
   end
 
-  def read_stream_forward(stream_uuid, start_version, count, timeout \\ 5_000)
-  def read_stream_forward(stream_uuid, start_version, count, _timeout) do
-    with {:ok, stream} <- stream_info(stream_uuid) do
-      read_storage_forward(start_version, count, stream)
+  def link_to_stream(stream_uuid, expected_version, events_or_event_ids, opts \\ []) do
+    with {:ok, stream} <- stream_info(stream_uuid),
+         {:ok, stream} <- prepare_stream(expected_version, stream) do
+      do_link_to_storage(events_or_event_ids, opts, stream)
     else
       reply -> reply
     end
   end
 
-  def stream_forward(stream_uuid, start_version, read_batch_size) do
+  def read_stream_forward(stream_uuid, start_version, count, opts \\ []) do
     with {:ok, stream} <- stream_info(stream_uuid) do
-      stream_storage_forward(start_version, read_batch_size, stream)
+      read_storage_forward(start_version, count, opts, stream)
+    else
+      reply -> reply
+    end
+  end
+
+  def stream_forward(stream_uuid, start_version, read_batch_size, opts \\ []) do
+    with {:ok, stream} <- stream_info(stream_uuid) do
+      stream_storage_forward(start_version, read_batch_size, opts, stream)
     else
       reply -> reply
     end
@@ -46,7 +48,7 @@ defmodule EventStore.Streams.Stream do
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
     {start_from, opts} = Keyword.pop(opts, :start_from, :origin)
 
-    opts = Keyword.merge([start_from_stream_version: start_from_stream_version(stream_uuid, start_from)], opts)
+    opts = Keyword.merge([start_from: start_from_stream_version(stream_uuid, start_from)], opts)
 
     Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
   end
@@ -84,44 +86,46 @@ defmodule EventStore.Streams.Stream do
   end
   defp start_from_stream_version(_stream_uuid, start_from) when is_integer(start_from), do: start_from
 
-  defp append_to_storage(expected_version, events, %Stream{stream_uuid: stream_uuid, stream_id: stream_id, stream_version: stream_version} = state)
+  defp prepare_stream(expected_version, %Stream{stream_uuid: stream_uuid, stream_id: stream_id, stream_version: stream_version} = state)
     when is_nil(stream_id) and stream_version == 0 and expected_version in [0, :any_version, :no_stream]
   do
     with {:ok, stream_id} <- Storage.create_stream(stream_uuid) do
-      do_append_to_storage(events, %Stream{state | stream_id: stream_id})
+      {:ok, %Stream{state | stream_id: stream_id}}
+    else
+      reply -> reply
     end
   end
 
-  defp append_to_storage(expected_version, events, %Stream{stream_id: stream_id, stream_version: stream_version} = stream)
+  defp prepare_stream(expected_version, %Stream{stream_id: stream_id, stream_version: stream_version} = stream)
     when not is_nil(stream_id) and expected_version in [stream_version, :any_version, :stream_exists]
   do
-    do_append_to_storage(events, stream)
+    {:ok, stream}
   end
 
-  defp append_to_storage(expected_version, events, %Stream{stream_id: stream_id, stream_version: stream_version} = stream)
+  defp prepare_stream(expected_version, %Stream{stream_id: stream_id, stream_version: stream_version} = stream)
     when not is_nil(stream_id) and stream_version == 0 and expected_version == :no_stream
   do
-    do_append_to_storage(events, stream)
+    {:ok, stream}
   end
 
-  defp append_to_storage(expected_version, _events, %Stream{stream_id: stream_id, stream_version: stream_version})
+  defp prepare_stream(expected_version, %Stream{stream_id: stream_id, stream_version: stream_version})
     when is_nil(stream_id) and stream_version == 0 and expected_version == :stream_exists
   do
     {:error, :stream_does_not_exist}
   end
 
-  defp append_to_storage(expected_version, _events, %Stream{stream_id: stream_id, stream_version: stream_version})
+  defp prepare_stream(expected_version, %Stream{stream_id: stream_id, stream_version: stream_version})
     when not is_nil(stream_id) and stream_version != 0 and expected_version == :no_stream
   do
     {:error, :stream_exists}
   end
 
-  defp append_to_storage(_expected_version, _events, _state), do: {:error, :wrong_expected_version}
+  defp prepare_stream(_expected_version, _state), do: {:error, :wrong_expected_version}
 
-  defp do_append_to_storage(events, %Stream{} = stream) do
+  defp do_append_to_storage(events, opts, %Stream{} = stream) do
     events
     |> prepare_events(stream)
-    |> write_to_stream(stream)
+    |> write_to_stream(opts, stream)
   end
 
   defp prepare_events(events, %Stream{serializer: serializer, stream_uuid: stream_uuid, stream_version: stream_version}) do
@@ -137,8 +141,8 @@ defmodule EventStore.Streams.Stream do
   end
 
   defp map_to_recorded_event(%EventData{
-      correlation_id: correlation_id,
       causation_id: causation_id,
+      correlation_id: correlation_id,
       event_type: event_type,
       data: data,
       metadata: metadata
@@ -146,8 +150,8 @@ defmodule EventStore.Streams.Stream do
   do
     %RecordedEvent{
       event_id: UUID.uuid4(),
-      correlation_id: correlation_id,
       causation_id: causation_id,
+      correlation_id: correlation_id,
       event_type: event_type,
       data: serializer.serialize(data),
       metadata: serializer.serialize(metadata),
@@ -155,38 +159,42 @@ defmodule EventStore.Streams.Stream do
     }
   end
 
+  defp do_link_to_storage(events_or_event_ids, opts, %Stream{stream_id: stream_id}) do
+    Storage.link_to_stream(stream_id, Enum.map(events_or_event_ids, &extract_event_id/1), opts)
+  end
+
+  defp extract_event_id(%RecordedEvent{event_id: event_id}), do: event_id
+  defp extract_event_id(event_id) when is_bitstring(event_id), do: event_id
+  defp extract_event_id(invalid), do: raise ArgumentError, message: "Invalid event id, expected a UUID but got: #{inspect invalid}"
+
   # Returns the current naive date time in UTC.
   defp utc_now, do: NaiveDateTime.utc_now()
 
-  defp write_to_stream(prepared_events, %Stream{stream_id: stream_id}) do
-    with {:ok, _} <- Storage.append_to_stream(stream_id, prepared_events) do
-      :ok
-    else
-      reply -> reply
-    end
+  defp write_to_stream(prepared_events, opts, %Stream{stream_id: stream_id}) do
+    Storage.append_to_stream(stream_id, prepared_events, opts)
   end
 
-  defp read_storage_forward(_start_version, _count, %Stream{stream_id: stream_id})
+  defp read_storage_forward(_start_version, _count, _opts, %Stream{stream_id: stream_id})
     when is_nil(stream_id), do: {:error, :stream_not_found}
 
-  defp read_storage_forward(start_version, count, %Stream{stream_id: stream_id, serializer: serializer}) do
-    case Storage.read_stream_forward(stream_id, start_version, count) do
+  defp read_storage_forward(start_version, count, opts, %Stream{stream_id: stream_id, serializer: serializer}) do
+    case Storage.read_stream_forward(stream_id, start_version, count, opts) do
       {:ok, recorded_events} -> {:ok, deserialize_recorded_events(recorded_events, serializer)}
       {:error, _reason} = reply -> reply
     end
   end
 
-  defp stream_storage_forward(_start_version, _read_batch_size, %Stream{stream_id: stream_id})
+  defp stream_storage_forward(_start_version, _read_batch_size, _opts, %Stream{stream_id: stream_id})
     when is_nil(stream_id), do: {:error, :stream_not_found}
 
-  defp stream_storage_forward(0, read_batch_size, stream),
-    do: stream_storage_forward(1, read_batch_size, stream)
+  defp stream_storage_forward(0, read_batch_size, opts, stream),
+    do: stream_storage_forward(1, read_batch_size, opts, stream)
 
-  defp stream_storage_forward(start_version, read_batch_size, %Stream{} = stream) do
+  defp stream_storage_forward(start_version, read_batch_size, opts, %Stream{} = stream) do
     Elixir.Stream.resource(
       fn -> start_version end,
       fn next_version ->
-        case read_storage_forward(next_version, read_batch_size, stream) do
+        case read_storage_forward(next_version, read_batch_size, opts, stream) do
           {:ok, []} -> {:halt, next_version}
           {:ok, events} -> {events, next_version + length(events)}
         end

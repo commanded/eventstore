@@ -16,7 +16,7 @@ defmodule EventStore.Streams.SingleStreamTest do
     end
 
     test "should set created at datetime", context do
-      now = DateTime.utc_now() |> DateTime.to_naive()
+      now = NaiveDateTime.utc_now()
 
       {:ok, [event]} = Stream.read_stream_forward(context[:stream_uuid], 0, 1)
 
@@ -30,7 +30,85 @@ defmodule EventStore.Streams.SingleStreamTest do
     end
 
     test "for wrong expected version should error", context do
-      {:error, :wrong_expected_version} = Stream.append_to_stream(context[:stream_uuid], 0, context[:events])
+      assert {:error, :wrong_expected_version} = Stream.append_to_stream(context[:stream_uuid], 0, context[:events])
+    end
+  end
+
+  describe "link events to stream" do
+    setup [
+      :append_events_to_stream,
+      :append_event_to_another_stream
+    ]
+
+    test "should link events", context do
+      %{
+        stream_uuid: source_stream_uuid,
+        other_stream_uuid: target_stream_uuid,
+      } = context
+
+      {:ok, source_events} = Stream.read_stream_forward(source_stream_uuid, 0, 1_000)
+
+      assert :ok = Stream.link_to_stream(target_stream_uuid, 1, source_events)
+
+      assert {:ok, events} = Stream.read_stream_forward(target_stream_uuid, 0, 1_000)
+
+      assert length(events) == 4
+      assert Enum.map(events, &(&1.event_number)) == [1, 2, 3, 4]
+      assert Enum.map(events, &(&1.stream_version)) == [1, 1, 2, 3]
+
+      for {source, linked} <- Enum.zip(source_events, Enum.drop(events, 1)) do
+        assert source.event_id == linked.event_id
+        assert source.stream_uuid == linked.stream_uuid
+        assert source.stream_version == linked.stream_version
+        assert source.causation_id == linked.causation_id
+        assert source.correlation_id == linked.correlation_id
+        assert source.event_type == linked.event_type
+        assert source.data == linked.data
+        assert source.metadata == linked.metadata
+        assert source.created_at == linked.created_at
+      end
+    end
+
+    test "should link events with `:any_version` expected version", context do
+      %{
+        stream_uuid: source_stream_uuid,
+        other_stream_uuid: target_stream_uuid,
+      } = context
+
+      {:ok, source_events} = Stream.read_stream_forward(source_stream_uuid, 0, 1_000)
+
+      assert :ok = Stream.link_to_stream(target_stream_uuid, :any_version, source_events)
+    end
+
+    test "should fail when wrong expected version", context do
+      %{
+        stream_uuid: source_stream_uuid,
+        other_stream_uuid: target_stream_uuid,
+      } = context
+
+      {:ok, source_events} = Stream.read_stream_forward(source_stream_uuid, 0, 1_000)
+
+      assert {:error, :wrong_expected_version} = Stream.link_to_stream(target_stream_uuid, 0, source_events)
+    end
+
+    test "should fail linking events that don't exist" do
+      stream_uuid = UUID.uuid4()
+      event_ids = [UUID.uuid4()]
+
+      assert {:error, :not_found} = Stream.link_to_stream(stream_uuid, 0, event_ids)
+    end
+
+    test "should prevent duplicate linked events", context do
+      %{
+        stream_uuid: source_stream_uuid,
+        other_stream_uuid: target_stream_uuid,
+      } = context
+
+      {:ok, source_events} = Stream.read_stream_forward(source_stream_uuid, 0, 1_000)
+
+      :ok = Stream.link_to_stream(target_stream_uuid, 1, source_events)
+
+      assert {:error, :duplicate_event} = Stream.link_to_stream(target_stream_uuid, 4, source_events)
     end
   end
 
@@ -142,7 +220,7 @@ defmodule EventStore.Streams.SingleStreamTest do
   end
 
   defp append_events_to_stream(_context) do
-    stream_uuid = UUID.uuid4
+    stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
     :ok = Stream.append_to_stream(stream_uuid, 0, events)
@@ -150,6 +228,18 @@ defmodule EventStore.Streams.SingleStreamTest do
     [
       stream_uuid: stream_uuid,
       events: events
+    ]
+  end
+
+  defp append_event_to_another_stream(_context) do
+    stream_uuid = UUID.uuid4()
+    events = EventFactory.create_events(1)
+
+    :ok = Stream.append_to_stream(stream_uuid, 0, events)
+
+    [
+      other_stream_uuid: stream_uuid,
+      other_events: events
     ]
   end
 
