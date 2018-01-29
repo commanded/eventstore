@@ -35,7 +35,7 @@ defmodule EventStore.Storage.Subscription do
       {:ok, subscription}
     else
       {:error, :subscription_not_found} ->
-        Subscription.Subscribe.execute(conn, stream_uuid, subscription_name, start_from, opts)
+        create_subscription(conn, stream_uuid, subscription_name, start_from, opts)
 
       reply ->
         reply
@@ -52,9 +52,19 @@ defmodule EventStore.Storage.Subscription do
   def unsubscribe_from_stream(conn, stream_uuid, subscription_name, opts \\ []),
     do: Subscription.Unsubscribe.execute(conn, stream_uuid, subscription_name, opts)
 
+  defp create_subscription(conn, stream_uuid, subscription_name, start_from, opts) do
+    case Subscription.Subscribe.execute(conn, stream_uuid, subscription_name, start_from, opts) do
+      {:error, :subscription_already_exists} ->
+        Subscription.Query.execute(conn, stream_uuid, subscription_name, opts)
+
+      reply ->
+        reply
+    end
+  end
+
   defmodule All do
     @moduledoc false
-    
+
     def execute(conn, opts) do
       conn
       |> Postgrex.query(Statements.query_all_subscriptions, [], opts)
