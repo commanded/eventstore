@@ -135,9 +135,10 @@ defmodule EventStoreTest do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(1)
 
-    {:ok, _subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self())
+    {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self())
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
+    assert_receive {:subscribed, ^subscription}
     assert_receive {:events, received_events}
 
     assert length(received_events) == 1
@@ -153,10 +154,11 @@ defmodule EventStoreTest do
 
     :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
 
-    {:ok, _subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self(), start_from: :current)
+    {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self(), start_from: :current)
 
     :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
 
+    assert_receive {:subscribed, ^subscription}
     assert_receive {:events, received_events}
 
     assert length(received_events) == 1
@@ -173,6 +175,7 @@ defmodule EventStoreTest do
     {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self())
 
     # should receive events appended before subscription created
+    assert_receive {:subscribed, ^subscription}
     assert_receive {:events, received_events}
     EventStore.ack(subscription, received_events)
 

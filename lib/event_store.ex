@@ -250,6 +250,34 @@ defmodule EventStore do
         to the subscriber.
 
   Returns `{:ok, subscription}` when subscription succeeds.
+
+  ## Notification messages
+
+  Subscribers will initially receive a `{:subscribed, subscription}` message
+  once the subscription has successfully subscribed.
+
+  After this message events will be sent to the subscriber, in batches, as
+  `{:events, events}` where events is a collection of `EventStore.RecordedEvent`
+  structs.
+
+  ## Example
+
+      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, "example", self())
+
+      # wait for the subscription confirmation
+      receive do
+        {:subscribed, ^subscription} ->
+          IO.puts "Successfully subscribed to stream: " <> inspect(stream_uuid)
+      end
+
+      receive do
+        {:events, events} ->
+          IO.puts "Received events: " <> inspect(events)
+
+          # acknowledge receipt
+          EventStore.ack(subscription, events)
+      end
+
   """
   @spec subscribe_to_stream(String.t, String.t, pid, keyword) :: {:ok, subscription :: pid}
     | {:error, :subscription_already_exists}
@@ -280,6 +308,25 @@ defmodule EventStore do
         to the subscriber.
 
   Returns `{:ok, subscription}` when subscription succeeds.
+
+  ## Example
+
+      {:ok, subscription} = EventStore.subscribe_to_all_streams("all_subscription", self())
+
+      # wait for the subscription confirmation
+      receive do
+        {:subscribed, ^subscription} ->
+          IO.puts "Successfully subscribed to all streams"
+      end
+
+      receive do
+        {:events, events} ->
+          IO.puts "Received events: " <> inspect(events)
+
+          # acknowledge receipt
+          EventStore.ack(subscription, events)
+      end
+
   """
   @spec subscribe_to_all_streams(String.t, pid, keyword) :: {:ok, subscription :: pid}
     | {:error, :subscription_already_exists}

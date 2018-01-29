@@ -44,6 +44,8 @@ MIT License
 Append events to a stream:
 
 ```elixir
+defmodule ExampleEvent, do: defstruct [:key]
+
 stream_uuid = UUID.uuid4()
 expected_version = 0
 events = [
@@ -70,12 +72,30 @@ Subscribe to events appended to all streams:
 ```elixir
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self())
 
+# wait for the subscription confirmation
 receive do
-  {:events, events} ->
-    # ... process events & ack receipt    
-    EventStore.ack(subscription, events)
+  {:subscribed, ^subscription} ->
+    IO.puts "Successfully subscribed to all streams"
 end
+
+receive_loop = fn loop ->
+  # receive a batch of events appended to the event store
+  receive do
+    {:events, events} ->
+      IO.puts "Received events: #{inspect events}"
+
+      # ack successful receipt of events
+      EventStore.ack(subscription, events)
+  end
+
+  loop.(loop)
+end
+
+# infinite receive loop
+receive_loop.(receive_loop)
 ```
+
+In production use you would use a [`GenServer` subscriber process](guides/Subscriptions.md#example-subscriber) and the `handle_info/2` callback to receive events.
 
 More: [Subscribe to streams](guides/Subscriptions.md)
 

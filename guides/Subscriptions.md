@@ -2,17 +2,27 @@
 
 Subscriptions to a stream will guarantee *at least once* delivery of every persisted event. Each subscription may be independently paused, then later resumed from where it stopped.
 
-A subscription can be created to receive events published from a single or all streams.
+A subscription can be created to receive events appended to a single or all streams.
 
-Events are received in batches after being persisted to storage. Each batch contains events from a single stream and for the same correlation id.
+Events are received in batches after being persisted to storage. A batch contains the events appended to a single stream using `EventStore.append_to_stream/4`.
 
-Subscriptions must be uniquely named and support a single subscriber. Attempting to connect two subscribers to the same subscription will return an error.
+Subscriptions must be uniquely named and support a single subscriber. Attempting to connect two subscribers to the same subscription will return an `{:error, :subscription_already_exists}` error.
 
 ## Event pub/sub
 
 PostgreSQL's `LISTEN` and `NOTIFY` commands are used to pub/sub event notifications from the database. An after update trigger on the `streams` table is used to execute `NOTIFY` for each batch of inserted events. The notification payload contains the stream uuid, stream id, and first / last stream versions (e.g. `stream-12345,1,1,5`).
 
 A single listener process will connect to the database to listen for these notifications. It fetches the event data and broadcasts to all interested subscriptions. This approach supports running the EventStore on multiple nodes, regardless of whether they are connected together to form a cluster. A single listener will be used when nodes form a cluster, otherwise one connection per node is used.
+
+## `:subscribed` message
+
+Once the subscription has successfully subscribed to the stream it will send the subscriber a `{:subscribed, subscription}` message. This indicates the subscription succeeded and you will begin receiving events.
+
+Only one instance of a subscription named subscription to a stream can connect to the database. This guarantees that starting the same subscription on each node when run on a cluster, or when running multiple single instance nodes, will only allow one subscription to actually connect. Therefore you can defer any initialisation until receipt of the `{:subscribed, subscription}` message to prevent duplicate effort by multiple nodes racing to create or subscribe to the same subscription.
+
+## `:events` message
+
+For each batch of events appended to the event store your subscriber will receive a `{:events, events}` message. The `events` list is a collection of `EventStore.RecordedEvent` structs.
 
 ## Subscription start from
 
@@ -43,9 +53,17 @@ Subscribe to events appended to all streams:
 ```elixir
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_all_subscription", self())
 
+# wait for the subscription confirmation
+receive do
+  {:subscribed, ^subscription} ->
+    IO.puts "Successfully subscribed to all streams"
+end
+
 receive do
   {:events, events} ->
-    # ... process events & ack receipt
+    IO.puts "Received events: #{inspect events}"
+
+    # acknowledge receipt
     EventStore.ack(subscription, events)
 end
 ```
@@ -64,9 +82,15 @@ Subscribe to events appended to a *single* stream:
 stream_uuid = UUID.uuid4()
 {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, "example_single_subscription", self())
 
+# wait for the subscription confirmation
+receive do
+  {:subscribed, ^subscription} ->
+    IO.puts "Successfully subscribed to single stream"
+end
+
 receive do
   {:events, events} ->
-    # ... process events & ack receipt
+    # ... process events & acknowledge receipt
     EventStore.ack(subscription, events)
 end
 ```
@@ -106,6 +130,12 @@ end
 
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), mapper: mapper)
 
+# wait for the subscription confirmation
+receive do
+  {:subscribed, ^subscription} ->
+    IO.puts "Successfully subscribed to all streams"
+end
+
 receive do
   {:events, mapped_events} ->
     # ... process events & ack receipt using last `event_number`
@@ -137,6 +167,12 @@ defmodule Subscriber do
     {:ok, %{events: events, subscription: subscription}}
   end
 
+  # Successfully subscribed to all streams
+  def handle_info({:subscribed, subscription}, %{subscription: subscription} = state) do
+    {:noreply, state}
+  end
+
+  # Event notification
   def handle_info({:events, events}, %{events: existing_events, subscription: subscription} = state) do
     # confirm receipt of received events
     EventStore.ack(subscription, events)
