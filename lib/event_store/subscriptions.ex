@@ -26,8 +26,6 @@ defmodule EventStore.Subscriptions do
   end
 
   defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    _ = Logger.debug(fn -> "Subscribing to stream #{inspect stream_uuid} named #{inspect subscription_name} with opts: #{inspect opts}" end)
-
     case Subscriptions.Supervisor.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
       {:ok, subscription} -> {:ok, subscription}
       {:error, {:already_started, _subscription}} -> {:error, :subscription_already_exists}

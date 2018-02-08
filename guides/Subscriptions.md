@@ -1,12 +1,9 @@
 # Subscriptions
 
-Subscriptions to a stream will guarantee *at least once* delivery of every persisted event. Each subscription may be independently paused, then later resumed from where it stopped.
+There are two types of subscriptions provided by EventStore:
 
-A subscription can be created to receive events appended to a single or all streams.
-
-Events are received in batches after being persisted to storage. A batch contains the events appended to a single stream using `EventStore.append_to_stream/4`.
-
-Subscriptions must be uniquely named and support a single subscriber. Attempting to connect two subscribers to the same subscription will return an `{:error, :subscription_already_exists}` error.
+1. [Transient subscriptions](#transient-subscriptions) where new events are broadcast to subscribers immediately after they have been appended to storage.
+2. [Persistent subscriptions](#persistent-subscriptions) which guarantee at-least-once delivery of every persisted event, provide back-pressure, and can be started, paused, and resumed from any position, including from the stream's origin.
 
 ## Event pub/sub
 
@@ -14,17 +11,47 @@ PostgreSQL's `LISTEN` and `NOTIFY` commands are used to pub/sub event notificati
 
 A single listener process will connect to the database to listen for these notifications. It fetches the event data and broadcasts to all interested subscriptions. This approach supports running the EventStore on multiple nodes, regardless of whether they are connected together to form a cluster. A single listener will be used when nodes form a cluster, otherwise one connection per node is used.
 
-## `:subscribed` message
+## Transient subscriptions
+
+Use `EventStore.subscribe/1` to create a transient subscription to a single stream identified by its `stream_uuid`. Events will be received in batches as an `{:events, events}` message, where `events` is a collection of `EventStore.RecordedEvent` structs.
+
+You can use `$all` as the stream identity to subscribe to events appended to all streams. With transient subscriptions you do not need to acknowledge receipt of the published events. The subscription will terminate when the subscriber process stops running.
+
+#### Subscribe to single stream events
+
+Subscribe to events appended to a *single* stream:
+
+```elixir
+:ok = EventStore.subscribe(stream_uuid)
+
+# receive first batch of events
+receive do
+  {:events, events} ->
+    IO.puts "Received events: " <> inspect(events)
+end
+```
+
+## Persistent subscriptions
+
+Persistent subscriptions to a stream will guarantee *at least once* delivery of every persisted event. Each subscription may be independently paused, then later resumed from where it stopped. The last received and acknowledged event is stored by the EventStore to support resuming at a later time later or whenever the subscriber process restarts.
+
+A subscription can be created to receive events appended to a single or all streams.
+
+Events are received in batches after being persisted to storage. A batch contains the events appended to a single stream using `EventStore.append_to_stream/4`.
+
+Subscriptions must be uniquely named and support a single subscriber. Attempting to connect two subscribers to the same subscription will return an `{:error, :subscription_already_exists}` error.
+
+### `:subscribed` message
 
 Once the subscription has successfully subscribed to the stream it will send the subscriber a `{:subscribed, subscription}` message. This indicates the subscription succeeded and you will begin receiving events.
 
 Only one instance of a subscription named subscription to a stream can connect to the database. This guarantees that starting the same subscription on each node when run on a cluster, or when running multiple single instance nodes, will only allow one subscription to actually connect. Therefore you can defer any initialisation until receipt of the `{:subscribed, subscription}` message to prevent duplicate effort by multiple nodes racing to create or subscribe to the same subscription.
 
-## `:events` message
+### `:events` message
 
 For each batch of events appended to the event store your subscriber will receive a `{:events, events}` message. The `events` list is a collection of `EventStore.RecordedEvent` structs.
 
-## Subscription start from
+### Subscription start from
 
 By default subscriptions are created from the stream origin; they will receive all events from the stream. You can optionally specify a given start position:
 
@@ -32,7 +59,7 @@ By default subscriptions are created from the stream origin; they will receive a
 - `:current` - subscribe to events from the current version.
 - `event_number` (integer) - specify an exact event number to subscribe from. This will be the same as the stream version for single stream subscriptions.
 
-## Ack received events
+### Ack received events
 
 Receipt of each event by the subscriber must be acknowledged. This allows the subscription to resume on failure without missing an event.
 
@@ -46,7 +73,7 @@ A subscriber can confirm receipt of each event in a batch by sending multiple ac
 
 A subscriber will not receive further published events until it has confirmed receipt of all received events. This provides back pressure to the subscription to prevent the subscriber from being overwhelmed with messages if it cannot keep up. The subscription will buffer events until the subscriber is ready to receive, or an overflow occurs. At which point it will move into a catch-up mode and query events and replay them from storage until caught up.
 
-### Subscribe to all events
+#### Subscribe to all events
 
 Subscribe to events appended to all streams:
 
@@ -74,7 +101,7 @@ Unsubscribe from all streams:
 :ok = EventStore.unsubscribe_from_all_streams("example_all_subscription")
 ```
 
-### Subscribe to single stream events
+#### Subscribe to single stream events
 
 Subscribe to events appended to a *single* stream:
 
@@ -101,7 +128,7 @@ Unsubscribe from a single stream:
 :ok = EventStore.unsubscribe_from_stream(stream_uuid, "example_single_subscription")
 ```
 
-### Start subscription from a given position
+#### Start subscription from a given position
 
 You can choose to receive events from a given starting position.
 
@@ -117,7 +144,7 @@ Example all stream subscription that will receive new events appended after the 
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), start_from: :current)
 ```
 
-### Mapping events
+#### Mapping events
 
 You can provide an event mapping function that runs in the subscription process, before sending the event to your subscriber. You can use this to change the data received.
 
@@ -145,7 +172,9 @@ receive do
 end
 ```
 
-## Example subscriber
+### Example persistent subscriber
+
+Use a `GenServer` process to subscribe to the event store and track all notified events:
 
 ```elixir
 # An example subscriber
@@ -173,7 +202,9 @@ defmodule Subscriber do
   end
 
   # Event notification
-  def handle_info({:events, events}, %{events: existing_events, subscription: subscription} = state) do
+  def handle_info({:events, events}, state) do
+    %{events: existing_events, subscription: subscription} = state
+
     # confirm receipt of received events
     EventStore.ack(subscription, events)
 
@@ -186,7 +217,7 @@ defmodule Subscriber do
 end
 ```
 
-Start your subscriber process, which subscribes to all streams in the event store.
+Start your subscriber process, which subscribes to all streams in the event store:
 
 ```elixir
 {:ok, subscriber} = Subscriber.start_link()

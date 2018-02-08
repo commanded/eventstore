@@ -1,4 +1,4 @@
-# Cluster
+# Running on a cluster of nodes
 
 EventStore supports running on multiple nodes as either a [distributed Erlang](http://erlang.org/doc/reference_manual/distributed.html) cluster or as multiple single instance nodes.
 

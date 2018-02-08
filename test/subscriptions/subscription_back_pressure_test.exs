@@ -49,7 +49,7 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
 
       # notify the subscription with unexpected events
       unexpected_events = EventFactory.create_recorded_events(5, stream1_uuid, 999)
-      Subscription.notify_events(subscription, unexpected_events)
+      send(subscription, {:events, unexpected_events})
 
       append_to_stream(stream3_uuid, 3)
       append_to_stream(stream4_uuid, 3)

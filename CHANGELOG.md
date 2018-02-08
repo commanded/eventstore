@@ -14,6 +14,7 @@
 - Use PostgreSQL's `NOTIFY` / `LISTEN` for event pub/sub ([#100](https://github.com/commanded/eventstore/pull/100)).
 - Link existing events to another stream ([#103](https://github.com/commanded/eventstore/pull/103)).
 - Subscription notification message once successfully subscribed ([#104](https://github.com/commanded/eventstore/pull/104)).
+- Transient subscriptions ([#105](https://github.com/commanded/eventstore/pull/105)).
 
 ## v0.13.2
 

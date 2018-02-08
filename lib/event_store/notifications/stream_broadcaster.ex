@@ -25,6 +25,6 @@ defmodule EventStore.Notifications.StreamBroadcaster do
   end
 
   defp broadcast(stream_uuid, events) do
-    Registration.broadcast(stream_uuid, {:notify_events, events})
+    Registration.broadcast(stream_uuid, {:events, events})
   end
 end
