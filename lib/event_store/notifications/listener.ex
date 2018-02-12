@@ -64,7 +64,7 @@ defmodule EventStore.Notifications.Listener do
   end
 
   defp listen_for_events(%Listener{} = state) do
-    {:ok, ref} = Postgrex.Notifications.listen(EventStore.Notifications, "events")
+    {:ok, ref} = Postgrex.Notifications.listen(EventStore.Notifications.Postgrex, "events")
 
     %Listener{state | ref: ref}
   end

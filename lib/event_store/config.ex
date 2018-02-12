@@ -96,6 +96,10 @@ defmodule EventStore.Config do
     :ssl_opts
   ]
 
+  def default_postgrex_opts(config) do
+    Keyword.take(config, @default_postgrex_opts)
+  end
+
   def postgrex_opts(config) do
     [
       pool_size: 10,
@@ -107,16 +111,19 @@ defmodule EventStore.Config do
       :pool_size,
       :pool_overflow
     ])
-    |> Keyword.put(:name, :event_store)
+    |> Keyword.put(:name, EventStore.Postgrex)
   end
 
   def notification_postgrex_opts(config) do
     config
-    |> Keyword.take(@default_postgrex_opts)
-    |> Keyword.put(:name, EventStore.Notifications)
+    |> default_postgrex_opts()
+    |> Keyword.put(:name, EventStore.Notifications.Postgrex)
   end
 
   def subscription_postgrex_opts(config) do
-    Keyword.take(config, @default_postgrex_opts)
+    config
+    |> default_postgrex_opts()
+    |> Keyword.put(:backoff_type, :stop)
+    |> Keyword.put(:name, EventStore.Subscriptions.Postgrex)
   end
 end

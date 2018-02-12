@@ -493,7 +493,9 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   describe "duplicate subscriptions" do
     setup [:create_two_duplicate_subscriptions]
 
-    test "should only allow single active subscription", %{subscription1: subscription1, subscription2: subscription2} do
+    test "should only allow single active subscription", context do
+      %{subscription1: subscription1, subscription2: subscription2} = context
+
       stream1_uuid = append_events_to_stream(3)
 
       # subscriber1 should receive events
@@ -530,12 +532,16 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     end
 
     defp create_two_duplicate_subscriptions(%{subscription_name: subscription_name}) do
-      postgrex_config = Config.parsed() |> Config.subscription_postgrex_opts()
+      postgrex_config = Config.parsed() |> Config.default_postgrex_opts()
 
-      {:ok, subscription1} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from: 0)
+      {:ok, conn1} = Postgrex.start_link(postgrex_config)
+      {:ok, conn2} = Postgrex.start_link(postgrex_config)
+
+      {:ok, subscription1} = EventStore.Subscriptions.Subscription.start_link(conn1, "$all", subscription_name, self(), start_from: 0)
       assert_receive {:subscribed, ^subscription1}
 
-      {:ok, subscription2} = EventStore.Subscriptions.Subscription.start_link(postgrex_config, "$all", subscription_name, self(), start_from: 0)
+      {:ok, subscription2} = EventStore.Subscriptions.Subscription.start_link(conn2, "$all", subscription_name, self(), start_from: 0)
+      refute_receive {:subscribed, ^subscription2}
 
       [
         subscription1: subscription1,

@@ -11,15 +11,18 @@ defmodule EventStore.Supervisor do
 
   def init(config) do
     postgrex_opts = Config.postgrex_opts(config)
+    subscription_postgrex_config = Config.subscription_postgrex_opts(config)
 
     children =
       [
         {Postgrex, postgrex_opts},
+        {Postgrex, subscription_postgrex_config},
         Supervisor.child_spec(
           {Registry, keys: :unique, name: EventStore.Subscriptions.Subscription},
           id: EventStore.Subscriptions.Subscription
         ),
-        {EventStore.Subscriptions.Supervisor, config},
+        {EventStore.AdvisoryLocks, []},
+        {EventStore.Subscriptions.Supervisor, [EventStore.Subscriptions.Postgrex]},
         {EventStore.Notifications.Supervisor, config}
       ] ++ Registration.child_spec()
 

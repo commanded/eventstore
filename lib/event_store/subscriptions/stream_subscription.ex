@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.StreamSubscription do
   @moduledoc false
 
-  alias EventStore.{RecordedEvent, Storage}
+  alias EventStore.{AdvisoryLocks, RecordedEvent, Storage}
   alias EventStore.Subscriptions.{SubscriptionState, Subscription}
 
   use Fsm, initial_state: :initial, initial_data: %SubscriptionState{}
@@ -284,7 +284,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   end
 
   defp try_acquire_exclusive_lock(conn, %Storage.Subscription{subscription_id: subscription_id}) do
-    Storage.Subscription.try_acquire_exclusive_lock(conn, subscription_id)
+    AdvisoryLocks.try_advisory_lock(conn, subscription_id)
   end
 
   defp unsubscribe_from_stream(%SubscriptionState{} = data) do

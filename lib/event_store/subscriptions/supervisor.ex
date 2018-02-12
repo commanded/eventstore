@@ -1,6 +1,6 @@
 defmodule EventStore.Subscriptions.Supervisor do
   @moduledoc false
-  
+
   # Supervise zero, one or more subscriptions to an event stream.
 
   use Supervisor
@@ -8,8 +8,8 @@ defmodule EventStore.Subscriptions.Supervisor do
   alias EventStore.Config
   alias EventStore.Subscriptions.Subscription
 
-  def start_link(config) do
-    Supervisor.start_link(__MODULE__, config, name: __MODULE__)
+  def start_link([conn]) do
+    Supervisor.start_link(__MODULE__, conn, name: __MODULE__)
   end
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, subscription_opts) do
@@ -29,11 +29,9 @@ defmodule EventStore.Subscriptions.Supervisor do
     end
   end
 
-  def init(config) do
-    postgrex_config = Config.subscription_postgrex_opts(config)
-
+  def init(conn) do
     children = [
-      worker(Subscription, [postgrex_config], restart: :temporary),
+      worker(Subscription, [conn], restart: :temporary),
     ]
 
     supervise(children, strategy: :simple_one_for_one)

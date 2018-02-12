@@ -45,7 +45,7 @@ defmodule EventStore.Notifications.Supervisor do
     Supervisor.init(
       [
         %{
-          id: EventStore.Notifications,
+          id: EventStore.Notifications.Postgrex,
           start: {Postgrex.Notifications, :start_link, [notification_opts]},
           restart: :permanent,
           shutdown: 5000,

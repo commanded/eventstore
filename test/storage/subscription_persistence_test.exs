@@ -46,7 +46,7 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
   end
 
   test "acquire and release lock by connection" do
-    config = Config.parsed() |> Config.subscription_postgrex_opts()
+    config = Config.parsed() |> Config.default_postgrex_opts()
 
     {:ok, conn1} = Postgrex.start_link(config)
     {:ok, conn2} = Postgrex.start_link(config)

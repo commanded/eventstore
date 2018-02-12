@@ -20,18 +20,17 @@ defmodule EventStore.Subscriptions.Subscription do
     subscriber: nil,
     subscription: nil,
     subscription_opts: [],
-    postgrex_config: nil,
     retry_interval: nil
   ]
 
-  def start_link(postgrex_config, stream_uuid, subscription_name, subscriber, subscription_opts, opts \\ []) do
+  def start_link(conn, stream_uuid, subscription_name, subscriber, subscription_opts, opts \\ []) do
     GenServer.start_link(__MODULE__, %Subscription{
+      conn: conn,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
       subscriber: subscriber,
       subscription: StreamSubscription.new(),
       subscription_opts: subscription_opts,
-      postgrex_config: postgrex_config,
       retry_interval: subscription_retry_interval()
     }, opts)
   end
@@ -78,19 +77,13 @@ defmodule EventStore.Subscriptions.Subscription do
 
   def handle_info(:subscribe_to_stream, %Subscription{} = state) do
     %Subscription{
-      postgrex_config: postgrex_config,
+      conn: conn,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
       subscriber: subscriber,
       subscription: subscription,
       subscription_opts: opts
     } = state
-
-    # Each subscription has its own connection to the database to acquire an
-    # advisory lock to ensure only one subscription
-    {:ok, conn} = Postgrex.start_link(postgrex_config)
-
-    state = %Subscription{state | conn: conn}
 
     subscription = StreamSubscription.subscribe(subscription, conn, stream_uuid, subscription_name, subscriber, opts)
 
@@ -153,7 +146,7 @@ defmodule EventStore.Subscriptions.Subscription do
 
     Process.send_after(self(), :subscribe_to_stream, retry_interval)
 
-    close_database_connection(state)
+    state
   end
 
   defp handle_subscription_state(%Subscription{subscription: %{state: :subscribe_to_events}} = state) do
@@ -181,7 +174,7 @@ defmodule EventStore.Subscriptions.Subscription do
   defp handle_subscription_state(%Subscription{subscription: %{state: :unsubscribed}} = state) do
     _ = Logger.warn(fn -> describe(state) <> " has unsubscribed" end)
 
-    close_database_connection(state)
+    state
   end
 
   # no-op for all other subscription states
@@ -195,12 +188,6 @@ defmodule EventStore.Subscriptions.Subscription do
   defp notify_subscribed(%Subscription{subscriber: subscriber}) do
     send(subscriber, {:subscribed, self()})
     :ok
-  end
-
-  defp close_database_connection(%Subscription{conn: conn} = state) do
-    :ok = GenServer.stop(conn)
-
-    %Subscription{state | conn: nil}
   end
 
   # Get the delay between subscription attempts, in milliseconds, from app

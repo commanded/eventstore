@@ -398,6 +398,11 @@ SELECT pg_try_advisory_lock($1);
 """
   end
 
+  def advisory_unlock do
+"""
+SELECT pg_advisory_unlock($1);
+"""
+  end
   def ack_last_seen_event do
 """
 UPDATE subscriptions

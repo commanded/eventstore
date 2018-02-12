@@ -12,7 +12,7 @@ defmodule EventStore.Storage do
     Subscription,
   }
 
-  @event_store :event_store
+  @event_store EventStore.Postgrex
 
   @doc """
   Initialise the PostgreSQL database by creating the tables and indexes.
