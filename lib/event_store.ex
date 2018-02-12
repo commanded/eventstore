@@ -7,24 +7,22 @@ defmodule EventStore do
   The `EventStore` module provides the public API to read and write events to an
   event stream, and subscribe to event notifications.
 
-  Please check the [getting started](getting-started.html) and
-  [usage](usage.html) guides to learn more.
+  Please refer to the following guides to learn more:
 
-  ## Example usage
-
-      # append events to a stream
-      :ok = EventStore.append_to_stream(stream_uuid, expected_version, events)
-
-      # read all events from a stream, starting at the beginning
-      {:ok, recorded_events} = EventStore.read_stream_forward(stream_uuid)
+  - [Getting started](getting-started.html)
+  - [Usage](usage.html)
+  - [Subscriptions](subscriptions.html)
+  - [Running on a cluster of nodes](cluster.html)
+  - [Event serialization](event-serialization.html)
+  - [Upgrading an existing EventStore database](upgrades.html)
 
   """
 
   @type expected_version :: :any_version | :no_stream | :stream_exists | non_neg_integer()
   @type start_from :: :origin | :current | non_neg_integer()
 
-  alias EventStore.{Config,EventData,RecordedEvent,Subscriptions}
-  alias EventStore.Snapshots.{SnapshotData,Snapshotter}
+  alias EventStore.{Config, EventData, RecordedEvent, Registration, Subscriptions}
+  alias EventStore.Snapshots.{SnapshotData, Snapshotter}
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Streams.Stream
 
@@ -54,7 +52,7 @@ defmodule EventStore do
     - `events` is a list of `%EventStore.EventData{}` structs.
 
     - `timeout` an optional timeout for the database transaction, in
-      milliseconds. Defaults to `#{@default_timeout}`.
+      milliseconds. Defaults to #{@default_timeout}ms.
 
   Returns `:ok` on success, or an `{:error, reason}` tagged tuple. The returned
   error may be due to one of the following reasons:
@@ -67,12 +65,13 @@ defmodule EventStore do
       expected version was `:stream_exists`.
 
   """
-  @spec append_to_stream(String.t, expected_version, list(EventData.t), timeout() | nil) :: :ok |
-    {:error, :cannot_append_to_all_stream} |
-    {:error, :stream_exists} |
-    {:error, :stream_does_not_exist} |
-    {:error, :wrong_expected_version} |
-    {:error, reason :: term}
+  @spec append_to_stream(String.t(), expected_version, list(EventData.t()), timeout() | nil) ::
+          :ok
+          | {:error, :cannot_append_to_all_stream}
+          | {:error, :stream_exists}
+          | {:error, :stream_does_not_exist}
+          | {:error, :wrong_expected_version}
+          | {:error, reason :: term}
 
   def append_to_stream(stream_uuid, expected_version, events, timeout \\ @default_timeout)
 
@@ -109,7 +108,7 @@ defmodule EventStore do
       event ids.
 
     - `timeout` an optional timeout for the database transaction, in
-      milliseconds. Defaults to `#{@default_timeout}`.
+      milliseconds. Defaults to #{@default_timeout}ms.
 
   Returns `:ok` on success, or an `{:error, reason}` tagged tuple. The returned
   error may be due to one of the following reasons:
@@ -122,14 +121,25 @@ defmodule EventStore do
       expected version was `:stream_exists`.
 
   """
-  @spec link_to_stream(String.t, expected_version, list(RecordedEvent.t) | list(non_neg_integer), timeout() | nil) :: :ok |
-    {:error, :cannot_append_to_all_stream} |
-    {:error, :stream_exists} |
-    {:error, :stream_does_not_exist} |
-    {:error, :wrong_expected_version} |
-    {:error, reason :: term}
+  @spec link_to_stream(
+          String.t(),
+          expected_version,
+          list(RecordedEvent.t()) | list(non_neg_integer),
+          timeout() | nil
+        ) ::
+          :ok
+          | {:error, :cannot_append_to_all_stream}
+          | {:error, :stream_exists}
+          | {:error, :stream_does_not_exist}
+          | {:error, :wrong_expected_version}
+          | {:error, reason :: term}
 
-  def link_to_stream(stream_uuid, expected_version, events_or_event_ids, timeout \\ @default_timeout)
+  def link_to_stream(
+        stream_uuid,
+        expected_version,
+        events_or_event_ids,
+        timeout \\ @default_timeout
+      )
 
   def link_to_stream(@all_stream, _expected_version, _events_or_event_ids, _timeout),
     do: {:error, :cannot_append_to_all_stream}
@@ -151,13 +161,19 @@ defmodule EventStore do
       If not set it will be limited to returning #{@default_count} events from the stream.
 
     - `timeout` an optional timeout for querying the database, in milliseconds.
-      Defaults to `#{@default_timeout}`.
+      Defaults to #{@default_timeout}ms.
 
   """
-  @spec read_stream_forward(String.t, non_neg_integer, non_neg_integer, timeout() | nil) :: {:ok, list(RecordedEvent.t)}
-    | {:error, reason :: term}
+  @spec read_stream_forward(String.t(), non_neg_integer, non_neg_integer, timeout() | nil) ::
+          {:ok, list(RecordedEvent.t())}
+          | {:error, reason :: term}
 
-  def read_stream_forward(stream_uuid, start_version \\ 0, count \\ @default_count, timeout \\ @default_timeout)
+  def read_stream_forward(
+        stream_uuid,
+        start_version \\ 0,
+        count \\ @default_count,
+        timeout \\ @default_timeout
+      )
 
   def read_stream_forward(stream_uuid, start_version, count, timeout) do
     Stream.read_stream_forward(stream_uuid, start_version, count, opts(timeout))
@@ -174,12 +190,18 @@ defmodule EventStore do
       Defaults to reading #{@default_batch_size} events per batch.
 
     - `timeout` an optional timeout for querying the database (per batch), in
-      milliseconds. Defaults to `#{@default_timeout}`.
+      milliseconds. Defaults to #{@default_timeout}ms.
 
   """
-  @spec stream_forward(String.t, non_neg_integer, non_neg_integer, timeout() | nil) :: Enumerable.t | {:error, reason :: term}
+  @spec stream_forward(String.t(), non_neg_integer, non_neg_integer, timeout() | nil) ::
+          Enumerable.t() | {:error, reason :: term}
 
-  def stream_forward(stream_uuid, start_version \\ 0, read_batch_size \\ @default_batch_size, timeout \\ @default_timeout)
+  def stream_forward(
+        stream_uuid,
+        start_version \\ 0,
+        read_batch_size \\ @default_batch_size,
+        timeout \\ @default_timeout
+      )
 
   def stream_forward(stream_uuid, start_version, read_batch_size, timeout) do
     Stream.stream_forward(stream_uuid, start_version, read_batch_size, opts(timeout))
@@ -196,12 +218,17 @@ defmodule EventStore do
       If not set it will be limited to returning #{@default_count} events from all streams.
 
     - `timeout` an optional timeout for querying the database, in milliseconds.
-      Defaults to `#{@default_timeout}`.
+      Defaults to #{@default_timeout}ms.
 
   """
-  @spec read_all_streams_forward(non_neg_integer, non_neg_integer, timeout() | nil) :: {:ok, list(RecordedEvent.t)} | {:error, reason :: term}
+  @spec read_all_streams_forward(non_neg_integer, non_neg_integer, timeout() | nil) ::
+          {:ok, list(RecordedEvent.t())} | {:error, reason :: term}
 
-  def read_all_streams_forward(start_event_number \\ 0, count \\ @default_count, timeout \\ @default_timeout)
+  def read_all_streams_forward(
+        start_event_number \\ 0,
+        count \\ @default_count,
+        timeout \\ @default_timeout
+      )
 
   def read_all_streams_forward(start_event_number, count, timeout) do
     Stream.read_stream_forward(@all_stream, start_event_number, count, opts(timeout))
@@ -218,19 +245,59 @@ defmodule EventStore do
       storage. Defaults to reading #{@default_batch_size} events per batch.
 
     - `timeout` an optional timeout for querying the database (per batch), in
-      milliseconds. Defaults to `#{@default_timeout}`.
+      milliseconds. Defaults to #{@default_timeout}ms.
   """
-  @spec stream_all_forward(non_neg_integer, non_neg_integer) :: Enumerable.t
+  @spec stream_all_forward(non_neg_integer, non_neg_integer) :: Enumerable.t()
 
-  def stream_all_forward(start_event_number \\ 0, read_batch_size \\ @default_batch_size, timeout \\ @default_timeout)
+  def stream_all_forward(
+        start_event_number \\ 0,
+        read_batch_size \\ @default_batch_size,
+        timeout \\ @default_timeout
+      )
 
   def stream_all_forward(start_event_number, read_batch_size, timeout) do
     Stream.stream_forward(@all_stream, start_event_number, read_batch_size, opts(timeout))
   end
 
   @doc """
-  Subscriber will be notified of each batch of events persisted to a single
-  stream.
+  Create a transient subscription to a given stream.
+
+    - `stream_uuid` is the stream to subscribe to.
+      Use the `$all` identifier to subscribe to events from all streams.
+
+  The calling process will be notified whenever new events are appended to
+  the given `stream_uuid`.
+
+  As the subscription is transient you do not need to acknowledge receipt of
+  each event. The subscriber process will miss any events if it is restarted
+  and resubscribes. If you need a persistent subscription with guaranteed
+  at-least-once event delivery and back-pressure you should use
+  `EventStore.subscribe_to_stream/4`.
+
+  ## Notification message
+
+  Events will be sent to the subscriber, in batches, as `{:events, events}`
+  where events is a collection of `EventStore.RecordedEvent` structs.
+
+  ## Example
+
+      {:ok, subscription} = EventStore.subscribe(stream_uuid)
+
+      # receive first batch of events
+      receive do
+        {:events, events} ->
+          IO.puts "Received events: " <> inspect(events)
+      end
+
+  """
+  @spec subscribe(String.t()) :: :ok | {:error, term}
+  def subscribe(stream_uuid), do: Registration.subscribe(stream_uuid)
+
+  @doc """
+  Create a persistent subscription to a single stream.
+
+  The `subscriber` process will be notified of each batch of events appended to
+  the single stream identified by `stream_uuid`.
 
     - `stream_uuid` is the stream to subscribe to.
       Use the `$all` identifier to subscribe to events from all streams.
@@ -248,6 +315,9 @@ defmodule EventStore do
           - any positive integer for a stream version to receive events after.
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
+
+  The subscription will resume from the last acknowledged event if it already
+  exists. It will ignore the `start_from` argument in this case.
 
   Returns `{:ok, subscription}` when subscription succeeds.
 
@@ -279,9 +349,10 @@ defmodule EventStore do
       end
 
   """
-  @spec subscribe_to_stream(String.t, String.t, pid, keyword) :: {:ok, subscription :: pid}
-    | {:error, :subscription_already_exists}
-    | {:error, reason :: term}
+  @spec subscribe_to_stream(String.t(), String.t(), pid, keyword) ::
+          {:ok, subscription :: pid}
+          | {:error, :subscription_already_exists}
+          | {:error, reason :: term}
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
 
@@ -290,7 +361,10 @@ defmodule EventStore do
   end
 
   @doc """
-  Subscriber will be notified of every event persisted to any stream.
+  Create a persistent subscription to all streams.
+
+  The `subscriber` process will be notified of each batch of events appended to
+  any stream.
 
     - `subscription_name` is used to uniquely identify the subscription.
 
@@ -306,6 +380,9 @@ defmodule EventStore do
             exact event.
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
+
+  The subscription will resume from the last acknowledged event if it already
+  exists. It will ignore the `start_from` argument in this case.
 
   Returns `{:ok, subscription}` when subscription succeeds.
 
@@ -328,9 +405,10 @@ defmodule EventStore do
       end
 
   """
-  @spec subscribe_to_all_streams(String.t, pid, keyword) :: {:ok, subscription :: pid}
-    | {:error, :subscription_already_exists}
-    | {:error, reason :: term}
+  @spec subscribe_to_all_streams(String.t(), pid, keyword) ::
+          {:ok, subscription :: pid}
+          | {:error, :subscription_already_exists}
+          | {:error, reason :: term}
 
   def subscribe_to_all_streams(subscription_name, subscriber, opts \\ [])
 
@@ -345,7 +423,8 @@ defmodule EventStore do
   Accepts a `RecordedEvent`, a list of `RecordedEvent`s, or the event number of
   the recorded event to acknowledge.
   """
-  @spec ack(pid, RecordedEvent.t | list(RecordedEvent.t) | non_neg_integer()) :: :ok | {:error, reason :: term}
+  @spec ack(pid, RecordedEvent.t() | list(RecordedEvent.t()) | non_neg_integer()) ::
+          :ok | {:error, reason :: term}
   def ack(subscription, ack) do
     Subscription.ack(subscription, ack)
   end
@@ -360,7 +439,7 @@ defmodule EventStore do
 
   Returns `:ok` on success.
   """
-  @spec unsubscribe_from_stream(String.t, String.t) :: :ok
+  @spec unsubscribe_from_stream(String.t(), String.t()) :: :ok
   def unsubscribe_from_stream(stream_uuid, subscription_name) do
     Subscriptions.unsubscribe_from_stream(stream_uuid, subscription_name)
   end
@@ -373,7 +452,7 @@ defmodule EventStore do
 
   Returns `:ok` on success.
   """
-  @spec unsubscribe_from_all_streams(String.t) :: :ok
+  @spec unsubscribe_from_all_streams(String.t()) :: :ok
   def unsubscribe_from_all_streams(subscription_name) do
     Subscriptions.unsubscribe_from_stream(@all_stream, subscription_name)
   end
@@ -384,7 +463,7 @@ defmodule EventStore do
   Returns `{:ok, %EventStore.Snapshots.SnapshotData{}}` on success, or
   `{:error, :snapshot_not_found}` when unavailable.
   """
-  @spec read_snapshot(String.t) :: {:ok, SnapshotData.t} | {:error, :snapshot_not_found}
+  @spec read_snapshot(String.t()) :: {:ok, SnapshotData.t()} | {:error, :snapshot_not_found}
   def read_snapshot(source_uuid) do
     Snapshotter.read_snapshot(source_uuid, Config.serializer())
   end
@@ -394,7 +473,7 @@ defmodule EventStore do
 
   Returns `:ok` on success.
   """
-  @spec record_snapshot(SnapshotData.t) :: :ok | {:error, reason :: term}
+  @spec record_snapshot(SnapshotData.t()) :: :ok | {:error, reason :: term}
   def record_snapshot(%SnapshotData{} = snapshot) do
     Snapshotter.record_snapshot(snapshot, Config.serializer())
   end
@@ -404,7 +483,7 @@ defmodule EventStore do
 
   Returns `:ok` on success, or when the snapshot does not exist.
   """
-  @spec delete_snapshot(String.t) :: :ok | {:error, reason :: term}
+  @spec delete_snapshot(String.t()) :: :ok | {:error, reason :: term}
   def delete_snapshot(source_uuid) do
     Snapshotter.delete_snapshot(source_uuid)
   end

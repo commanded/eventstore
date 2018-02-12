@@ -254,7 +254,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert pluck(received_events, :data) == pluck(events, :data)
 
       # notify duplicate events, should be ignored
-      Subscription.notify_events(subscription, recorded_events)
+      send(subscription, {:events, recorded_events})
 
       refute_receive {:events, _events}
     end

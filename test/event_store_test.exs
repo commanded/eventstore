@@ -131,84 +131,145 @@ defmodule EventStoreTest do
     assert recorded_event.data.event == unicode_text
   end
 
-  test "notify subscribers after event persisted" do
-    stream_uuid = UUID.uuid4()
-    events = EventFactory.create_events(1)
+  describe "transient subscription" do
+    test "should notify subscribers after event persisted to stream" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(1)
 
-    {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self())
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+      assert :ok = EventStore.subscribe(stream_uuid)
 
-    assert_receive {:subscribed, ^subscription}
-    assert_receive {:events, received_events}
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-    assert length(received_events) == 1
-    assert hd(received_events).data == hd(events).data
+      assert_receive {:events, received_events}
+      assert length(received_events) == 1
+      assert hd(received_events).data == hd(events).data
+    end
 
-    :ok = EventStore.unsubscribe_from_all_streams(@subscription_name)
+    test "should ignore events persisted before subscription" do
+      stream_uuid = UUID.uuid4()
+      initial_events = EventFactory.create_events(1)
+      events = EventFactory.create_events(2)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+
+      :timer.sleep(100)
+
+      assert :ok = EventStore.subscribe(stream_uuid)
+
+      refute_receive {:events, _received_events}
+
+      :ok = EventStore.append_to_stream(stream_uuid, 1, events)
+
+      assert_receive {:events, received_events}
+      assert length(received_events) == 2
+    end
+
+    test "should ignore events persisted to another stream" do
+      stream_uuid = UUID.uuid4()
+      another_stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(1)
+
+      assert :ok = EventStore.subscribe(stream_uuid)
+
+      :ok = EventStore.append_to_stream(another_stream_uuid, 0, events)
+
+      refute_receive {:events, _received_events}
+    end
+
+    test "should notify `$all` stream subscribers after events persisted to any stream" do
+      assert :ok = EventStore.subscribe("$all")
+
+      :ok = EventStore.append_to_stream(UUID.uuid4(), 0, EventFactory.create_events(1))
+      :ok = EventStore.append_to_stream(UUID.uuid4(), 0, EventFactory.create_events(2))
+
+      assert_receive {:events, received_events}
+      assert length(received_events) == 1
+
+      assert_receive {:events, received_events}
+      assert length(received_events) == 2
+    end
   end
 
-  test "subscribe to all streams from current position" do
-    stream_uuid = UUID.uuid4()
-    initial_events = EventFactory.create_events(1)
-    new_events = EventFactory.create_events(1, 2)
+  describe "persistent subscription" do
+    test "should notify subscribers after event persisted" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(1)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+      {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self())
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-    {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self(), start_from: :current)
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
 
-    :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
+      assert length(received_events) == 1
+      assert hd(received_events).data == hd(events).data
 
-    assert_receive {:subscribed, ^subscription}
-    assert_receive {:events, received_events}
+      :ok = EventStore.unsubscribe_from_all_streams(@subscription_name)
+    end
 
-    assert length(received_events) == 1
-    assert hd(received_events).data == hd(new_events).data
+    test "should subscribe to all streams from current position" do
+      stream_uuid = UUID.uuid4()
+      initial_events = EventFactory.create_events(1)
+      new_events = EventFactory.create_events(1, 2)
 
-    :ok = EventStore.unsubscribe_from_all_streams(@subscription_name)
-  end
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
 
-  test "catch-up subscription should receive all persisted events" do
-    stream_uuid = UUID.uuid4()
-    events = EventFactory.create_events(3)
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+      {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self(), start_from: :current)
 
-    {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self())
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
 
-    # should receive events appended before subscription created
-    assert_receive {:subscribed, ^subscription}
-    assert_receive {:events, received_events}
-    EventStore.ack(subscription, received_events)
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
 
-    assert length(received_events) == 3
-    assert pluck(received_events, :event_number) == [1, 2, 3]
-    assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
-    assert pluck(received_events, :stream_version) == [1, 2, 3]
-    assert pluck(received_events, :correlation_id) == pluck(events, :correlation_id)
-    assert pluck(received_events, :causation_id) == pluck(events, :causation_id)
-    assert pluck(received_events, :event_type) == pluck(events, :event_type)
-    assert pluck(received_events, :data) == pluck(events, :data)
-    assert pluck(received_events, :metadata) == pluck(events, :metadata)
-    refute pluck(received_events, :created_at) |> Enum.any?(&is_nil/1)
+      assert length(received_events) == 1
+      assert hd(received_events).data == hd(new_events).data
 
-    new_events = EventFactory.create_events(3, 4)
-    :ok = EventStore.append_to_stream(stream_uuid, 3, new_events)
+      :ok = EventStore.unsubscribe_from_all_streams(@subscription_name)
+    end
 
-    # should receive events appended after subscription created
-    assert_receive {:events, received_events}
-    EventStore.ack(subscription, received_events)
+    test "catch-up subscription should receive all persisted events" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-    assert length(received_events) == 3
-    assert pluck(received_events, :event_number) == [4, 5, 6]
-    assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
-    assert pluck(received_events, :stream_version) == [4, 5, 6]
-    assert pluck(received_events, :correlation_id) == pluck(new_events, :correlation_id)
-    assert pluck(received_events, :causation_id) == pluck(new_events, :causation_id)
-    assert pluck(received_events, :event_type) == pluck(new_events, :event_type)
-    assert pluck(received_events, :data) == pluck(new_events, :data)
-    assert pluck(received_events, :metadata) == pluck(new_events, :metadata)
-    refute pluck(received_events, :created_at) |> Enum.any?(&is_nil/1)
+      {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self())
 
-    :ok = EventStore.unsubscribe_from_all_streams(@subscription_name)
+      # should receive events appended before subscription created
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      EventStore.ack(subscription, received_events)
+
+      assert length(received_events) == 3
+      assert pluck(received_events, :event_number) == [1, 2, 3]
+      assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
+      assert pluck(received_events, :stream_version) == [1, 2, 3]
+      assert pluck(received_events, :correlation_id) == pluck(events, :correlation_id)
+      assert pluck(received_events, :causation_id) == pluck(events, :causation_id)
+      assert pluck(received_events, :event_type) == pluck(events, :event_type)
+      assert pluck(received_events, :data) == pluck(events, :data)
+      assert pluck(received_events, :metadata) == pluck(events, :metadata)
+      refute pluck(received_events, :created_at) |> Enum.any?(&is_nil/1)
+
+      new_events = EventFactory.create_events(3, 4)
+      :ok = EventStore.append_to_stream(stream_uuid, 3, new_events)
+
+      # should receive events appended after subscription created
+      assert_receive {:events, received_events}
+      EventStore.ack(subscription, received_events)
+
+      assert length(received_events) == 3
+      assert pluck(received_events, :event_number) == [4, 5, 6]
+      assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
+      assert pluck(received_events, :stream_version) == [4, 5, 6]
+      assert pluck(received_events, :correlation_id) == pluck(new_events, :correlation_id)
+      assert pluck(received_events, :causation_id) == pluck(new_events, :causation_id)
+      assert pluck(received_events, :event_type) == pluck(new_events, :event_type)
+      assert pluck(received_events, :data) == pluck(new_events, :data)
+      assert pluck(received_events, :metadata) == pluck(new_events, :metadata)
+      refute pluck(received_events, :created_at) |> Enum.any?(&is_nil/1)
+
+      :ok = EventStore.unsubscribe_from_all_streams(@subscription_name)
+    end
   end
 
   defmodule ExampleData, do: defstruct [:data]

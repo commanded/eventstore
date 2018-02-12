@@ -1,6 +1,6 @@
 # Event serialization
 
-The default serialization of event data and metadata uses Erlang's [external term format](http://erlang.org/doc/apps/erts/erl_ext_dist.html). This is not a recommended serialization format for production usage.
+The default serialization of event data and metadata uses Erlang's [external term format](http://erlang.org/doc/apps/erts/erl_ext_dist.html). This is not a recommended serialization format for production usage as backwards compatibility is only guaranteed going back at least two major releases.
 
 You must implement the `EventStore.Serializer` behaviour to provide your preferred serialization format.
 

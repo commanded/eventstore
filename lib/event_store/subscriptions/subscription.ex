@@ -36,10 +36,6 @@ defmodule EventStore.Subscriptions.Subscription do
     }, opts)
   end
 
-  def notify_events(subscription, events) when is_list(events) do
-    send(subscription, {:notify_events, events})
-  end
-
   @doc """
   Confirm receipt of the given event by its `stream_version`
   """
@@ -101,7 +97,7 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
-  def handle_info({:notify_events, events}, %Subscription{subscription: subscription} = state) do
+  def handle_info({:events, events}, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " received #{length(events)} events(s)" end)
 
     subscription = StreamSubscription.notify_events(subscription, events)
