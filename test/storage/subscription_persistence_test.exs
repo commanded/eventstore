@@ -1,7 +1,7 @@
 defmodule EventStore.Storage.SubscriptionPersistenceTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config,ProcessHelper,Storage}
+  alias EventStore.Storage
 
   @all_stream "$all"
   @subscription_name "test_subscription"
@@ -39,34 +39,6 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
 
     {:ok, subscriptions} = Storage.subscriptions
     assert length(subscriptions) == initial_length
-  end
-
-  test "acquire exclusive subscription lock" do
-    assert :ok = Storage.try_acquire_exclusive_lock(1)
-  end
-
-  test "acquire and release lock by connection" do
-    config = Config.parsed() |> Config.default_postgrex_opts()
-
-    {:ok, conn1} = Postgrex.start_link(config)
-    {:ok, conn2} = Postgrex.start_link(config)
-
-    # conn1 acquire lock
-    assert :ok = Storage.Subscription.try_acquire_exclusive_lock(conn1, 1)
-
-    # conn2 cannot acquire lock
-    assert {:error, :lock_already_taken} = Storage.Subscription.try_acquire_exclusive_lock(conn2, 1)
-
-    # conn1 can acquire same lock multiple times
-    assert :ok = Storage.Subscription.try_acquire_exclusive_lock(conn1, 1)
-
-    # shutdown conn1 process should release its locks
-    ProcessHelper.shutdown(conn1)
-
-    # conn2 can now acquire lock
-    assert :ok = Storage.Subscription.try_acquire_exclusive_lock(conn2, 1)
-
-    ProcessHelper.shutdown(conn2)
   end
 
   test "remove subscription when not found should not fail" do

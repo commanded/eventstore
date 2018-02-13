@@ -42,9 +42,6 @@ defmodule EventStore.Storage.Subscription do
     end
   end
 
-  def try_acquire_exclusive_lock(conn, subscription_id, opts \\ []),
-    do: Subscription.TryAdvisoryLock.execute(conn, subscription_id, opts)
-
   def ack_last_seen_event(conn, stream_uuid, subscription_name, last_seen, opts \\ []) do
     Subscription.Ack.execute(conn, stream_uuid, subscription_name, last_seen, opts)
   end
@@ -117,28 +114,6 @@ defmodule EventStore.Storage.Subscription do
 
     defp handle_response({:error, error}, stream_uuid, subscription_name) do
       _ = Logger.warn(fn -> "Failed to create stream create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: #{error}" end)
-      {:error, error}
-    end
-  end
-
-  defmodule TryAdvisoryLock do
-    @moduledoc false
-
-    def execute(conn, subscription_id, opts) do
-      conn
-      |> Postgrex.query(Statements.try_advisory_lock(), [subscription_id], opts)
-      |> handle_response()
-    end
-
-    defp handle_response({:ok, %Postgrex.Result{rows: [[true]]}}) do
-      :ok
-    end
-
-    defp handle_response({:ok, %Postgrex.Result{rows: [[false]]}}) do
-      {:error, :lock_already_taken}
-    end
-
-    defp handle_response({:error, error}) do
       {:error, error}
     end
   end

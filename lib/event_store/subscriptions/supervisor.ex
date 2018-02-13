@@ -5,33 +5,40 @@ defmodule EventStore.Subscriptions.Supervisor do
 
   use Supervisor
 
-  alias EventStore.Config
   alias EventStore.Subscriptions.Subscription
 
-  def start_link([conn]) do
-    Supervisor.start_link(__MODULE__, conn, name: __MODULE__)
+  def start_link(args) do
+    Supervisor.start_link(__MODULE__, args, name: __MODULE__)
   end
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, subscription_opts) do
     name = {:via, Registry, registry_name(stream_uuid, subscription_name)}
 
-    Supervisor.start_child(__MODULE__, [stream_uuid, subscription_name, subscriber, subscription_opts, [name: name]])
+    Supervisor.start_child(__MODULE__, [
+      stream_uuid,
+      subscription_name,
+      subscriber,
+      subscription_opts,
+      [name: name]
+    ])
   end
 
   def unsubscribe_from_stream(stream_uuid, subscription_name) do
     name = registry_name(stream_uuid, subscription_name)
 
     case Registry.whereis_name(name) do
-      :undefined -> :ok
+      :undefined ->
+        :ok
+
       subscription ->
         :ok = Subscription.unsubscribe(subscription)
         :ok = Supervisor.terminate_child(__MODULE__, subscription)
     end
   end
 
-  def init(conn) do
+  def init(args) do
     children = [
-      worker(Subscription, [conn], restart: :temporary),
+      worker(Subscription, args, restart: :temporary)
     ]
 
     supervise(children, strategy: :simple_one_for_one)

@@ -75,15 +75,6 @@ defmodule EventStore.Storage do
   end
 
   @doc """
-  Attempt to acquire an exclusive lock for the given subscription id. Uses
-  PostgreSQL's advisory locks[1] to provide session level locking.
-  [1] https://www.postgresql.org/docs/current/static/explicit-locking.html#ADVISORY-LOCKS
-  """
-  def try_acquire_exclusive_lock(subscription_id) do
-    Subscription.try_acquire_exclusive_lock(@event_store, subscription_id, pool: DBConnection.Poolboy)
-  end
-
-  @doc """
   Acknowledge receipt of an event by its number, for a single subscription.
   """
   def ack_last_seen_event(stream_uuid, subscription_name, last_seen) do
