@@ -58,7 +58,7 @@ defmodule EventStore.AdvisoryLocks do
 
         keys ->
           ref =
-            case Enum.find(keys, fn lock_pid, _key -> lock_pid == pid end) do
+            case Enum.find(keys, fn {lock_pid, _key, _ref} -> lock_pid == pid end) do
               nil -> Process.monitor(pid)
               {_pid, _key, ref} -> ref
             end

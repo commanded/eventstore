@@ -37,7 +37,13 @@ defmodule EventStore.Subscriptions do
     subscription_postgrex_config = Config.subscription_postgrex_opts(config)
 
     children = [
-      MonitoredServer.child_spec({Postgrex, :start_link, [subscription_postgrex_config]}),
+      MonitoredServer.child_spec([
+        {Postgrex, :start_link, [subscription_postgrex_config]},
+        [
+          after_restart: &Subscriptions.Supervisor.connect/0,
+          after_exit: &Subscriptions.Supervisor.disconnect/0
+        ]
+      ]),
       {EventStore.Subscriptions.Supervisor, [EventStore.Subscriptions.Postgrex]}
     ]
 

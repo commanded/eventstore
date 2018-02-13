@@ -49,11 +49,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     defevent ack(_ack), data: %SubscriptionState{} = data do
       next_state(:initial, data)
     end
-
-    defevent unsubscribe, data: %SubscriptionState{} = data do
-      unsubscribe_from_stream(data)
-      next_state(:unsubscribed, data)
-    end
   end
 
   defstate subscribe_to_events do
@@ -68,11 +63,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
         |> notify_pending_events()
 
       next_state(:subscribe_to_events, data)
-    end
-
-    defevent unsubscribe, data: %SubscriptionState{} = data do
-      unsubscribe_from_stream(data)
-      next_state(:unsubscribed, data)
     end
   end
 
@@ -93,11 +83,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     # ignore event notifications while catching up
     defevent notify_events(events), data: %SubscriptionState{} = data do
       next_state(:request_catch_up, track_last_received(events, data))
-    end
-
-    defevent unsubscribe, data: %SubscriptionState{} = data do
-      unsubscribe_from_stream(data)
-      next_state(:unsubscribed, data)
     end
   end
 
@@ -134,11 +119,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     # ignore event notifications while catching up
     defevent notify_events(events), data: %SubscriptionState{} = data do
       next_state(:catching_up, track_last_received(events, data))
-    end
-
-    defevent unsubscribe, data: %SubscriptionState{} = data do
-      unsubscribe_from_stream(data)
-      next_state(:unsubscribed, data)
     end
   end
 
@@ -209,11 +189,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     defevent catch_up, data: %SubscriptionState{} = data do
       next_state(:request_catch_up, data)
     end
-
-    defevent unsubscribe, data: %SubscriptionState{} = data do
-      unsubscribe_from_stream(data)
-      next_state(:unsubscribed, data)
-    end
   end
 
   defstate max_capacity do
@@ -242,11 +217,6 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     defevent catch_up, data: %SubscriptionState{} = data do
       next_state(:max_capacity, data)
     end
-
-    defevent unsubscribe, data: %SubscriptionState{} = data do
-      unsubscribe_from_stream(data)
-      next_state(:unsubscribed, data)
-    end
   end
 
   defstate unsubscribed do
@@ -265,10 +235,15 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     defevent caught_up(_last_seen), data: %SubscriptionState{} = data do
       next_state(:unsubscribed, data)
     end
+  end
 
-    defevent unsubscribe, data: %SubscriptionState{} = data do
-      next_state(:unsubscribed, data)
-    end
+  defevent disconnect, data: %SubscriptionState{} = data do
+    next_state(:initial, data)
+  end
+
+  defevent unsubscribe, data: %SubscriptionState{} = data do
+    unsubscribe_from_stream(data)
+    next_state(:unsubscribed, data)
   end
 
   defp create_subscription(%SubscriptionState{} = data, opts) do

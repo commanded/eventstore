@@ -56,6 +56,24 @@ defmodule EventStore.Subscriptions.Subscription do
     GenServer.cast(subscription, {:ack, event_number})
   end
 
+  @doc """
+  Attempt to subscribe to the subscription.
+
+  Typically used to resume a subscription after a database connection failure.
+  """
+  def connect(subscription) do
+    GenServer.cast(subscription, :subscribe_to_stream)
+  end
+
+  @doc """
+  Disconnect the subscription.
+
+  Typically due to a database connection failure.
+  """
+  def disconnect(subscription) do
+    GenServer.cast(subscription, :disconnect)
+  end
+
   @doc false
   def caught_up(subscription, last_seen) do
     GenServer.cast(subscription, {:caught_up, last_seen})
@@ -115,6 +133,12 @@ defmodule EventStore.Subscriptions.Subscription do
 
   def handle_cast({:caught_up, last_seen}, %Subscription{subscription: subscription} = state) do
     subscription = StreamSubscription.caught_up(subscription, last_seen)
+
+    {:noreply, apply_subscription_to_state(subscription, state)}
+  end
+
+  def handle_cast(:disconnect, %Subscription{subscription: subscription} = state) do
+    subscription = StreamSubscription.disconnect(subscription)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
