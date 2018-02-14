@@ -40,17 +40,25 @@ defmodule EventStore.Notifications.Supervisor do
   end
 
   def init(config) do
-    notification_opts = Config.notification_postgrex_opts(config)
-
     Supervisor.init(
       [
-        MonitoredServer.child_spec([
-          {Postgrex.Notifications, :start_link, [notification_opts]},
-          [
-            after_start: &Listener.connect/0,
-            after_exit: &Listener.disconnect/0
-          ]
-        ]),
+        Supervisor.child_spec(
+          {MonitoredServer, [
+            {Postgrex.Notifications, :start_link, [Config.listener_postgrex_opts(config)]},
+            [
+              after_restart: &Listener.connect/0,
+              after_exit: &Listener.disconnect/0
+            ]
+          ]},
+          id: Listener.Postgrex
+        ),
+        Supervisor.child_spec(
+          {MonitoredServer, [
+            {Postgrex, :start_link, [Config.reader_postgrex_opts(config)]},
+            []
+          ]},
+          id: Reader.Postgrex
+        ),
         {Listener, []},
         {Reader, Config.serializer()},
         {StreamBroadcaster, []}

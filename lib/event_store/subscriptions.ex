@@ -37,6 +37,7 @@ defmodule EventStore.Subscriptions do
     subscription_postgrex_config = Config.subscription_postgrex_opts(config)
 
     children = [
+      {EventStore.AdvisoryLocks, []},
       MonitoredServer.child_spec([
         {Postgrex, :start_link, [subscription_postgrex_config]},
         [

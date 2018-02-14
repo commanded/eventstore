@@ -26,6 +26,7 @@ defmodule EventStore do
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Streams.Stream
 
+  @conn EventStore.Postgrex
   @all_stream "$all"
   @default_batch_size 1_000
   @default_count 1_000
@@ -79,7 +80,7 @@ defmodule EventStore do
     do: {:error, :cannot_append_to_all_stream}
 
   def append_to_stream(stream_uuid, expected_version, events, timeout) do
-    Stream.append_to_stream(stream_uuid, expected_version, events, opts(timeout))
+    Stream.append_to_stream(@conn, stream_uuid, expected_version, events, opts(timeout))
   end
 
   @doc """
@@ -145,7 +146,13 @@ defmodule EventStore do
     do: {:error, :cannot_append_to_all_stream}
 
   def link_to_stream(stream_uuid, expected_version, events_or_event_ids, timeout) do
-    Stream.link_to_stream(stream_uuid, expected_version, events_or_event_ids, opts(timeout))
+    Stream.link_to_stream(
+      @conn,
+      stream_uuid,
+      expected_version,
+      events_or_event_ids,
+      opts(timeout)
+    )
   end
 
   @doc """
@@ -176,7 +183,7 @@ defmodule EventStore do
       )
 
   def read_stream_forward(stream_uuid, start_version, count, timeout) do
-    Stream.read_stream_forward(stream_uuid, start_version, count, opts(timeout))
+    Stream.read_stream_forward(@conn, stream_uuid, start_version, count, opts(timeout))
   end
 
   @doc """
@@ -204,7 +211,13 @@ defmodule EventStore do
       )
 
   def stream_forward(stream_uuid, start_version, read_batch_size, timeout) do
-    Stream.stream_forward(stream_uuid, start_version, read_batch_size, opts(timeout))
+    Stream.stream_forward(
+      @conn,
+      stream_uuid,
+      start_version,
+      read_batch_size,
+      opts(timeout)
+    )
   end
 
   @doc """
@@ -231,7 +244,13 @@ defmodule EventStore do
       )
 
   def read_all_streams_forward(start_event_number, count, timeout) do
-    Stream.read_stream_forward(@all_stream, start_event_number, count, opts(timeout))
+    Stream.read_stream_forward(
+      @conn,
+      @all_stream,
+      start_event_number,
+      count,
+      opts(timeout)
+    )
   end
 
   @doc """
@@ -256,7 +275,13 @@ defmodule EventStore do
       )
 
   def stream_all_forward(start_event_number, read_batch_size, timeout) do
-    Stream.stream_forward(@all_stream, start_event_number, read_batch_size, opts(timeout))
+    Stream.stream_forward(
+      @conn,
+      @all_stream,
+      start_event_number,
+      read_batch_size,
+      opts(timeout)
+    )
   end
 
   @doc """
@@ -357,7 +382,13 @@ defmodule EventStore do
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    Stream.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
+    with {start_from, opts} <- Keyword.pop(opts, :start_from, :origin),
+         {:ok, start_from} <- Stream.start_from(@conn, stream_uuid, start_from, opts()),
+         opts <- Keyword.put(opts, :start_from, start_from) do
+      Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
+    else
+      reply -> reply
+    end
   end
 
   @doc """
@@ -413,7 +444,7 @@ defmodule EventStore do
   def subscribe_to_all_streams(subscription_name, subscriber, opts \\ [])
 
   def subscribe_to_all_streams(subscription_name, subscriber, opts) do
-    Stream.subscribe_to_stream(@all_stream, subscription_name, subscriber, opts)
+    subscribe_to_stream(@all_stream, subscription_name, subscriber, opts)
   end
 
   @doc """
@@ -465,7 +496,7 @@ defmodule EventStore do
   """
   @spec read_snapshot(String.t()) :: {:ok, SnapshotData.t()} | {:error, :snapshot_not_found}
   def read_snapshot(source_uuid) do
-    Snapshotter.read_snapshot(source_uuid, Config.serializer())
+    Snapshotter.read_snapshot(@conn, source_uuid, Config.serializer(), opts())
   end
 
   @doc """
@@ -475,7 +506,7 @@ defmodule EventStore do
   """
   @spec record_snapshot(SnapshotData.t()) :: :ok | {:error, reason :: term}
   def record_snapshot(%SnapshotData{} = snapshot) do
-    Snapshotter.record_snapshot(snapshot, Config.serializer())
+    Snapshotter.record_snapshot(@conn, snapshot, Config.serializer(), opts())
   end
 
   @doc """
@@ -485,9 +516,18 @@ defmodule EventStore do
   """
   @spec delete_snapshot(String.t()) :: :ok | {:error, reason :: term}
   def delete_snapshot(source_uuid) do
-    Snapshotter.delete_snapshot(source_uuid)
+    Snapshotter.delete_snapshot(@conn, source_uuid, opts())
   end
 
-  defp opts(nil), do: []
-  defp opts(timeout), do: [timeout: timeout]
+  @default_opts [pool: DBConnection.Poolboy]
+
+  defp opts(timeout \\ nil) do
+    case timeout do
+      timeout when is_integer(timeout) ->
+        Keyword.put(@default_opts, :timeout, timeout)
+
+      _ ->
+        @default_opts
+    end
+  end
 end

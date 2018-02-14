@@ -237,6 +237,14 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     end
   end
 
+  # Catch-all event handlers
+
+  defevent subscribe(_conn, _stream_uuid, _subscription_name, _subscriber, _opts),
+    data: %SubscriptionState{} = data,
+    state: state do
+    next_state(state, data)
+  end
+
   defevent disconnect, data: %SubscriptionState{} = data do
     next_state(:initial, data)
   end
@@ -285,10 +293,16 @@ defmodule EventStore.Subscriptions.StreamSubscription do
 
   # Fetch unseen events from the stream, transition to `subscribed` state when
   # stream ends
-  defp catch_up_from_stream(%SubscriptionState{stream_uuid: stream_uuid, last_seen: last_seen} = data) do
+  defp catch_up_from_stream(%SubscriptionState{} = data) do
+    %SubscriptionState{
+      conn: conn,
+      stream_uuid: stream_uuid,
+      last_seen: last_seen
+    } = data
+
     reply_to = self()
 
-    case unseen_event_stream(stream_uuid, last_seen, @max_buffer_size) do
+    case unseen_event_stream(conn, stream_uuid, last_seen, @max_buffer_size) do
       {:error, :stream_not_found} ->
         Subscription.caught_up(reply_to, last_seen)
         data
@@ -320,8 +334,8 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     end
   end
 
-  defp unseen_event_stream(stream_uuid, last_seen, read_batch_size) do
-    EventStore.Streams.Stream.stream_forward(stream_uuid, last_seen + 1, read_batch_size)
+  defp unseen_event_stream(conn, stream_uuid, last_seen, read_batch_size) do
+    EventStore.Streams.Stream.stream_forward(conn, stream_uuid, last_seen + 1, read_batch_size)
   end
 
   # wait until the subscriber ack's the last sent event
@@ -392,8 +406,14 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   defp send_to_subscriber(subscriber, events),
     do: send(subscriber, {:events, events})
 
-  defp ack_events(%SubscriptionState{stream_uuid: stream_uuid, subscription_name: subscription_name} = data, ack) do
-    :ok = Storage.ack_last_seen_event(stream_uuid, subscription_name, ack)
+  defp ack_events(%SubscriptionState{} = data, ack) do
+    %SubscriptionState{
+      conn: conn,
+      stream_uuid: stream_uuid,
+      subscription_name: subscription_name
+    } = data
+
+    :ok = Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, ack)
 
     %SubscriptionState{data| last_ack: ack}
   end

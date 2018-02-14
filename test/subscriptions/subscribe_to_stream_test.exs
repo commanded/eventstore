@@ -2,7 +2,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   use EventStore.StorageCase
 
   alias EventStore.{Config,EventFactory,ProcessHelper,Subscriptions,Subscriber,Wait}
-  alias EventStore.Streams.Stream
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Support.CollectingSubscriber
 
@@ -29,7 +28,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self())
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       assert_receive {:events, received_events}
       assert pluck(received_events, :event_number) == [1, 2, 3]
@@ -48,11 +47,11 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       initial_events = EventFactory.create_events(1)
       new_events = EventFactory.create_events(1, 2)
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
 
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), start_from: 1)
 
-      :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
 
       assert_receive {:events, received_events}
       assert pluck(received_events, :event_number) == [2]
@@ -69,8 +68,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     test "subscribe to stream more than once using same subscription name should error", %{subscription_name: subscription_name} do
       stream_uuid = UUID.uuid4
 
-      assert {:ok, _subscription} = Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, self())
-      assert {:error, :subscription_already_exists} = Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, self())
+      assert {:ok, _subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
+      assert {:error, :subscription_already_exists} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
     end
 
     test "subscribe to single stream should ignore events from another stream", %{subscription_name: subscription_name} do
@@ -82,8 +81,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, _subscription} = subscribe_to_stream(interested_stream_uuid, subscription_name, self())
 
-      :ok = Stream.append_to_stream(interested_stream_uuid, 0, interested_events)
-      :ok = Stream.append_to_stream(other_stream_uuid, 0, other_events)
+      :ok = EventStore.append_to_stream(interested_stream_uuid, 0, interested_events)
+      :ok = EventStore.append_to_stream(other_stream_uuid, 0, other_events)
 
       # received events should not include events from the other stream
       assert_receive {:events, received_events}
@@ -97,7 +96,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), mapper: fn event -> event.event_number end)
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       assert_receive {:events, received_mapped_events}
       assert received_mapped_events == [1, 2, 3]
@@ -108,10 +107,10 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       initial_events = EventFactory.create_events(1)
       new_events = EventFactory.create_events(1, 2)
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
-      :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
 
-      {:ok, subscription} = Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, self())
+      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
 
       assert_receive {:subscribed, ^subscription}
       assert_receive {:events, received_events}
@@ -132,10 +131,10 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       initial_events = EventFactory.create_events(1)
       new_events = EventFactory.create_events(1, 2)
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
-      :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
 
-      {:ok, subscription} = Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, self())
+      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
 
       assert_receive {:subscribed, ^subscription}
       assert_receive {:events, received_events}
@@ -156,10 +155,10 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       initial_events = EventFactory.create_events(1)
       new_events = EventFactory.create_events(1, 2)
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
-      :ok = Stream.append_to_stream(stream_uuid, 1, new_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
 
-      {:ok, subscription} = Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, self())
+      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
 
       assert_receive {:subscribed, ^subscription}
       assert_receive {:events, received_events}
@@ -185,8 +184,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
 
-      :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_events)
-      :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)
+      :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_events)
+      :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
 
       assert_receive {:events, stream1_received_events}
       assert pluck(stream1_received_events, :event_number) == [1]
@@ -222,13 +221,13 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream1_new_events = EventFactory.create_events(1, 2)
       stream2_new_events = EventFactory.create_events(1, 2)
 
-      :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_initial_events)
-      :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_initial_events)
+      :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_initial_events)
+      :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_initial_events)
 
       {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), start_from: 2)
 
-      :ok = Stream.append_to_stream(stream1_uuid, 1, stream1_new_events)
-      :ok = Stream.append_to_stream(stream2_uuid, 1, stream2_new_events)
+      :ok = EventStore.append_to_stream(stream1_uuid, 1, stream1_new_events)
+      :ok = EventStore.append_to_stream(stream2_uuid, 1, stream2_new_events)
 
       assert_receive {:events, stream1_received_events}
       Subscription.ack(subscription, stream1_received_events)
@@ -247,7 +246,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       assert_receive {:events, received_events}
       assert length(received_events) == 3
@@ -280,7 +279,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert Process.alive?(subscriber2) == true
 
       # appending events to stream should notify subscription 2
-      :ok = Stream.append_to_stream(stream_uuid, 0, events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       # subscription 2 should still receive events
       assert_receive {:events, received_events}
@@ -298,7 +297,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, initial_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
 
       assert_receive {:events, initial_received_events}
       assert length(initial_received_events) == 3
@@ -310,7 +309,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       refute_receive {:events, _events}
 
       # should not send further events until ack'd all previous
-      :ok = Stream.append_to_stream(stream_uuid, 3, remaining_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 3, remaining_events)
 
       refute_receive {:events, _events}
 
@@ -331,8 +330,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
 
-      :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_events)
-      :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)
+      :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_events)
+      :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
 
       assert_receive {:events, stream1_received_events}
       Subscription.ack(subscription, 1)
@@ -351,10 +350,10 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream1_events = EventFactory.create_events(1)
       stream2_events = EventFactory.create_events(1)
 
-      :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_events)
-      :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)
+      :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_events)
+      :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
 
-      {:ok, subscription} = Subscriptions.subscribe_to_all_streams(subscription_name, self())
+      {:ok, subscription} = EventStore.subscribe_to_all_streams(subscription_name, self())
 
       assert_receive {:subscribed, ^subscription}
       assert_receive {:events, stream1_received_events}
@@ -397,7 +396,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert Process.alive?(subscriber2) == true
 
       # should still notify subscription 2
-      :ok = Stream.append_to_stream(stream_uuid, 0, events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       # subscription 2 should still receive events
       assert_receive {:events, received_events}
@@ -433,7 +432,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert Process.alive?(subscriber2) == true
 
       # should still notify subscription 2
-      :ok = Stream.append_to_stream(stream_uuid, 0, events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       # subscription 2 should still receive events
       assert_receive {:events, received_events}
@@ -451,7 +450,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       :ok = Subscriptions.unsubscribe_from_stream(stream_uuid, subscription_name)
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       refute_receive {:events, _received_events}
       assert Process.alive?(subscription) == false
@@ -468,7 +467,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name <> "-single", self())
       {:ok, _subscription} = subscribe_to_all_streams(subscription_name <> "-all", self(), start_from: 3)
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       # should receive events twice
       assert_receive_events(stream_uuid, events, [1, 2, 3])
@@ -553,7 +552,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream_uuid = UUID.uuid4()
       stream_events = EventFactory.create_events(count)
 
-      :ok = Stream.append_to_stream(stream_uuid, 0, stream_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 0, stream_events)
 
       stream_uuid
     end
@@ -577,8 +576,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert_receive {:subscribed, ^subscriber3}
       assert_receive {:subscribed, ^subscriber4}
 
-      :ok = Stream.append_to_stream(stream1_uuid, 0, stream1_events)
-      :ok = Stream.append_to_stream(stream2_uuid, 0, stream2_events)
+      :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_events)
+      :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
 
       Wait.until(fn ->
         all_received_events =
@@ -608,7 +607,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
   # subscribe to a single stream and wait for the subscription to be subscribed
   defp subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ []) do
-    {:ok, subscription} = Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
+    {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
 
     assert_receive {:subscribed, ^subscription}
 
@@ -617,7 +616,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
   # subscribe to all streams and wait for the subscription to be subscribed
   defp subscribe_to_all_streams(subscription_name, subscriber, opts \\ []) do
-    {:ok, subscription} = Subscriptions.subscribe_to_all_streams(subscription_name, subscriber, opts)
+    {:ok, subscription} = EventStore.subscribe_to_all_streams(subscription_name, subscriber, opts)
 
     assert_receive {:subscribed, ^subscription}
 

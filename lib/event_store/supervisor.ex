@@ -19,7 +19,6 @@ defmodule EventStore.Supervisor do
           {Registry, keys: :unique, name: EventStore.Subscriptions.Subscription},
           id: EventStore.Subscriptions.Subscription
         ),
-        {EventStore.AdvisoryLocks, []},
         {EventStore.Subscriptions, config},
         {EventStore.Notifications.Supervisor, config}
       ] ++ Registration.child_spec()

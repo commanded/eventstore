@@ -36,7 +36,13 @@ defmodule EventStore.Notifications.Reader do
   defp read_events(stream_uuid, stream_id, from_stream_version, to_stream_version, serializer) do
     count = to_stream_version - from_stream_version + 1
 
-    with {:ok, events} <- Storage.read_stream_forward(stream_id, from_stream_version, count),
+    with {:ok, events} <-
+           Storage.read_stream_forward(
+             EventStore.Notifications.Reader.Postgrex,
+             stream_id,
+             from_stream_version,
+             count
+           ),
          deserialized_events <- deserialize_recorded_events(events, serializer) do
       {stream_uuid, deserialized_events}
     end

@@ -28,12 +28,12 @@ defmodule EventStore.MonitoredServer do
     state = %State{
       after_exit: Keyword.get(opts, :after_exit),
       after_restart: Keyword.get(opts, :after_restart),
-      backoff: Backoff.new(backoff_type: :rand_exp),
+      backoff: Backoff.new(backoff_type: :exp),
       mfa: mfa,
       shutdown: Keyword.get(opts, :shutdown, 100)
     }
 
-    {:ok, start_process(state, :start)}
+    {:ok, start_process(:start, state)}
   end
 
   @doc """
@@ -49,7 +49,7 @@ defmodule EventStore.MonitoredServer do
   end
 
   def handle_info(:start_process, %State{} = state) do
-    {:noreply, start_process(state)}
+    {:noreply, start_process(:restart, state)}
   end
 
   @doc """
@@ -58,7 +58,7 @@ defmodule EventStore.MonitoredServer do
   Terminate any linked processes for the same reason.
   """
   def handle_info({:EXIT, pid, reason}, %State{pid: pid, links: links} = state) do
-    after_exit_callback(state)
+    after_callback(:exit, state)
 
     for pid <- links do
       Process.exit(pid, reason)
@@ -67,6 +67,12 @@ defmodule EventStore.MonitoredServer do
     state = %State{state | links: [], pid: nil}
 
     {:noreply, delayed_start(state)}
+  end
+
+  def handle_info({:EXIT, _pid, reason}, %State{} = state) do
+    Logger.debug(fn -> "Monitored process EXIT due to: #{inspect(reason)}" end)
+
+    {:noreply, state}
   end
 
   def terminate(_, %State{pid: nil}), do: :ok
@@ -97,15 +103,16 @@ defmodule EventStore.MonitoredServer do
   end
 
   # Attempt to start the process, retry after a delay on failure
-  defp start_process(%State{} = state, start_type \\ :restart) do
+  defp start_process(start_type, %State{} = state) do
     %State{mfa: {module, fun, args}} = state
+
+    Logger.debug(fn -> "Attempting to start #{inspect(module)}" end)
 
     case apply(module, fun, args) do
       {:ok, pid} ->
-        case start_type do
-          :start -> :ok
-          :restart -> after_restart_callback(state)
-        end
+        Logger.debug(fn -> "Successfully started #{inspect(module)} (#{inspect pid})" end)
+
+        after_callback(start_type, state)
 
         %State{state | pid: pid}
 
@@ -117,19 +124,18 @@ defmodule EventStore.MonitoredServer do
   end
 
   # Invoke `after_restart/0` callback function
-  defp after_restart_callback(%State{after_restart: after_restart})
+  defp after_callback(:restart, %State{after_restart: after_restart})
        when is_function(after_restart, 0) do
     Task.start(after_restart)
   end
 
-  defp after_restart_callback(%State{}), do: :ok
-
   # Invoke `after_exit/0` callback function
-  defp after_exit_callback(%State{after_exit: after_exit}) when is_function(after_exit, 0) do
+  defp after_callback(:exit, %State{after_exit: after_exit})
+       when is_function(after_exit, 0) do
     Task.start(after_exit)
   end
 
-  defp after_exit_callback(%State{}), do: :ok
+  defp after_callback(_type, _state), do: :ok
 
   defp delayed_start(%State{backoff: backoff} = state) do
     {delay, backoff} = Backoff.backoff(backoff)

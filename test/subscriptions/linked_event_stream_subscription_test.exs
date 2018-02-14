@@ -1,9 +1,7 @@
 defmodule EventStore.Subscriptions.LinkedEventStreamSubscriptionTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, ProcessHelper, Subscriptions}
-  alias EventStore.Streams.Stream
-  alias EventStore.Subscriptions.Subscription
+  alias EventStore.{EventFactory, ProcessHelper}
 
   describe "subscription to linked event stream" do
     test "should receive linked events" do
@@ -49,16 +47,16 @@ defmodule EventStore.Subscriptions.LinkedEventStreamSubscriptionTest do
     assert pluck(received_events, :metadata) == pluck(expected_events, :metadata)
     refute pluck(received_events, :created_at) |> Enum.any?(&is_nil/1)
 
-    Subscription.ack(subscription, received_events)
+    EventStore.ack(subscription, received_events)
   end
 
   defp link_events_in_stream(link_to_stream_uuid, expected_version) do
     source_stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
-    with :ok <- Stream.append_to_stream(source_stream_uuid, 0, events),
-         {:ok, read_events} <- Stream.read_stream_forward(source_stream_uuid, 0, 3),
-         :ok <- Stream.link_to_stream(link_to_stream_uuid, expected_version, read_events) do
+    with :ok <- EventStore.append_to_stream(source_stream_uuid, 0, events),
+         {:ok, read_events} <- EventStore.read_stream_forward(source_stream_uuid, 0, 3),
+         :ok <- EventStore.link_to_stream(link_to_stream_uuid, expected_version, read_events) do
       {:ok, source_stream_uuid, events}
     end
   end
@@ -66,7 +64,7 @@ defmodule EventStore.Subscriptions.LinkedEventStreamSubscriptionTest do
   defp subscribe_to_stream(stream_uuid, subscriber, opts \\ []) do
     name = UUID.uuid4()
 
-    {:ok, subscription} = Subscriptions.subscribe_to_stream(stream_uuid, name, subscriber, opts)
+    {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, name, subscriber, opts)
 
     assert_receive {:subscribed, ^subscription}
 

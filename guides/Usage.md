@@ -17,6 +17,10 @@ expected_version = 0
 Build a list of events to persist. The data and metadata fields will be serialized to binary data. This uses your own serializer, as defined in config, that implements the `EventStore.Serializer` behaviour.
 
 ```elixir
+defmodule ExampleEvent do
+  defstruct [:key]
+end
+
 events = [
   %EventStore.EventData{
     event_type: "Elixir.ExampleEvent",

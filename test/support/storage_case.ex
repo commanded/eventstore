@@ -5,9 +5,11 @@ defmodule EventStore.StorageCase do
 
   setup do
     config = Config.parsed()
+    postgrex_config = Config.default_postgrex_opts(config)
+
     registry = Application.get_env(:eventstore, :registry, :local)
 
-    {:ok, conn} = Postgrex.start_link(config)
+    {:ok, conn} = Postgrex.start_link(postgrex_config)
 
     EventStore.Storage.Initializer.reset!(conn)
 

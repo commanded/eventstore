@@ -1,27 +1,20 @@
 defmodule EventStore.Storage.QueryStreamInfo do
   @moduledoc false
-  
+
   alias EventStore.Sql.Statements
 
-  def execute(conn, stream_uuid) do
-    conn
-    |> Postgrex.query(
-      Statements.query_stream_id_and_latest_version(),
-      [stream_uuid],
-      pool: DBConnection.Poolboy
-    )
-    |> handle_response
-  end
+  def execute(conn, stream_uuid, opts \\ []) do
+    query = Statements.query_stream_id_and_latest_version()
 
-  defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}) do
-    {:ok, nil, 0}
-  end
+    case Postgrex.query(conn, query, [stream_uuid], opts) do
+      {:ok, %Postgrex.Result{num_rows: 0}} ->
+        {:ok, nil, 0}
 
-  defp handle_response({:ok, %Postgrex.Result{rows: [[stream_id, nil]]}}) do
-    {:ok, stream_id, 0}
-  end
+      {:ok, %Postgrex.Result{rows: [[stream_id, nil]]}} ->
+        {:ok, stream_id, 0}
 
-  defp handle_response({:ok, %Postgrex.Result{rows: [[stream_id, stream_version]]}}) do
-    {:ok, stream_id, stream_version}
+      {:ok, %Postgrex.Result{rows: [[stream_id, stream_version]]}} ->
+        {:ok, stream_id, stream_version}
+    end
   end
 end

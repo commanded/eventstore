@@ -62,7 +62,7 @@ defmodule EventStore.Subscriptions.Subscription do
   Typically used to resume a subscription after a database connection failure.
   """
   def connect(subscription) do
-    GenServer.cast(subscription, :subscribe_to_stream)
+    send(subscription, :subscribe_to_stream)
   end
 
   @doc """
@@ -94,6 +94,8 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def handle_info(:subscribe_to_stream, %Subscription{} = state) do
+    _ = Logger.debug(fn -> describe(state) <> " subscribe to stream" end)
+
     %Subscription{
       conn: conn,
       stream_uuid: stream_uuid,
@@ -138,6 +140,8 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def handle_cast(:disconnect, %Subscription{subscription: subscription} = state) do
+    _ = Logger.debug(fn -> describe(state) <> " disconnected" end)
+
     subscription = StreamSubscription.disconnect(subscription)
 
     {:noreply, apply_subscription_to_state(subscription, state)}

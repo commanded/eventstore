@@ -51,10 +51,9 @@ defmodule EventStore.AdvisoryLocks do
     locks =
       case Map.get(locks, conn, []) do
         [] ->
-          _ref = Process.monitor(conn)
-          ref = Process.monitor(pid)
-
-          Map.put(locks, conn, [{pid, key, ref}])
+          Process.monitor(conn)
+          
+          Map.put(locks, conn, [{pid, key, Process.monitor(pid)}])
 
         keys ->
           ref =
