@@ -28,12 +28,12 @@ defmodule Mix.Tasks.EventStore.Migrate do
 
     migrate_database(config, opts)
 
-    Mix.Task.reenable "event_store.migrate"
+    Mix.Task.reenable("event_store.migrate")
   end
 
   @available_migrations [
     "0.13.0",
-    "0.14.0",
+    "0.14.0"
   ]
 
   defp migrate_database(config, opts) do
@@ -45,7 +45,8 @@ defmodule Mix.Tasks.EventStore.Migrate do
 
         [event_store_version | _] ->
           # only run newer migrations
-          @available_migrations |> Enum.filter(fn migration_version ->
+          @available_migrations
+          |> Enum.filter(fn migration_version ->
             migration_version |> Version.parse!() |> Version.compare(event_store_version) == :gt
           end)
       end
@@ -54,30 +55,34 @@ defmodule Mix.Tasks.EventStore.Migrate do
   end
 
   defp migrate(_config, opts, []) do
-    unless opts[:quiet], do: Mix.shell.info "The EventStore database is already migrated."
+    unless opts[:quiet], do: Mix.shell().info("The EventStore database is already migrated.")
   end
 
   defp migrate(config, opts, migrations) do
     for migration <- migrations do
-      unless opts[:quiet], do: Mix.shell.info "Running migration v#{migration}..."
+      unless opts[:quiet], do: Mix.shell().info("Running migration v#{migration}...")
 
       path = Application.app_dir(:eventstore, "priv/event_store/migrations/v#{migration}.sql")
       script = File.read!(path)
 
       case Database.migrate(config, script) do
-        :ok -> :ok
+        :ok ->
+          :ok
+
         {:error, term} ->
-          Mix.raise "The EventStore database couldn't be migrated, reason given: #{inspect term}."
+          Mix.raise(
+            "The EventStore database couldn't be migrated, reason given: #{inspect(term)}."
+          )
       end
     end
 
-    unless opts[:quiet], do: Mix.shell.info "The EventStore database has been migrated."
+    unless opts[:quiet], do: Mix.shell().info("The EventStore database has been migrated.")
   end
 
   defp event_store_schema_version(config) do
     config
     |> query_schema_migrations()
-    |> Enum.sort(fn (left, right) ->
+    |> Enum.sort(fn left, right ->
       case Version.compare(left, right) do
         :gt -> true
         _ -> false
@@ -88,13 +93,16 @@ defmodule Mix.Tasks.EventStore.Migrate do
   defp query_schema_migrations(config) do
     with {:ok, conn} <- Postgrex.start_link(config) do
       conn
-      |> Postgrex.query!("SELECT major_version, minor_version, patch_version FROM schema_migrations", [], pool: DBConnection.Poolboy)
+      |> Postgrex.query!(
+        "SELECT major_version, minor_version, patch_version FROM schema_migrations",
+        [],
+        pool: DBConnection.Poolboy
+      )
       |> handle_response()
     end
   end
 
-  defp handle_response(%Postgrex.Result{num_rows: 0}),
-    do: []
+  defp handle_response(%Postgrex.Result{num_rows: 0}), do: []
 
   defp handle_response(%Postgrex.Result{rows: rows}) do
     Enum.map(rows, fn [major_version, minor_version, patch_version] ->

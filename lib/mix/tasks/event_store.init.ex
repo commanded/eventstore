@@ -14,7 +14,7 @@ defmodule Mix.Tasks.EventStore.Init do
 
   use Mix.Task
 
-  alias EventStore.{Config,Storage}
+  alias EventStore.{Config, Storage}
 
   @is_events_table_exists """
     SELECT EXISTS (
@@ -36,25 +36,28 @@ defmodule Mix.Tasks.EventStore.Init do
 
     initialize_storage!(config, opts)
 
-    Mix.Task.reenable "event_store.init"
+    Mix.Task.reenable("event_store.init")
   end
 
   defp initialize_storage!(config, opts) do
     {:ok, conn} = Postgrex.start_link(config)
 
-    Postgrex.query!(conn, @is_events_table_exists, [], pool: DBConnection.Poolboy)
+    conn_opts = [pool: DBConnection.Poolboy]
+
+    Postgrex.query!(conn, @is_events_table_exists, [], conn_opts)
     |> case do
       %{rows: [[true]]} ->
         info("The EventStore database has already been initialized.", opts)
+
       %{rows: [[false]]} ->
-        Storage.Initializer.run!(conn)
+        Storage.Initializer.run!(conn, conn_opts)
         info("The EventStore database has been initialized.", opts)
     end
   end
 
   defp info(msg, opts) do
     unless opts[:quiet] do
-      Mix.shell.info msg
+      Mix.shell().info(msg)
     end
   end
 end
