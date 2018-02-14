@@ -4,7 +4,6 @@ defmodule EventStore.Storage.Lock do
   require Logger
 
   alias EventStore.Sql.Statements
-  alias EventStore.Storage.Lock.{TryAdvisoryLock, Unlock}
 
   def try_acquire_exclusive_lock(conn, key, opts \\ []) do
     case Postgrex.query(conn, Statements.try_advisory_lock(), [key], opts) do
@@ -14,7 +13,7 @@ defmodule EventStore.Storage.Lock do
       {:ok, %Postgrex.Result{rows: [[false]]}} ->
         {:error, :lock_already_taken}
 
-      {:error, error} = reply ->
+      {:error, _error} = reply ->
         reply
     end
   end
@@ -27,7 +26,7 @@ defmodule EventStore.Storage.Lock do
       {:ok, %Postgrex.Result{rows: [[false]]}} ->
         :ok
 
-      {:error, error} = reply ->
+      {:error, _error} = reply ->
         reply
     end
   end

@@ -46,7 +46,7 @@ defmodule EventStore.Notifications.Supervisor do
           {MonitoredServer, [
             {Postgrex.Notifications, :start_link, [Config.listener_postgrex_opts(config)]},
             [
-              after_restart: &Listener.connect/0,
+              after_restart: &Listener.reconnect/0,
               after_exit: &Listener.disconnect/0
             ]
           ]},

@@ -15,6 +15,7 @@ defmodule EventStore.Subscriptions.Subscription do
 
   defstruct [
     conn: nil,
+    retry_ref: nil,
     stream_uuid: nil,
     subscription_name: nil,
     subscriber: nil,
@@ -57,12 +58,12 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc """
-  Attempt to subscribe to the subscription.
+  Attempt to reconnect the subscription.
 
   Typically used to resume a subscription after a database connection failure.
   """
-  def connect(subscription) do
-    send(subscription, :subscribe_to_stream)
+  def reconnect(subscription) do
+    GenServer.cast(subscription, :reconnect)
   end
 
   @doc """
@@ -96,18 +97,7 @@ defmodule EventStore.Subscriptions.Subscription do
   def handle_info(:subscribe_to_stream, %Subscription{} = state) do
     _ = Logger.debug(fn -> describe(state) <> " subscribe to stream" end)
 
-    %Subscription{
-      conn: conn,
-      stream_uuid: stream_uuid,
-      subscription_name: subscription_name,
-      subscriber: subscriber,
-      subscription: subscription,
-      subscription_opts: opts
-    } = state
-
-    subscription = StreamSubscription.subscribe(subscription, conn, stream_uuid, subscription_name, subscriber, opts)
-
-    {:noreply, apply_subscription_to_state(subscription, state)}
+    {:noreply, subscribe_to_stream(state)}
   end
 
   def handle_info({:events, events}, %Subscription{subscription: subscription} = state) do
@@ -137,6 +127,14 @@ defmodule EventStore.Subscriptions.Subscription do
     subscription = StreamSubscription.caught_up(subscription, last_seen)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
+  end
+
+  def handle_cast(:reconnect, %Subscription{} = state) do
+    _ = Logger.debug(fn -> describe(state) <> " reconnected" end)
+
+    state = state |> cancel_retry_timer() |> subscribe_to_stream()
+
+    {:noreply, state}
   end
 
   def handle_cast(:disconnect, %Subscription{subscription: subscription} = state) do
@@ -172,9 +170,9 @@ defmodule EventStore.Subscriptions.Subscription do
 
     _ = Logger.debug(fn -> describe(state) <> " failed to subscribe, will retry in #{retry_interval}ms" end)
 
-    Process.send_after(self(), :subscribe_to_stream, retry_interval)
+    retry_ref = Process.send_after(self(), :subscribe_to_stream, retry_interval)
 
-    state
+    %Subscription{state | retry_ref: retry_ref}
   end
 
   defp handle_subscription_state(%Subscription{subscription: %{state: :subscribe_to_events}} = state) do
@@ -207,6 +205,29 @@ defmodule EventStore.Subscriptions.Subscription do
 
   # no-op for all other subscription states
   defp handle_subscription_state(state), do: state
+
+  defp subscribe_to_stream(%Subscription{} = state) do
+    %Subscription{
+      conn: conn,
+      stream_uuid: stream_uuid,
+      subscription_name: subscription_name,
+      subscriber: subscriber,
+      subscription: subscription,
+      subscription_opts: opts
+    } = state
+
+    subscription
+    |> StreamSubscription.subscribe(conn, stream_uuid, subscription_name, subscriber, opts)
+    |> apply_subscription_to_state(state)
+  end
+
+  defp cancel_retry_timer(%Subscription{retry_ref: ref} = state) when is_reference(ref) do
+    Process.cancel_timer(ref)
+
+    %Subscription{state | retry_ref: nil}
+  end
+
+  defp cancel_retry_timer(%Subscription{} = state), do: state
 
   defp subscribe_to_events(%Subscription{stream_uuid: stream_uuid}) do
     Registration.subscribe(stream_uuid)

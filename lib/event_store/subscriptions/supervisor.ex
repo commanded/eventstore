@@ -36,9 +36,9 @@ defmodule EventStore.Subscriptions.Supervisor do
     end
   end
 
-  def connect do
+  def reconnect do
     for {_id, subscription, _type, _modules} <- Supervisor.which_children(__MODULE__) do
-      Subscription.connect(subscription)
+      Subscription.reconnect(subscription)
     end
   end
 
