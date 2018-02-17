@@ -128,22 +128,21 @@ defmodule EventStore.Config do
   end
 
   def listener_postgrex_opts(config) do
-    named_postgrex_opts(config, EventStore.Notifications.Listener.Postgrex)
+    sync_connect_postgrex_opts(config)
   end
 
   def reader_postgrex_opts(config) do
-    named_postgrex_opts(config, EventStore.Notifications.Reader.Postgrex)
+    sync_connect_postgrex_opts(config)
   end
 
   def subscription_postgrex_opts(config) do
-    named_postgrex_opts(config, EventStore.Subscriptions.Postgrex)
+    sync_connect_postgrex_opts(config)
   end
 
-  defp named_postgrex_opts(config, name) do
+  defp sync_connect_postgrex_opts(config) do
     config
     |> default_postgrex_opts()
     |> Keyword.put(:backoff_type, :stop)
     |> Keyword.put(:sync_connect, true)
-    |> Keyword.put(:name, name)
   end
 end

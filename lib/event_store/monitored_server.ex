@@ -6,14 +6,14 @@ defmodule EventStore.MonitoredServer do
   # exponential backoff strategy. Allows interested processes to be informed
   # when the process terminates.
 
-  use GenServer
+  use GenProxy
 
   require Logger
 
   alias DBConnection.Backoff
 
   defmodule State do
-    defstruct [:mfa, :after_exit, :after_restart, :backoff, :pid, :shutdown, links: []]
+    defstruct [:mfa, :after_exit, :after_restart, :backoff, :pid, :shutdown, :queue]
   end
 
   def start_link([{_module, _fun, _args} = mfa, opts]) do
@@ -30,49 +30,58 @@ defmodule EventStore.MonitoredServer do
       after_restart: Keyword.get(opts, :after_restart),
       backoff: Backoff.new(backoff_type: :exp),
       mfa: mfa,
+      queue: :queue.new(),
       shutdown: Keyword.get(opts, :shutdown, 100)
     }
 
     {:ok, start_process(:start, state)}
   end
 
-  @doc """
-  Link the given `pid` to the monitored `GenServer` process, once it has been
-  started.
-  """
-  def link(s, pid) do
-    GenServer.call(s, {:link, pid})
-  end
-
-  def handle_call({:link, pid}, _from, %State{links: links} = state) do
-    {:reply, :ok, %State{state | links: [pid | links]}}
-  end
-
-  def handle_info(:start_process, %State{} = state) do
+  def proxy_info(:start_process, %State{} = state) do
     {:noreply, start_process(:restart, state)}
   end
 
   @doc """
   Handle process terminate by attempting to restart, after a delay.
-
-  Terminate any linked processes for the same reason.
   """
-  def handle_info({:EXIT, pid, reason}, %State{pid: pid, links: links} = state) do
+  def proxy_info({:EXIT, pid, reason}, %State{pid: pid} = state) do
+    Logger.debug(fn -> "Monitored process EXIT due to: #{inspect(reason)}" end)
+
     after_callback(:exit, state)
 
-    for pid <- links do
-      Process.exit(pid, reason)
-    end
-
-    state = %State{state | links: [], pid: nil}
+    state = %State{state | pid: nil}
 
     {:noreply, delayed_start(state)}
   end
 
-  def handle_info({:EXIT, _pid, reason}, %State{} = state) do
+  def proxy_info({:EXIT, _pid, reason}, %State{} = state) do
     Logger.debug(fn -> "Monitored process EXIT due to: #{inspect(reason)}" end)
 
     {:noreply, state}
+  end
+
+  def proxy_info(msg, %State{pid: nil, queue: queue} = state) do
+    {:noreply, %State{state | queue: :queue.in(queue, {:info, msg})}}
+  end
+
+  def proxy_info(_msg, %State{pid: pid} = state) do
+    {:forward, pid, state}
+  end
+
+  def proxy_call(msg, from, %State{pid: nil, queue: queue} = state) do
+    {:noreply, %State{state | queue: :queue.in(queue, {:call, msg, from})}}
+  end
+
+  def proxy_call(_msg, _from, %State{pid: pid} = state) do
+    {:forward, pid, state}
+  end
+
+  def proxy_cast(msg, %State{pid: nil, queue: queue} = state) do
+    {:noreply, %State{state | queue: :queue.in(queue, {:cast, msg})}}
+  end
+
+  def proxy_cast(_msg, %State{pid: pid} = state) do
+    {:forward, pid, state}
   end
 
   def terminate(_, %State{pid: nil}), do: :ok
@@ -104,23 +113,48 @@ defmodule EventStore.MonitoredServer do
 
   # Attempt to start the process, retry after a delay on failure
   defp start_process(start_type, %State{} = state) do
-    %State{mfa: {module, fun, args}} = state
+    %State{mfa: {module, fun, args}, queue: queue} = state
 
     Logger.debug(fn -> "Attempting to start #{inspect(module)}" end)
 
     case apply(module, fun, args) do
       {:ok, pid} ->
-        Logger.debug(fn -> "Successfully started #{inspect(module)} (#{inspect pid})" end)
+        Logger.debug(fn -> "Successfully started #{inspect(module)} (#{inspect(pid)})" end)
+
+        send_queued_msgs(pid, queue)
 
         after_callback(start_type, state)
 
-        %State{state | pid: pid}
+        %State{state | pid: pid, queue: :queue.new()}
 
       {:error, reason} ->
         Logger.info(fn -> "Failed to start #{inspect(module)} due to: #{inspect(reason)}" end)
 
         delayed_start(state)
     end
+  end
+
+  defp send_queued_msgs(pid, queue) do
+    case :queue.out(queue) do
+      {{:value, item}, new_queue} ->
+        send_queued_msg(pid, item)
+        send_queued_msgs(pid, new_queue)
+
+      {:empty, _new_queue} ->
+        :ok
+    end
+  end
+
+  defp send_queued_msg(pid, {:info, msg}) do
+    :erlang.send(pid, msg, [:noconnect])
+  end
+
+  defp send_queued_msg(pid, {:call, msg, from}) do
+    :erlang.send(pid, {:"$gen_call", from, msg}, [:noconnect])
+  end
+
+  defp send_queued_msg(pid, {:cast, msg}) do
+    :erlang.send(pid, {:"$gen_cast", msg}, [:noconnect])
   end
 
   # Invoke `after_restart/0` callback function

@@ -47,7 +47,8 @@ defmodule EventStore.Notifications.Supervisor do
             {Postgrex.Notifications, :start_link, [Config.listener_postgrex_opts(config)]},
             [
               after_restart: &Listener.reconnect/0,
-              after_exit: &Listener.disconnect/0
+              after_exit: &Listener.disconnect/0,
+              name: EventStore.Notifications.Listener.Postgrex
             ]
           ]},
           id: Listener.Postgrex
@@ -55,7 +56,7 @@ defmodule EventStore.Notifications.Supervisor do
         Supervisor.child_spec(
           {MonitoredServer, [
             {Postgrex, :start_link, [Config.reader_postgrex_opts(config)]},
-            []
+            [name: EventStore.Notifications.Reader.Postgrex]
           ]},
           id: Reader.Postgrex
         ),

@@ -42,7 +42,8 @@ defmodule EventStore.Subscriptions do
         {Postgrex, :start_link, [subscription_postgrex_config]},
         [
           after_restart: &Subscriptions.Supervisor.reconnect/0,
-          after_exit: &Subscriptions.Supervisor.disconnect/0
+          after_exit: &Subscriptions.Supervisor.disconnect/0,
+          name: EventStore.Subscriptions.Postgrex
         ]
       ]),
       {EventStore.Subscriptions.Supervisor, [EventStore.Subscriptions.Postgrex]}
