@@ -155,6 +155,16 @@ You can also produce an HTML page containing a graph comparing benchmark runs:
 MIX_ENV=bench mix bench.graph
 ```
 
+Taking the above example output, the append events benchmark is for writing 100 events in a single batch. That's what the µs/op average time is measuring. For a single writer it takes on average 0.02s per 100 events appended (4,929 events/sec) and for 50 concurrent writers it's 50 x 100 events in 0.58s (8,586 events/sec).
+
+For reading events it takes a single reader 3.67ms to read 100 events (27,211 events/sec) and for 50 concurrent readers it takes 0.19s (26,561 events/sec).
+
+### Using the benchmark suite
+
+The purpose of the benchmark suite is to measure the performance impact of proposed changes, as opposed to looking at the raw numbers. The above figures are taken when run against a local PostgreSQL database. You can run the benchmarks against your own hardware to get indicative performance figures for the Event Store.
+
+The benchmark suite is configured to use Erlang's [external term format](http://erlang.org/doc/apps/erts/erl_ext_dist.html) serialization. Using another serialization format, such as JSON, will likely have a negative impact on performance.
+
 ## Contributing
 
 Pull requests to contribute new or improved features, and extend documentation are most welcome.
