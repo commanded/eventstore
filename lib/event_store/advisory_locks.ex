@@ -34,15 +34,11 @@ defmodule EventStore.AdvisoryLocks do
     case Lock.try_acquire_exclusive_lock(conn, key) do
       :ok ->
         GenServer.cast(__MODULE__, {:monitor_lock, conn, key, self()})
-        :ok
 
       reply ->
         reply
     end
   end
-
-  @doc false
-  def locks, do: GenServer.call(__MODULE__, :locks)
 
   @doc false
   # Monitor the connection process and the locking process to release any
@@ -52,7 +48,7 @@ defmodule EventStore.AdvisoryLocks do
       case Map.get(locks, conn, []) do
         [] ->
           Process.monitor(conn)
-          
+
           Map.put(locks, conn, [{pid, key, Process.monitor(pid)}])
 
         keys ->
@@ -68,8 +64,7 @@ defmodule EventStore.AdvisoryLocks do
     {:noreply, %State{state | locks: locks}}
   end
 
-  def handle_call(:locks, _from, %State{locks: locks} = state), do: {:reply, locks, state}
-
+  @doc false
   def handle_info({:DOWN, _ref, :process, pid, _reason}, %State{locks: locks} = state) do
     locks =
       case Map.has_key?(locks, pid) do

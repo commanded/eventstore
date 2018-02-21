@@ -16,8 +16,8 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   #
 
   defstate initial do
-    defevent subscribe(conn, stream_uuid, subscription_name, subscriber, opts), data: %SubscriptionState{} = data do
-      data = %SubscriptionState{data |
+    defevent subscribe(conn, stream_uuid, subscription_name, subscriber, opts), data: %SubscriptionState{} do
+      data = %SubscriptionState{
         conn: conn,
         stream_uuid: stream_uuid,
         subscription_name: subscription_name,
