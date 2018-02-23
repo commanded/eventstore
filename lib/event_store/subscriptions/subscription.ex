@@ -15,23 +15,23 @@ defmodule EventStore.Subscriptions.Subscription do
 
   defstruct [
     conn: nil,
+    retry_ref: nil,
     stream_uuid: nil,
     subscription_name: nil,
     subscriber: nil,
     subscription: nil,
     subscription_opts: [],
-    postgrex_config: nil,
     retry_interval: nil
   ]
 
-  def start_link(postgrex_config, stream_uuid, subscription_name, subscriber, subscription_opts, opts \\ []) do
+  def start_link(conn, stream_uuid, subscription_name, subscriber, subscription_opts, opts \\ []) do
     GenServer.start_link(__MODULE__, %Subscription{
+      conn: conn,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
       subscriber: subscriber,
       subscription: StreamSubscription.new(),
       subscription_opts: subscription_opts,
-      postgrex_config: postgrex_config,
       retry_interval: subscription_retry_interval()
     }, opts)
   end
@@ -57,6 +57,24 @@ defmodule EventStore.Subscriptions.Subscription do
     GenServer.cast(subscription, {:ack, event_number})
   end
 
+  @doc """
+  Attempt to reconnect the subscription.
+
+  Typically used to resume a subscription after a database connection failure.
+  """
+  def reconnect(subscription) do
+    GenServer.cast(subscription, :reconnect)
+  end
+
+  @doc """
+  Disconnect the subscription.
+
+  Typically due to a database connection failure.
+  """
+  def disconnect(subscription) do
+    GenServer.cast(subscription, :disconnect)
+  end
+
   @doc false
   def caught_up(subscription, last_seen) do
     GenServer.cast(subscription, {:caught_up, last_seen})
@@ -77,24 +95,9 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def handle_info(:subscribe_to_stream, %Subscription{} = state) do
-    %Subscription{
-      postgrex_config: postgrex_config,
-      stream_uuid: stream_uuid,
-      subscription_name: subscription_name,
-      subscriber: subscriber,
-      subscription: subscription,
-      subscription_opts: opts
-    } = state
+    _ = Logger.debug(fn -> describe(state) <> " subscribe to stream" end)
 
-    # Each subscription has its own connection to the database to acquire an
-    # advisory lock to ensure only one subscription
-    {:ok, conn} = Postgrex.start_link(postgrex_config)
-
-    state = %Subscription{state | conn: conn}
-
-    subscription = StreamSubscription.subscribe(subscription, conn, stream_uuid, subscription_name, subscriber, opts)
-
-    {:noreply, apply_subscription_to_state(subscription, state)}
+    {:noreply, subscribe_to_stream(state)}
   end
 
   def handle_info({:events, events}, %Subscription{subscription: subscription} = state) do
@@ -126,6 +129,22 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
+  def handle_cast(:reconnect, %Subscription{} = state) do
+    _ = Logger.debug(fn -> describe(state) <> " reconnected" end)
+
+    state = state |> cancel_retry_timer() |> subscribe_to_stream()
+
+    {:noreply, state}
+  end
+
+  def handle_cast(:disconnect, %Subscription{subscription: subscription} = state) do
+    _ = Logger.debug(fn -> describe(state) <> " disconnected" end)
+
+    subscription = StreamSubscription.disconnect(subscription)
+
+    {:noreply, apply_subscription_to_state(subscription, state)}
+  end
+
   def handle_cast({:ack, ack}, %Subscription{subscription: subscription} = state) do
     subscription = StreamSubscription.ack(subscription, ack)
 
@@ -151,9 +170,9 @@ defmodule EventStore.Subscriptions.Subscription do
 
     _ = Logger.debug(fn -> describe(state) <> " failed to subscribe, will retry in #{retry_interval}ms" end)
 
-    Process.send_after(self(), :subscribe_to_stream, retry_interval)
+    retry_ref = Process.send_after(self(), :subscribe_to_stream, retry_interval)
 
-    close_database_connection(state)
+    %Subscription{state | retry_ref: retry_ref}
   end
 
   defp handle_subscription_state(%Subscription{subscription: %{state: :subscribe_to_events}} = state) do
@@ -181,11 +200,34 @@ defmodule EventStore.Subscriptions.Subscription do
   defp handle_subscription_state(%Subscription{subscription: %{state: :unsubscribed}} = state) do
     _ = Logger.warn(fn -> describe(state) <> " has unsubscribed" end)
 
-    close_database_connection(state)
+    state
   end
 
   # no-op for all other subscription states
   defp handle_subscription_state(state), do: state
+
+  defp subscribe_to_stream(%Subscription{} = state) do
+    %Subscription{
+      conn: conn,
+      stream_uuid: stream_uuid,
+      subscription_name: subscription_name,
+      subscriber: subscriber,
+      subscription: subscription,
+      subscription_opts: opts
+    } = state
+
+    subscription
+    |> StreamSubscription.subscribe(conn, stream_uuid, subscription_name, subscriber, opts)
+    |> apply_subscription_to_state(state)
+  end
+
+  defp cancel_retry_timer(%Subscription{retry_ref: ref} = state) when is_reference(ref) do
+    Process.cancel_timer(ref)
+
+    %Subscription{state | retry_ref: nil}
+  end
+
+  defp cancel_retry_timer(%Subscription{} = state), do: state
 
   defp subscribe_to_events(%Subscription{stream_uuid: stream_uuid}) do
     Registration.subscribe(stream_uuid)
@@ -195,12 +237,6 @@ defmodule EventStore.Subscriptions.Subscription do
   defp notify_subscribed(%Subscription{subscriber: subscriber}) do
     send(subscriber, {:subscribed, self()})
     :ok
-  end
-
-  defp close_database_connection(%Subscription{conn: conn} = state) do
-    :ok = GenServer.stop(conn)
-
-    %Subscription{state | conn: nil}
   end
 
   # Get the delay between subscription attempts, in milliseconds, from app

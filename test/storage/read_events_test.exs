@@ -8,14 +8,14 @@ defmodule EventStore.Storage.ReadEventsTest do
   @all_stream_id 0
 
   describe "read stream forward" do
-    test "when stream does not exist" do
-      {:ok, []} = Storage.read_stream_forward(1, 0, 1_000)
+    test "when stream does not exist", %{conn: conn} do
+      {:ok, []} = Storage.read_stream_forward(conn, 1, 0, 1_000)
     end
 
     test "when empty", %{conn: conn} do
       {:ok, _stream_uuid, stream_id} = create_stream(conn)
 
-      assert {:ok, []} = Storage.read_stream_forward(stream_id, 0, 1_000)
+      assert {:ok, []} = Storage.read_stream_forward(conn, stream_id, 0, 1_000)
     end
 
     test "with single event", %{conn: conn} do
@@ -24,7 +24,7 @@ defmodule EventStore.Storage.ReadEventsTest do
       [recorded_event] = EventFactory.create_recorded_events(1, stream_uuid)
       :ok = Appender.append(conn, stream_id, [recorded_event])
 
-      assert {:ok, [read_event]} = Storage.read_stream_forward(stream_id, 0, 1_000)
+      assert {:ok, [read_event]} = Storage.read_stream_forward(conn, stream_id, 0, 1_000)
 
       assert recorded_event == read_event
       assert read_event.event_id == recorded_event.event_id
@@ -45,7 +45,7 @@ defmodule EventStore.Storage.ReadEventsTest do
 
       :ok = Appender.append(conn, stream_id, [recorded_event])
 
-      assert {:ok, [read_event]} = Storage.read_stream_forward(stream_id, 0, 1_000)
+      assert {:ok, [read_event]} = Storage.read_stream_forward(conn, stream_id, 0, 1_000)
       assert recorded_event == read_event
     end
 
@@ -58,14 +58,14 @@ defmodule EventStore.Storage.ReadEventsTest do
 
       :ok = Appender.append(conn, stream_id, [recorded_event])
 
-      assert {:ok, [read_event]} = Storage.read_stream_forward(stream_id, 0, 1_000)
+      assert {:ok, [read_event]} = Storage.read_stream_forward(conn, stream_id, 0, 1_000)
       assert recorded_event == read_event
     end
 
     test "with multiple events from origin limited by count", %{conn: conn} do
       {:ok, _stream_uuid, stream_id} = create_stream_containing_events(conn, 10)
 
-      {:ok, read_events} = Storage.read_stream_forward(stream_id, 0, 5)
+      {:ok, read_events} = Storage.read_stream_forward(conn, stream_id, 0, 5)
 
       assert length(read_events) == 5
       assert pluck(read_events, :event_number) == Enum.to_list(1..5)
@@ -74,7 +74,7 @@ defmodule EventStore.Storage.ReadEventsTest do
     test "with multiple events from stream version limited by count", %{conn: conn} do
       {:ok, _stream_uuid, stream_id} = create_stream_containing_events(conn, 10)
 
-      {:ok, read_events} = Storage.read_stream_forward(stream_id, 6, 5)
+      {:ok, read_events} = Storage.read_stream_forward(conn, stream_id, 6, 5)
 
       assert length(read_events) == 5
       assert pluck(read_events, :event_number) == Enum.to_list(6..10)
@@ -82,8 +82,8 @@ defmodule EventStore.Storage.ReadEventsTest do
   end
 
   describe "read all streams forward" do
-    test "when no streams exist" do
-      {:ok, []} = Storage.read_stream_forward(@all_stream_id, 0, 1_000)
+    test "when no streams exist", %{conn: conn} do
+      {:ok, []} = Storage.read_stream_forward(conn, @all_stream_id, 0, 1_000)
     end
 
     test "with multiple events", %{conn: conn} do
@@ -95,7 +95,7 @@ defmodule EventStore.Storage.ReadEventsTest do
       :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(1, stream1_uuid, 3, 2))
       :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(1, stream2_uuid, 4, 2))
 
-      {:ok, events} = Storage.read_stream_forward(@all_stream_id, 0, 1_000)
+      {:ok, events} = Storage.read_stream_forward(conn, @all_stream_id, 0, 1_000)
 
       assert length(events) == 4
       assert [1, 2, 3, 4] == Enum.map(events, &(&1.event_number))
@@ -110,7 +110,7 @@ defmodule EventStore.Storage.ReadEventsTest do
       :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(1, stream1_uuid))
       :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(1, stream2_uuid, 2))
 
-      {:ok, events} = Storage.read_stream_forward(@all_stream_id, 3, 1_000)
+      {:ok, events} = Storage.read_stream_forward(conn, @all_stream_id, 3, 1_000)
 
       assert length(events) == 0
     end
@@ -124,12 +124,12 @@ defmodule EventStore.Storage.ReadEventsTest do
       :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(5, stream1_uuid, 11, 6))
       :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(5, stream2_uuid, 16, 6))
 
-      {:ok, events} = Storage.read_stream_forward(@all_stream_id, 0, 10)
+      {:ok, events} = Storage.read_stream_forward(conn, @all_stream_id, 0, 10)
 
       assert length(events) == 10
       assert pluck(events, :event_number) == Enum.to_list(1..10)
 
-      {:ok, events} = Storage.read_stream_forward(@all_stream_id, 11, 10)
+      {:ok, events} = Storage.read_stream_forward(conn, @all_stream_id, 11, 10)
 
       assert length(events) == 10
       assert pluck(events, :event_number) == Enum.to_list(11..20)

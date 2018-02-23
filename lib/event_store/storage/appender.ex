@@ -29,7 +29,7 @@ defmodule EventStore.Storage.Appender do
         |> Stream.map(&encode_uuids/1)
         |> Stream.chunk_every(1_000)
         |> Enum.map(fn batch ->
-          case insert_event_batch(transaction, batch) do
+          case insert_event_batch(transaction, batch, opts) do
             :ok -> Enum.map(batch, & &1.event_id)
             {:error, reason} -> Postgrex.rollback(transaction, reason)
           end
@@ -42,15 +42,15 @@ defmodule EventStore.Storage.Appender do
             |> Stream.with_index(1)
             |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
-          with :ok <- insert_stream_events(transaction, parameters, stream_id, event_count),
-               :ok <- insert_link_events(transaction, parameters, @all_stream_id, event_count) do
+          with :ok <- insert_stream_events(transaction, parameters, stream_id, event_count, opts),
+               :ok <- insert_link_events(transaction, parameters, @all_stream_id, event_count, opts) do
             :ok
           else
             {:error, reason} -> Postgrex.rollback(transaction, reason)
           end
         end)
       end,
-      Keyword.put(opts, :pool, DBConnection.Poolboy)
+      opts
     )
     |> case do
       {:ok, :ok} ->
@@ -91,14 +91,14 @@ defmodule EventStore.Storage.Appender do
             |> Stream.with_index(1)
             |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
-          with :ok <- insert_link_events(transaction, parameters, stream_id, count) do
+          with :ok <- insert_link_events(transaction, parameters, stream_id, count, opts) do
             :ok
           else
             {:error, reason} -> Postgrex.rollback(transaction, reason)
           end
         end)
       end,
-      Keyword.put(opts, :pool, DBConnection.Poolboy)
+      opts
     )
     |> case do
       {:ok, :ok} ->
@@ -130,13 +130,13 @@ defmodule EventStore.Storage.Appender do
     event_id |> uuid()
   end
 
-  defp insert_event_batch(conn, events) do
+  defp insert_event_batch(conn, events, opts) do
     event_count = length(events)
     statement = Statements.create_events(event_count)
     parameters = build_insert_parameters(events)
 
     conn
-    |> Postgrex.query(statement, parameters, pool: DBConnection.Poolboy)
+    |> Postgrex.query(statement, parameters, opts)
     |> handle_response()
   end
 
@@ -155,21 +155,21 @@ defmodule EventStore.Storage.Appender do
     end)
   end
 
-  defp insert_stream_events(conn, parameters, stream_id, event_count) do
+  defp insert_stream_events(conn, parameters, stream_id, event_count, opts) do
     statement = Statements.create_stream_events(event_count)
     params = [stream_id | [event_count | parameters]]
 
     conn
-    |> Postgrex.query(statement, params, pool: DBConnection.Poolboy)
+    |> Postgrex.query(statement, params, opts)
     |> handle_response()
   end
 
-  defp insert_link_events(conn, parameters, stream_id, event_count) do
+  defp insert_link_events(conn, parameters, stream_id, event_count, opts) do
     statement = Statements.create_link_events(event_count)
     params = [stream_id | [event_count | parameters]]
 
     conn
-    |> Postgrex.query(statement, params, pool: DBConnection.Poolboy)
+    |> Postgrex.query(statement, params, opts)
     |> handle_response()
   end
 

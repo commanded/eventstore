@@ -33,9 +33,11 @@ defmodule EventStore.Config do
   Converts a database url into a Keyword list
   """
   def parse_url(""), do: []
+
   def parse_url({:system, env}) when is_binary(env) do
     parse_url(System.get_env(env) || "")
   end
+
   def parse_url(url) do
     info = url |> URI.decode() |> URI.parse()
 
@@ -50,11 +52,13 @@ defmodule EventStore.Config do
     destructure [username, password], info.userinfo && String.split(info.userinfo, ":")
     "/" <> database = info.path
 
-    opts = [username: username,
-            password: password,
-            database: database,
-            hostname: info.host,
-            port:     info.port]
+    opts = [
+      username: username,
+      password: password,
+      database: database,
+      hostname: info.host,
+      port: info.port
+    ]
 
     Enum.reject(opts, fn {_k, v} -> is_nil(v) end)
   end
@@ -71,9 +75,14 @@ defmodule EventStore.Config do
   """
   def column_data_type do
     case Application.get_env(:eventstore, :column_data_type, "bytea") do
-      valid when valid in ["bytea", "jsonb"] -> valid
+      valid when valid in ["bytea", "jsonb"] ->
+        valid
+
       invalid ->
-        raise ArgumentError, "EventStore `:column_data_type` expects either \"bytea\" or \"jsonb\" but got: #{inspect invalid}"
+        raise ArgumentError,
+              "EventStore `:column_data_type` expects either \"bytea\" or \"jsonb\" but got: #{
+                inspect(invalid)
+              }"
     end
   end
 
@@ -82,7 +91,8 @@ defmodule EventStore.Config do
   """
   def serializer do
     Application.get_env(:eventstore, EventStore.Storage, [])[:serializer] ||
-      raise ArgumentError, "EventStore storage configuration expects :serializer to be configured in environment"
+      raise ArgumentError,
+            "EventStore storage configuration expects :serializer to be configured in environment"
   end
 
   @default_postgrex_opts [
@@ -96,27 +106,43 @@ defmodule EventStore.Config do
     :ssl_opts
   ]
 
+  def default_postgrex_opts(config) do
+    Keyword.take(config, @default_postgrex_opts)
+  end
+
   def postgrex_opts(config) do
     [
       pool_size: 10,
       pool_overflow: 0
     ]
     |> Keyword.merge(config)
-    |> Keyword.take(@default_postgrex_opts ++ [
-      :pool,
-      :pool_size,
-      :pool_overflow
-    ])
-    |> Keyword.put(:name, :event_store)
+    |> Keyword.take(
+      @default_postgrex_opts ++
+        [
+          :pool,
+          :pool_size,
+          :pool_overflow
+        ]
+    )
+    |> Keyword.put(:name, EventStore.Postgrex)
   end
 
-  def notification_postgrex_opts(config) do
-    config
-    |> Keyword.take(@default_postgrex_opts)
-    |> Keyword.put(:name, EventStore.Notifications)
+  def listener_postgrex_opts(config) do
+    sync_connect_postgrex_opts(config)
+  end
+
+  def reader_postgrex_opts(config) do
+    sync_connect_postgrex_opts(config)
   end
 
   def subscription_postgrex_opts(config) do
-    Keyword.take(config, @default_postgrex_opts)
+    sync_connect_postgrex_opts(config)
+  end
+
+  defp sync_connect_postgrex_opts(config) do
+    config
+    |> default_postgrex_opts()
+    |> Keyword.put(:backoff_type, :stop)
+    |> Keyword.put(:sync_connect, true)
   end
 end

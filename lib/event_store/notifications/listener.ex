@@ -25,6 +25,26 @@ defmodule EventStore.Notifications.Listener do
     {:producer, listen_for_events(state)}
   end
 
+  def reconnect do
+    GenServer.cast(__MODULE__, :listen_for_events)
+  end
+
+  def disconnect do
+    GenServer.cast(__MODULE__, :disconnect)
+  end
+
+  def handle_cast(:listen_for_events, %Listener{ref: nil} = state) do
+    {:noreply, [], listen_for_events(state)}
+  end
+
+  def handle_cast(:listen_for_events, %Listener{} = state) do
+    {:noreply, [], state}
+  end
+
+  def handle_cast(:disconnect, %Listener{} = state) do
+    {:noreply, [], %Listener{state | ref: nil}}
+  end
+
   # Notification received from PostgreSQL's `NOTIFY`
   def handle_info(
         {:notification, _connection_pid, ref, channel, payload},
@@ -64,7 +84,8 @@ defmodule EventStore.Notifications.Listener do
   end
 
   defp listen_for_events(%Listener{} = state) do
-    {:ok, ref} = Postgrex.Notifications.listen(EventStore.Notifications, "events")
+    {:ok, ref} =
+      Postgrex.Notifications.listen(EventStore.Notifications.Listener.Postgrex, "events")
 
     %Listener{state | ref: ref}
   end

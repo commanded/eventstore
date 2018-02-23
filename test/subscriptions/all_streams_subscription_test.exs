@@ -9,7 +9,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   @subscription_name "test_subscription"
 
   setup do
-    config = Config.parsed() |> Config.subscription_postgrex_opts()
+    config = Config.parsed() |> Config.default_postgrex_opts()
 
     {:ok, conn} = Postgrex.start_link(config)
 

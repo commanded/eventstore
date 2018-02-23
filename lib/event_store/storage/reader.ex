@@ -90,29 +90,22 @@ defmodule EventStore.Storage.Reader do
 
   defmodule Query do
     @moduledoc false
-    
+
     def read_events_forward(conn, stream_id, start_version, count, opts) do
-      conn
-      |> Postgrex.query(
-        Statements.read_events_forward(),
-        [stream_id, start_version, count],
-        Keyword.put(opts, :pool, DBConnection.Poolboy)
-      )
-      |> handle_response()
-    end
+      query = Statements.read_events_forward()
 
-    defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}) do
-      {:ok, []}
-    end
+      case Postgrex.query(conn, query, [stream_id, start_version, count], opts) do
+        {:ok, %Postgrex.Result{num_rows: 0}} ->
+          {:ok, []}
 
-    defp handle_response({:ok, %Postgrex.Result{rows: rows}}) do
-      {:ok, rows}
-    end
+        {:ok, %Postgrex.Result{rows: rows}} ->
+          {:ok, rows}
 
-    defp handle_response({:error, %Postgrex.Error{postgres: %{message: reason}}}) do
-      Logger.warn(fn -> "Failed to read events from stream due to: #{inspect(reason)}" end)
+        {:error, %Postgrex.Error{postgres: %{message: reason}}} ->
+          Logger.warn(fn -> "Failed to read events from stream due to: #{inspect(reason)}" end)
 
-      {:error, reason}
+          {:error, reason}
+      end
     end
   end
 end
