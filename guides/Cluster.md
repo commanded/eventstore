@@ -6,7 +6,7 @@ EventStore supports running on multiple nodes as either a [distributed Erlang](h
 
 PostgreSQL's `LISTEN` / `NOTIFY` is used to pub/sub event notifications.
 
-A single listener process will connect to the database to listen for events when using a distributed cluster. Events will be broadcast to all connected nodes using Erlang's [pg2](http://erlang.org/doc/man/pg2.html) process groups. This limits the number of database connections to at most the number of running clusters.
+A single listener process will connect to the database to listen for events when using a distributed cluster. Events will be broadcast from the single listener process to a `GenServer` process running on each connected node that forwards events to its local subscribers. This limits the number of database connections to at most the number of running clusters.
 
 Running EventStore on multiple nodes that are not connected together to form a cluster will result in one listener process and database connection per node.
 

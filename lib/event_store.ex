@@ -290,6 +290,10 @@ defmodule EventStore do
     - `stream_uuid` is the stream to subscribe to.
       Use the `$all` identifier to subscribe to events from all streams.
 
+    - `opts` is an optional map providing additional subscription configuration:
+      - `mapper` to define a function to map each recorded event before sending
+        to the subscriber.
+
   The calling process will be notified whenever new events are appended to
   the given `stream_uuid`.
 
@@ -315,8 +319,11 @@ defmodule EventStore do
       end
 
   """
-  @spec subscribe(String.t()) :: :ok | {:error, term}
-  def subscribe(stream_uuid), do: Registration.subscribe(stream_uuid)
+  @spec subscribe(String.t(), mapper: (RecordedEvent.t() -> any())) :: :ok | {:error, term}
+
+  def subscribe(stream_uuid, opts \\ [])
+
+  def subscribe(stream_uuid, opts), do: Registration.subscribe(stream_uuid, opts)
 
   @doc """
   Create a persistent subscription to a single stream.

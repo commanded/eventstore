@@ -26,27 +26,12 @@ defmodule EventStore.Registration.LocalRegistry do
   @doc """
   Subscribes the caller to the given topic.
   """
-  @spec subscribe(binary) :: :ok | {:error, term}
+  @spec subscribe(binary, mapper: (RecordedEvent.t() -> any())) :: :ok | {:error, term}
   @impl EventStore.Registration
-  def subscribe(topic) do
-    with {:ok, _} <- Registry.register(EventStore.PubSub, topic, []) do
+  def subscribe(topic, opts) do
+    with {:ok, _} <- Registry.register(EventStore.PubSub, topic, opts) do
       :ok
     end
-  end
-
-  @doc """
-  Is the caller subscribed to the given topic?
-  """
-  @spec subscribed?(binary) :: true | false
-  @impl EventStore.Registration
-  def subscribed?(topic) do
-    subscriptions = Registry.lookup(EventStore.PubSub, topic)
-    caller = self()
-
-    Enum.any?(subscriptions, fn
-      {^caller, _} -> true
-      _ -> false
-    end)
   end
 
   @doc """
@@ -56,7 +41,17 @@ defmodule EventStore.Registration.LocalRegistry do
   @impl EventStore.Registration
   def broadcast(topic, message) do
     Registry.dispatch(EventStore.PubSub, topic, fn entries ->
-      for {pid, _} <- entries, do: send(pid, message)
+      for {pid, opts} <- entries do
+        notify_subscriber(pid, message, opts)
+      end
     end)
+  end
+
+  defp notify_subscriber(pid, {:events, events}, mapper: mapper) when is_function(mapper, 1) do
+    send(pid, {:events, Enum.map(events, mapper)})
+  end
+
+  defp notify_subscriber(pid, message, _opts) do
+    send(pid, message)
   end
 end
