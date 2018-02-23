@@ -3,6 +3,8 @@ defmodule EventStore.Registration do
   Registration specification for EventStore pub/sub.
   """
 
+  alias EventStore.Registration.{DistributedRegistry, LocalRegistry}
+
   @doc """
   Return an optional supervisor spec for the registry.
   """
@@ -11,12 +13,7 @@ defmodule EventStore.Registration do
   @doc """
   Subscribes the caller to the given topic.
   """
-  @callback subscribe(binary) :: :ok | {:error, term}
-
-  @doc """
-  Is the caller subscribed to the given topic?
-  """
-  @callback subscribed?(binary) :: true | false
+  @callback subscribe(binary, mapper: (RecordedEvent.t() -> any())) :: :ok | {:error, term}
 
   @doc """
   Broadcasts message on given topic.
@@ -32,14 +29,8 @@ defmodule EventStore.Registration do
   @doc """
   Subscribes the caller to the given topic.
   """
-  @spec subscribe(binary) :: :ok | {:error, term}
-  def subscribe(topic), do: registry_provider().subscribe(topic)
-
-  @doc """
-  Is the caller subscribed to the given topic?
-  """
-  @spec subscribed?(binary) :: true | false
-  def subscribed?(topic), do: registry_provider().subscribed?(topic)
+  @spec subscribe(binary, mapper: (RecordedEvent.t() -> any())) :: :ok | {:error, term}
+  def subscribe(topic, opts \\ []), do: registry_provider().subscribe(topic, opts)
 
   @doc """
   Broadcasts message on given topic.
@@ -53,10 +44,10 @@ defmodule EventStore.Registration do
   def registry_provider do
     case Application.get_env(:eventstore, :registry, :local) do
       :local ->
-        EventStore.Registration.LocalRegistry
+        LocalRegistry
 
       :distributed ->
-        EventStore.Registration.PG2Registry
+        DistributedRegistry
 
       unknown ->
         raise ArgumentError, message: "Unknown `:registry` setting in config: #{inspect(unknown)}"

@@ -31,6 +31,22 @@ receive do
 end
 ```
 
+#### Mapping events
+
+You can provide an event mapping function that maps each `RecordedEvent` before sending it to the subscriber:
+
+```elixir
+EventStore.subscribe(stream_uuid, mapper: fn
+  %EventStore.RecordedEvent{data: data} -> data
+end)
+
+# receive first batch of mapped event data
+receive do
+  {:events, event_data} ->
+    IO.puts "Received event data: " <> inspect(event_data)
+end
+```
+
 ## Persistent subscriptions
 
 Persistent subscriptions to a stream will guarantee *at least once* delivery of every persisted event. Each subscription may be independently paused, then later resumed from where it stopped. The last received and acknowledged event is stored by the EventStore to support resuming at a later time later or whenever the subscriber process restarts.
