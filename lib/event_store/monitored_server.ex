@@ -37,8 +37,8 @@ defmodule EventStore.MonitoredServer do
     {:ok, start_process(:start, state)}
   end
 
-  def handle_call(msg, from, %State{pid: nil, queue: queue} = state) do
-    {:noreply, %State{state | queue: :queue.in(queue, {:call, msg, from})}}
+  def handle_call(msg, from, %State{pid: nil} = state) do
+    {:noreply, enqueue({:call, msg, from}, state)}
   end
 
   def handle_call(msg, from, %State{pid: pid} = state) do
@@ -47,8 +47,8 @@ defmodule EventStore.MonitoredServer do
     {:noreply, state}
   end
 
-  def handle_cast(msg, %State{pid: nil, queue: queue} = state) do
-    {:noreply, %State{state | queue: :queue.in(queue, {:cast, msg})}}
+  def handle_cast(msg, %State{pid: nil} = state) do
+    {:noreply, enqueue({:cast, msg}, state)}
   end
 
   def handle_cast(msg, %State{pid: pid} = state) do
@@ -80,8 +80,8 @@ defmodule EventStore.MonitoredServer do
     {:noreply, state}
   end
 
-  def handle_info(msg, %State{pid: nil, queue: queue} = state) do
-    {:noreply, %State{state | queue: :queue.in(queue, {:info, msg})}}
+  def handle_info(msg, %State{pid: nil} = state) do
+    {:noreply, enqueue({:info, msg}, state)}
   end
 
   def handle_info(msg, %State{pid: pid} = state) do
@@ -138,6 +138,10 @@ defmodule EventStore.MonitoredServer do
 
         delayed_start(state)
     end
+  end
+
+  defp enqueue(item, %State{queue: queue} = state) do
+    %State{state | queue: :queue.in(item, queue)}
   end
 
   defp forward_call(pid, msg, from) do
