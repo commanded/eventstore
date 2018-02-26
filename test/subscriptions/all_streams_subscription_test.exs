@@ -3,7 +3,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
   alias EventStore.{Config,EventFactory,ProcessHelper,RecordedEvent}
   alias EventStore.Storage.{Appender,CreateStream}
-  alias EventStore.Subscriptions.StreamSubscription
+  alias EventStore.Subscriptions.SubscriptionFsm
 
   @all_stream "$all"
   @subscription_name "test_subscription"
@@ -50,13 +50,13 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   test "catch-up subscription, no persisted events", context do
     subscription =
       create_subscription(context)
-      |> StreamSubscription.subscribed()
-      |> StreamSubscription.catch_up()
+      |> SubscriptionFsm.subscribed()
+      |> SubscriptionFsm.catch_up()
 
     assert subscription.state == :catching_up
     assert_receive_caught_up(0)
 
-    subscription = StreamSubscription.caught_up(subscription, 0)
+    subscription = SubscriptionFsm.caught_up(subscription, 0)
 
     assert subscription.state == :subscribed
     assert subscription.data.last_seen == 0
@@ -68,15 +68,15 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
     subscription =
       create_subscription(context)
-      |> StreamSubscription.subscribed()
-      |> StreamSubscription.catch_up()
+      |> SubscriptionFsm.subscribed()
+      |> SubscriptionFsm.catch_up()
 
     assert subscription.state == :catching_up
 
     assert_receive {:events, received_events}
     subscription = ack(subscription, received_events)
 
-    subscription = StreamSubscription.caught_up(subscription, 3)
+    subscription = SubscriptionFsm.caught_up(subscription, 3)
     assert_receive_caught_up(3)
 
     assert subscription.state == :subscribed
@@ -96,10 +96,10 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
     subscription =
       create_subscription(context)
-      |> StreamSubscription.subscribed()
-      |> StreamSubscription.catch_up()
-      |> StreamSubscription.caught_up(0)
-      |> StreamSubscription.notify_events(events)
+      |> SubscriptionFsm.subscribed()
+      |> SubscriptionFsm.catch_up()
+      |> SubscriptionFsm.caught_up(0)
+      |> SubscriptionFsm.notify_events(events)
 
     assert subscription.state == :subscribed
     assert subscription.data.last_received == 1
@@ -114,8 +114,8 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   test "should catch up when events received while catching up", context do
     subscription =
       create_subscription(context)
-      |> StreamSubscription.subscribed()
-      |> StreamSubscription.catch_up()
+      |> SubscriptionFsm.subscribed()
+      |> SubscriptionFsm.catch_up()
 
     assert subscription.state == :catching_up
     assert_receive_caught_up(0)
@@ -124,9 +124,9 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     recorded_events = EventFactory.create_recorded_events(3, stream_uuid)
 
     # notify events while subscription is catching up
-    subscription = StreamSubscription.notify_events(subscription, recorded_events)
+    subscription = SubscriptionFsm.notify_events(subscription, recorded_events)
 
-    subscription = StreamSubscription.caught_up(subscription, 0)
+    subscription = SubscriptionFsm.caught_up(subscription, 0)
 
     assert subscription.state == :request_catch_up
     assert subscription.data.last_received == 3
@@ -147,15 +147,15 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
       subscription =
         create_subscription(context)
-        |> StreamSubscription.subscribed()
-        |> StreamSubscription.catch_up()
+        |> SubscriptionFsm.subscribed()
+        |> SubscriptionFsm.catch_up()
 
       assert_receive_caught_up(3)
 
       # should not receive already seen events
       refute_receive {:events, _received_events}
 
-      subscription = StreamSubscription.caught_up(subscription, 3)
+      subscription = SubscriptionFsm.caught_up(subscription, 3)
 
       assert subscription.state == :subscribed
       assert subscription.data.last_seen == 3
@@ -166,8 +166,8 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     test "should replay events when catching up and events had not been acknowledged", context do
       subscription =
         create_subscription(context)
-        |> StreamSubscription.subscribed()
-        |> StreamSubscription.catch_up()
+        |> SubscriptionFsm.subscribed()
+        |> SubscriptionFsm.catch_up()
 
       # should receive already seen events
       assert_receive {:events, received_events}
@@ -176,7 +176,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
       subscription = ack(subscription, received_events)
       assert_receive_caught_up(3)
 
-      subscription = StreamSubscription.caught_up(subscription, 3)
+      subscription = SubscriptionFsm.caught_up(subscription, 3)
 
       assert subscription.state == :subscribed
       assert subscription.data.last_seen == 3
@@ -187,15 +187,15 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     def create_caught_up_subscription(context) do
       subscription =
         create_subscription(context)
-        |> StreamSubscription.subscribed()
-        |> StreamSubscription.catch_up()
+        |> SubscriptionFsm.subscribed()
+        |> SubscriptionFsm.catch_up()
 
       assert subscription.state == :catching_up
 
       assert_receive {:events, received_events}
       assert length(received_events) == 3
 
-      subscription = StreamSubscription.caught_up(subscription, 3)
+      subscription = SubscriptionFsm.caught_up(subscription, 3)
 
       assert subscription.state == :subscribed
       assert subscription.data.last_seen == 3
@@ -214,11 +214,11 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
     subscription =
       create_subscription(context)
-      |> StreamSubscription.subscribed()
-      |> StreamSubscription.catch_up()
-      |> StreamSubscription.caught_up(0)
-      |> StreamSubscription.notify_events(initial_events)
-      |> StreamSubscription.notify_events(remaining_events)
+      |> SubscriptionFsm.subscribed()
+      |> SubscriptionFsm.catch_up()
+      |> SubscriptionFsm.caught_up(0)
+      |> SubscriptionFsm.notify_events(initial_events)
+      |> SubscriptionFsm.notify_events(remaining_events)
 
     assert subscription.state == :subscribed
     assert subscription.data.last_received == 6
@@ -260,11 +260,11 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
       subscription =
         create_subscription(context, max_size: 3)
-        |> StreamSubscription.subscribed()
-        |> StreamSubscription.catch_up()
-        |> StreamSubscription.caught_up(0)
-        |> StreamSubscription.notify_events(initial_events)
-        |> StreamSubscription.notify_events(remaining_events)
+        |> SubscriptionFsm.subscribed()
+        |> SubscriptionFsm.catch_up()
+        |> SubscriptionFsm.caught_up(0)
+        |> SubscriptionFsm.notify_events(initial_events)
+        |> SubscriptionFsm.notify_events(remaining_events)
 
       assert subscription.state == :max_capacity
       assert subscription.data.last_received == 6
@@ -298,11 +298,11 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
       subscription =
         create_subscription(context, max_size: 3)
-        |> StreamSubscription.subscribed()
-        |> StreamSubscription.catch_up()
-        |> StreamSubscription.caught_up(0)
-        |> StreamSubscription.notify_events(initial_events)
-        |> StreamSubscription.notify_events(remaining_events)
+        |> SubscriptionFsm.subscribed()
+        |> SubscriptionFsm.catch_up()
+        |> SubscriptionFsm.caught_up(0)
+        |> SubscriptionFsm.notify_events(initial_events)
+        |> SubscriptionFsm.notify_events(remaining_events)
 
       assert subscription.state == :max_capacity
       assert subscription.data.last_received == 6
@@ -344,14 +344,14 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
     test "should allow second subscriber to takeover when first connection terminates", %{subscription_conn: conn, subscription_conn2: conn2, subscription2: subscription2} do
       # attempt to resubscribe should fail
-      subscription2 = StreamSubscription.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
+      subscription2 = SubscriptionFsm.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
       assert subscription2.state == :initial
 
       # stop subscription1 connection
       ProcessHelper.shutdown(conn)
 
       # attempt to resubscribe should now succeed
-      subscription2 = StreamSubscription.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
+      subscription2 = SubscriptionFsm.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
       assert subscription2.state == :subscribe_to_events
     end
 
@@ -389,8 +389,8 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   end
 
   defp create_subscription(%{subscription_conn: conn}, opts \\ []) do
-    StreamSubscription.new()
-    |> StreamSubscription.subscribe(conn, @all_stream, @subscription_name, self(), opts)
+    SubscriptionFsm.new()
+    |> SubscriptionFsm.subscribe(conn, @all_stream, @subscription_name, self(), opts)
   end
 
   defp ack_refute_receive(subscription, ack, expected_last_ack) do
@@ -412,7 +412,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   end
 
   def ack(subscription, %RecordedEvent{event_number: event_number}) do
-    StreamSubscription.ack(subscription, event_number)
+    SubscriptionFsm.ack(subscription, event_number)
   end
 
   defp assert_receive_caught_up(to) do

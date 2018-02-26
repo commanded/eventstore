@@ -10,8 +10,8 @@ defmodule EventStore.Subscriptions.Subscription do
   use GenServer
   require Logger
 
-  alias EventStore.{RecordedEvent,Registration}
-  alias EventStore.Subscriptions.{StreamSubscription,Subscription}
+  alias EventStore.{RecordedEvent, Registration}
+  alias EventStore.Subscriptions.{SubscriptionFsm, Subscription}
 
   defstruct [
     conn: nil,
@@ -30,7 +30,7 @@ defmodule EventStore.Subscriptions.Subscription do
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
       subscriber: subscriber,
-      subscription: StreamSubscription.new(),
+      subscription: SubscriptionFsm.new(),
       subscription_opts: subscription_opts,
       retry_interval: subscription_retry_interval()
     }, opts)
@@ -103,28 +103,19 @@ defmodule EventStore.Subscriptions.Subscription do
   def handle_info({:events, events}, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " received #{length(events)} events(s)" end)
 
-    subscription = StreamSubscription.notify_events(subscription, events)
-
-    {:noreply, apply_subscription_to_state(subscription, state)}
-  end
-
-  def handle_cast(:subscribe_to_events, %Subscription{subscription: subscription} = state) do
-    :ok = subscribe_to_events(state)
-    :ok = notify_subscribed(state)
-
-    subscription = StreamSubscription.subscribed(subscription)
+    subscription = SubscriptionFsm.notify_events(subscription, events)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
   def handle_cast(:catch_up, %Subscription{subscription: subscription} = state) do
-    subscription = StreamSubscription.catch_up(subscription)
+    subscription = SubscriptionFsm.catch_up(subscription)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
   def handle_cast({:caught_up, last_seen}, %Subscription{subscription: subscription} = state) do
-    subscription = StreamSubscription.caught_up(subscription, last_seen)
+    subscription = SubscriptionFsm.caught_up(subscription, last_seen)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
@@ -140,13 +131,13 @@ defmodule EventStore.Subscriptions.Subscription do
   def handle_cast(:disconnect, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " disconnected" end)
 
-    subscription = StreamSubscription.disconnect(subscription)
+    subscription = SubscriptionFsm.disconnect(subscription)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
   def handle_cast({:ack, ack}, %Subscription{subscription: subscription} = state) do
-    subscription = StreamSubscription.ack(subscription, ack)
+    subscription = SubscriptionFsm.ack(subscription, ack)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
@@ -154,18 +145,18 @@ defmodule EventStore.Subscriptions.Subscription do
   def handle_call(:unsubscribe, _from, %Subscription{subscriber: subscriber, subscription: subscription} = state) do
     Process.unlink(subscriber)
 
-    subscription = StreamSubscription.unsubscribe(subscription)
+    subscription = SubscriptionFsm.unsubscribe(subscription)
 
     {:reply, :ok, apply_subscription_to_state(subscription, state)}
   end
 
-  defp apply_subscription_to_state(%StreamSubscription{} = subscription, %Subscription{} = state) do
+  defp apply_subscription_to_state(%SubscriptionFsm{} = subscription, %Subscription{} = state) do
     state = %Subscription{state | subscription: subscription}
 
     handle_subscription_state(state)
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %{state: :initial}} = state) do
+  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :initial}} = state) do
     %Subscription{retry_interval: retry_interval} = state
 
     _ = Logger.debug(fn -> describe(state) <> " failed to subscribe, will retry in #{retry_interval}ms" end)
@@ -175,15 +166,22 @@ defmodule EventStore.Subscriptions.Subscription do
     %Subscription{state | retry_ref: retry_ref}
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %{state: :subscribe_to_events}} = state) do
+  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :subscribe_to_events} = subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " subscribing to events" end)
 
-    GenServer.cast(self(), :subscribe_to_events)
+    :ok = subscribe_to_events(state)
+    :ok = notify_subscribed(state)
 
-    state
+    case SubscriptionFsm.subscribed(subscription) do
+      %SubscriptionFsm{state: :subscribe_to_events} = subscription ->
+        %Subscription{state | subscription: subscription}
+
+      subscription ->
+        apply_subscription_to_state(subscription, state)
+    end
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %{state: :request_catch_up}} = state) do
+  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :request_catch_up}} = state) do
     _ = Logger.debug(fn -> describe(state) <> " requesting catch-up" end)
 
     GenServer.cast(self(), :catch_up)
@@ -191,13 +189,13 @@ defmodule EventStore.Subscriptions.Subscription do
     state
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %{state: :max_capacity}} = state) do
+  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :max_capacity}} = state) do
     _ = Logger.warn(fn -> describe(state) <> " has reached max capacity, events will be ignored until it has caught up" end)
 
     state
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %{state: :unsubscribed}} = state) do
+  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :unsubscribed}} = state) do
     _ = Logger.warn(fn -> describe(state) <> " has unsubscribed" end)
 
     state
@@ -217,7 +215,7 @@ defmodule EventStore.Subscriptions.Subscription do
     } = state
 
     subscription
-    |> StreamSubscription.subscribe(conn, stream_uuid, subscription_name, subscriber, opts)
+    |> SubscriptionFsm.subscribe(conn, stream_uuid, subscription_name, subscriber, opts)
     |> apply_subscription_to_state(state)
   end
 
@@ -246,7 +244,7 @@ defmodule EventStore.Subscriptions.Subscription do
     case Application.get_env(:eventstore, :subscription_retry_interval) do
       interval when is_integer(interval) and interval > 0 ->
         # ensure interval is no less than one second
-        min(interval, 1_000)
+        max(interval, 1_000)
 
       _ ->
         # default to 60s

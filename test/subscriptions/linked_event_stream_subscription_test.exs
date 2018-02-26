@@ -1,4 +1,4 @@
-defmodule EventStore.Subscriptions.LinkedEventStreamSubscriptionTest do
+defmodule EventStore.Subscriptions.LinkedEventSubscriptionFsmTest do
   use EventStore.StorageCase
 
   alias EventStore.{EventFactory, ProcessHelper}

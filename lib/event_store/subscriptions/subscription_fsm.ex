@@ -1,4 +1,4 @@
-defmodule EventStore.Subscriptions.StreamSubscription do
+defmodule EventStore.Subscriptions.SubscriptionFsm do
   @moduledoc false
 
   alias EventStore.{AdvisoryLocks, RecordedEvent, Storage}
@@ -214,6 +214,10 @@ defmodule EventStore.Subscriptions.StreamSubscription do
     defevent ack(_ack), data: %SubscriptionState{} = data do
       next_state(:unsubscribed, data)
     end
+
+    defevent unsubscribe, data: %SubscriptionState{} = data do
+      next_state(:unsubscribed, data)
+    end
   end
 
   # Catch-all event handlers
@@ -246,8 +250,7 @@ defmodule EventStore.Subscriptions.StreamSubscription do
   end
 
   defevent unsubscribe, data: %SubscriptionState{} = data do
-    unsubscribe_from_stream(data)
-    next_state(:unsubscribed, data)
+    next_state(:unsubscribed, unsubscribe_from_stream(data))
   end
 
   defp create_subscription(%SubscriptionState{} = data, opts) do
@@ -273,7 +276,20 @@ defmodule EventStore.Subscriptions.StreamSubscription do
       subscription_name: subscription_name
     } = data
 
+    data = terminate_catch_up(data)
+
     Storage.Subscription.unsubscribe_from_stream(conn, stream_uuid, subscription_name)
+
+    data
+  end
+
+  defp terminate_catch_up(%SubscriptionState{catch_up_pid: catch_up_pid} = data) do
+    if is_pid(catch_up_pid) do
+      Process.unlink(catch_up_pid)
+      Process.exit(catch_up_pid, :kill)
+    end
+
+    %SubscriptionState{data | catch_up_pid: nil}
   end
 
   defp track_last_received(events, %SubscriptionState{} = data) do
