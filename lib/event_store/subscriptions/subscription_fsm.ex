@@ -368,7 +368,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         wait_for_ack(ack)
 
       message ->
-        raise RuntimeError, message: "Unexpected ack received: #{inspect(message)}"
+        raise RuntimeError, message: "Unexpected ack received: #{inspect(message)}, but expected: #{inspect ack}"
     end
   end
 
