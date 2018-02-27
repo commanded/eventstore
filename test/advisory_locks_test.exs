@@ -2,50 +2,46 @@ defmodule EventStore.AdvisoryLocksTest do
   use EventStore.StorageCase
 
   alias EventStore.{AdvisoryLocks, Config, ProcessHelper}
+  alias EventStore.Storage
 
   setup do
     postgrex_config = Config.parsed() |> Config.default_postgrex_opts()
 
-    {:ok, conn1} = Postgrex.start_link(postgrex_config)
-    {:ok, conn2} = Postgrex.start_link(postgrex_config)
+    {:ok, conn} = Postgrex.start_link(postgrex_config)
 
     on_exit fn ->
-      ProcessHelper.shutdown(conn1)
-      ProcessHelper.shutdown(conn2)
+      ProcessHelper.shutdown(conn)
     end
 
     [
-      conn1: conn1,
-      conn2: conn2
+      conn: conn
     ]
   end
 
   describe "acquire lock" do
-    test "should acquire lock when available", %{conn1: conn1} do
-      assert :ok = AdvisoryLocks.try_advisory_lock(conn1, 1)
+    test "should acquire lock when available" do
+      assert :ok = AdvisoryLocks.try_advisory_lock(1)
     end
 
-    test "should acquire lock when same process already has lock", %{conn1: conn1} do
-      assert :ok = AdvisoryLocks.try_advisory_lock(conn1, 1)
-      assert :ok = AdvisoryLocks.try_advisory_lock(conn1, 1)
-      assert :ok = AdvisoryLocks.try_advisory_lock(conn1, 1)
+    test "should acquire lock when same process already has lock" do
+      assert :ok = AdvisoryLocks.try_advisory_lock(1)
+      assert :ok = AdvisoryLocks.try_advisory_lock(1)
+      assert :ok = AdvisoryLocks.try_advisory_lock(1)
     end
 
-    test "should fail to acquire lock when already taken", context do
-      %{conn1: conn1, conn2: conn2} = context
+    test "should fail to acquire lock when already taken", %{conn: conn} do
+      :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
 
-      assert :ok = AdvisoryLocks.try_advisory_lock(conn1, 1)
-      assert {:error, :lock_already_taken} = AdvisoryLocks.try_advisory_lock(conn2, 1)
+      assert {:error, :lock_already_taken} = AdvisoryLocks.try_advisory_lock(1)
     end
   end
 
   describe "release lock" do
-    test "should release lock when process terminates", context do
-      %{conn1: conn1, conn2: conn2} = context
-
+    test "should release lock when process terminates", %{conn: conn} do
       reply_to = self()
+
       pid = spawn_link(fn ->
-        assert :ok = AdvisoryLocks.try_advisory_lock(conn1, 1)
+        assert :ok = AdvisoryLocks.try_advisory_lock(1)
 
         send(reply_to, :lock_acquired)
 
@@ -54,28 +50,59 @@ defmodule EventStore.AdvisoryLocksTest do
       end)
 
       assert_receive :lock_acquired
-      assert {:error, :lock_already_taken} = AdvisoryLocks.try_advisory_lock(conn2, 1)
+      assert {:error, :lock_already_taken} = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
 
       ProcessHelper.shutdown(pid)
 
       # wait for lock to be released after process terminates
       :timer.sleep 100
 
-      assert :ok = AdvisoryLocks.try_advisory_lock(conn2, 1)
+      assert :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
+    end
+  end
+
+  describe "disconnect" do
+    test "should execute `lock_released` callback function" do
+      reply_to = self()
+
+      assert :ok = AdvisoryLocks.try_advisory_lock(1, lock_released: fn ->
+        send(reply_to, :lock_released)
+      end)
+
+      AdvisoryLocks.disconnect()
+
+      assert_receive(:lock_released)
+    end
+  end
+
+  describe "reconnect" do
+    test "should execute `lock_reacquired` callback function when reacquired" do
+      reply_to = self()
+
+      assert :ok = AdvisoryLocks.try_advisory_lock(1, lock_reacquired: fn ->
+        send(reply_to, :lock_reacquired)
+      end)
+
+      :ok = AdvisoryLocks.disconnect()
+
+      assert :ok = AdvisoryLocks.reconnect()
+      assert_receive(:lock_reacquired)
     end
 
-    test "should forget locks when `conn` terminates", context do
-      %{conn1: conn1, conn2: conn2} = context
+    test "should not execute `lock_reacquired` callback function when cannot reacquire", %{conn: conn} do
+      reply_to = self()
 
-      assert :ok = AdvisoryLocks.try_advisory_lock(conn1, 1)
-      assert :ok = AdvisoryLocks.try_advisory_lock(conn2, 2)
+      assert :ok = AdvisoryLocks.try_advisory_lock(1, lock_reacquired: fn ->
+        send(reply_to, :lock_reacquired)
+      end)
 
-      # shutdown connection
-      ProcessHelper.shutdown(conn1)
+      :ok = AdvisoryLocks.disconnect()
 
-      :timer.sleep 100
+      :ok = Storage.Lock.unlock(AdvisoryLocks.Postgrex, 1)
+      :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
 
-      assert :ok = AdvisoryLocks.try_advisory_lock(conn2, 1)
+      assert :ok = AdvisoryLocks.reconnect()
+      refute_receive(:lock_reacquired)
     end
   end
 end

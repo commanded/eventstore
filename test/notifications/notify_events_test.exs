@@ -8,7 +8,7 @@ defmodule EventStore.Notifications.NotifyEventsTest do
   setup do
     listener_opts =
       Config.parsed()
-      |> Config.listener_postgrex_opts()
+      |> Config.sync_connect_postgrex_opts()
       |> Keyword.put(:name, __MODULE__)
 
     {:ok, conn} = Postgrex.Notifications.start_link(listener_opts)

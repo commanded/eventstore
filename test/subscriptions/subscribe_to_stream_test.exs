@@ -1,9 +1,11 @@
 defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config,EventFactory,ProcessHelper,Subscriptions,Subscriber,Wait}
+  alias EventStore.{Config, EventFactory, ProcessHelper, Subscriptions, Subscriber, Wait}
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Support.CollectingSubscriber
+
+  @conn EventStore.Postgrex
 
   setup do
     subscription_name = UUID.uuid4()
@@ -148,29 +150,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       Subscription.ack(subscription, 2)
 
       refute_receive {:events, _received_events}
-    end
-
-    test "should error when attempting to ack received events by invalid `stream_version`", %{subscription_name: subscription_name} do
-      stream_uuid = UUID.uuid4
-      initial_events = EventFactory.create_events(1)
-      new_events = EventFactory.create_events(1, 2)
-
-      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
-      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
-
-      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
-
-      assert_receive {:subscribed, ^subscription}
-      assert_receive {:events, received_events}
-      assert pluck(received_events, :data) == pluck(initial_events, :data)
-
-      Process.unlink(subscription)
-      ref = Process.monitor(subscription)
-
-      # ack an incorrect `stream_version` should crash subscription process
-      Subscription.ack(subscription, 2)
-
-      assert_receive {:DOWN, ^ref, _, _, _}
     end
   end
 
@@ -342,31 +321,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert pluck(stream2_received_events, :data) == pluck(stream2_events, :data)
       assert stream1_received_events != stream2_received_events
     end
-
-    test "should error when attempting to ack received events by incorrect `event_number`", %{subscription_name: subscription_name} do
-      stream1_uuid = UUID.uuid4
-      stream2_uuid = UUID.uuid4
-
-      stream1_events = EventFactory.create_events(1)
-      stream2_events = EventFactory.create_events(1)
-
-      :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_events)
-      :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
-
-      {:ok, subscription} = EventStore.subscribe_to_all_streams(subscription_name, self())
-
-      assert_receive {:subscribed, ^subscription}
-      assert_receive {:events, stream1_received_events}
-      assert pluck(stream1_received_events, :data) == pluck(stream1_events, :data)
-
-      Process.unlink(subscription)
-      ref = Process.monitor(subscription)
-
-      # ack an incorrect `event_number` should crash subscription process
-      Subscription.ack(subscription, 2)
-
-      assert_receive {:DOWN, ^ref, _, _, _}
-    end
   end
 
   describe "monitor single stream subscription" do
@@ -490,62 +444,63 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   end
 
   describe "duplicate subscriptions" do
-    setup [:create_two_duplicate_subscriptions]
+    setup [:lock_subscription, :create_subscription]
 
     test "should only allow single active subscription", context do
-      %{subscription1: subscription1, subscription2: subscription2} = context
+      %{conn2: conn2, subscription: subscription} = context
 
-      stream1_uuid = append_events_to_stream(3)
+      stream1_uuid = append_events_to_stream(1)
 
-      # subscriber1 should receive events
-      assert_receive {:events, received_events}
+      # subscriber should not receive events until subscribed
+      refute_receive {:events, _received_events}
 
-      Subscription.ack(subscription1, received_events)
+      # release lock, allowing subscriber to subscribe
+      ProcessHelper.shutdown(conn2)
 
-      assert length(received_events) == 3
+      # subscription should now be subscribed
+      assert_receive {:subscribed, ^subscription}
+
+      stream2_uuid = append_events_to_stream(2)
+
+      # subscriber should now start receiving events
+      assert_receive {:events, received_events}, 5_000
+      assert length(received_events) == 1
       Enum.each(received_events, fn event ->
         assert event.stream_uuid == stream1_uuid
       end)
 
-      # subscriber2 should not receive any events
-      refute_receive {:events, _received_events}
+      :ok = Subscription.ack(subscription, received_events)
 
-      # shutdown subscriber1 process
-      ProcessHelper.shutdown(subscription1)
-
-      # subscription2 should now be subscribed
-      assert_receive {:subscribed, ^subscription2}
-
-      stream2_uuid = append_events_to_stream(3)
-
-      # subscriber2 should now start receiving events
       assert_receive {:events, received_events}, 5_000
-      Subscription.ack(subscription2, received_events)
-
-      assert length(received_events) == 3
+      assert length(received_events) == 2
       Enum.each(received_events, fn event ->
         assert event.stream_uuid == stream2_uuid
       end)
 
+      :ok = Subscription.ack(subscription, received_events)
+
       refute_receive {:events, _received_events}
     end
 
-    defp create_two_duplicate_subscriptions(%{subscription_name: subscription_name}) do
-      postgrex_config = Config.parsed() |> Config.default_postgrex_opts()
+    defp lock_subscription(_context) do
+      config = Config.parsed() |> Config.sync_connect_postgrex_opts()
 
-      {:ok, conn1} = Postgrex.start_link(postgrex_config)
-      {:ok, conn2} = Postgrex.start_link(postgrex_config)
+      {:ok, conn} = Postgrex.start_link(config)
 
-      {:ok, subscription1} = EventStore.Subscriptions.Subscription.start_link(conn1, "$all", subscription_name, self(), start_from: 0)
-      assert_receive {:subscribed, ^subscription1}
+      EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1)
 
-      {:ok, subscription2} = EventStore.Subscriptions.Subscription.start_link(conn2, "$all", subscription_name, self(), start_from: 0)
-      refute_receive {:subscribed, ^subscription2}
+      on_exit fn ->
+        ProcessHelper.shutdown(conn)
+      end
 
-      [
-        subscription1: subscription1,
-        subscription2: subscription2
-      ]
+      [conn2: conn]
+    end
+
+    defp create_subscription(%{subscription_name: subscription_name}) do
+      {:ok, subscription} = EventStore.Subscriptions.Subscription.start_link(@conn, "$all", subscription_name, self(), start_from: 0)
+      refute_receive {:subscribed, ^subscription}
+
+      [subscription: subscription]
     end
 
     defp append_events_to_stream(count) do

@@ -8,14 +8,18 @@ defmodule EventStore.AdvisoryLocks do
   use GenServer
 
   defmodule State do
-    defstruct locks: %{}
+    defstruct conn: nil, state: :connected, locks: %{}
   end
 
-  alias EventStore.AdvisoryLocks.State
-  alias EventStore.Storage.Lock
+  defmodule Lock do
+    defstruct key: nil, opts: nil
+  end
 
-  def start_link(_args) do
-    GenServer.start_link(__MODULE__, %State{}, name: __MODULE__)
+  alias EventStore.AdvisoryLocks.{Lock, State}
+  alias EventStore.Storage
+
+  def start_link(conn) do
+    GenServer.start_link(__MODULE__, %State{conn: conn}, name: __MODULE__)
   end
 
   def init(%State{} = state) do
@@ -25,76 +29,101 @@ defmodule EventStore.AdvisoryLocks do
   @doc """
   Attempt to obtain an advisory lock.
 
-  Returns `:ok` on success, or `{:error, :lock_already_taken}` if the lock
-  cannot be acquired immediately.
+     - `key` - an application specific integer to acquire a lock on.
+     - `opts` an optional keyword list:
+        - `lock_released` - a 0-arity function called when the lock is released
+          (usually due to a lost database connection).
+        - `lock_reacquired` - a 0-arity function called when the lock has been
+          successfully reacquired.
+
+  Returns `:ok` when lock successfully acquired, or
+  `{:error, :lock_already_taken}` if the lock cannot be acquired immediately.
+
   """
-  @spec try_advisory_lock(conn :: pid, key :: non_neg_integer()) ::
+  @spec try_advisory_lock(key :: non_neg_integer(), opts :: []) ::
           :ok | {:error, :lock_already_taken} | {:error, term}
-  def try_advisory_lock(conn, key) when is_integer(key) do
-    case Lock.try_acquire_exclusive_lock(conn, key) do
+  def try_advisory_lock(key, opts \\ []) when is_integer(key) do
+    GenServer.call(__MODULE__, {:try_advisory_lock, key, self(), opts})
+  end
+
+  def disconnect do
+    GenServer.cast(__MODULE__, :disconnect)
+  end
+
+  def reconnect do
+    GenServer.cast(__MODULE__, :reconnect)
+  end
+
+  def handle_call({:try_advisory_lock, key, pid, opts}, _from, %State{} = state) do
+    %State{conn: conn} = state
+
+    case Storage.Lock.try_acquire_exclusive_lock(conn, key) do
       :ok ->
-        GenServer.cast(__MODULE__, {:monitor_lock, conn, key, self()})
+        {:reply, :ok, monitor_lock(key, pid, opts, state)}
 
       reply ->
-        reply
+        {:reply, reply, state}
     end
   end
 
-  @doc false
-  # Monitor the connection process and the locking process to release any
-  # acquired advisory locks when the process terminates
-  def handle_cast({:monitor_lock, conn, key, pid}, %State{locks: locks} = state) do
-    locks =
-      case Map.get(locks, conn, []) do
-        [] ->
-          Process.monitor(conn)
+  def handle_cast(:disconnect, %State{locks: locks} = state) do
+    for {_ref, %Lock{opts: opts}} <- locks do
+      :ok = notify(:lock_released, opts)
+    end
 
-          Map.put(locks, conn, [{pid, key, Process.monitor(pid)}])
-
-        keys ->
-          ref =
-            case Enum.find(keys, fn {lock_pid, _key, _ref} -> lock_pid == pid end) do
-              nil -> Process.monitor(pid)
-              {_pid, _key, ref} -> ref
-            end
-
-          Map.put(locks, conn, [{pid, key, ref} | keys])
-      end
-
-    {:noreply, %State{state | locks: locks}}
+    {:noreply, %State{state | state: :disconnected}}
   end
 
-  @doc false
-  def handle_info({:DOWN, _ref, :process, pid, _reason}, %State{locks: locks} = state) do
-    locks =
-      case Map.has_key?(locks, pid) do
-        true ->
-          # connection has terminated, any locks will be released by Postgres
+  def handle_cast(:reconnect, %State{} = state) do
+    %State{conn: conn, locks: locks} = state
 
-          for {_pid, _key, ref} <- Map.get(locks, pid) do
-            Process.demonitor(ref)
-          end
+    for {_ref, %Lock{key: key, opts: opts}} <- locks do
+      with :ok <- Storage.Lock.try_acquire_exclusive_lock(conn, key),
+           :ok <- notify(:lock_reacquired, opts) do
+        :ok
+      else
+        {:error, :lock_already_taken} -> :ok
+      end
+    end
 
-          Map.delete(locks, pid)
+    {:noreply, %State{state | state: :connected}}
+  end
 
-        false ->
-          Enum.reduce(locks, %{}, fn {conn, keys}, locks ->
-            keys =
-              Enum.reduce(keys, [], fn
-                {^pid, key, _ref}, keys ->
-                  # release lock when locking process terminates
-                  :ok = Lock.unlock(conn, key)
+  defp notify(notification, opts) do
+    case Keyword.get(opts, notification) do
+      fun when is_function(fun, 0) ->
+        apply(fun, [])
 
-                  keys
+      _ ->
+        :ok
+    end
+  end
 
-                pair, keys ->
-                  [pair | keys]
-              end)
+  defp monitor_lock(key, pid, opts, %State{locks: locks} = state) do
+    ref = Process.monitor(pid)
 
-            Map.put(locks, conn, keys)
-          end)
+    %State{state | locks: Map.put(locks, ref, %Lock{key: key, opts: opts})}
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, %State{locks: locks} = state) do
+    state =
+      case Map.get(locks, ref) do
+        nil ->
+          state
+
+        %Lock{key: key} ->
+          :ok = release_lock(key, state)
+
+          %State{state | locks: Map.delete(locks, ref)}
       end
 
-    {:noreply, %State{state | locks: locks}}
+    {:noreply, state}
+  end
+
+  defp release_lock(key, %State{conn: conn, state: state}) do
+    case state do
+      :connected -> Storage.Lock.unlock(conn, key)
+      _ -> :ok
+    end
   end
 end

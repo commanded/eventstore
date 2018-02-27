@@ -124,22 +124,11 @@ defmodule EventStore.Config do
           :pool_overflow
         ]
     )
+    |> Keyword.put(:backoff_type, :exp)
     |> Keyword.put(:name, EventStore.Postgrex)
   end
 
-  def listener_postgrex_opts(config) do
-    sync_connect_postgrex_opts(config)
-  end
-
-  def reader_postgrex_opts(config) do
-    sync_connect_postgrex_opts(config)
-  end
-
-  def subscription_postgrex_opts(config) do
-    sync_connect_postgrex_opts(config)
-  end
-
-  defp sync_connect_postgrex_opts(config) do
+  def sync_connect_postgrex_opts(config) do
     config
     |> default_postgrex_opts()
     |> Keyword.put(:backoff_type, :stop)

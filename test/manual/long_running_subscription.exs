@@ -18,7 +18,7 @@ defmodule LoggingSubscriber do
     {:ok, subscribe_to_stream(stream_uuid)}
   end
 
-  def handle_info({:subscribed, subscription} = message, subscription) do
+  def handle_info({:subscribed, subscription}, subscription) do
     Logger.debug(fn -> "Subscribed to stream" end)
 
     {:noreply, subscription}
@@ -75,6 +75,6 @@ end
 
 stream_uuid = UUID.uuid4()
 
-{:ok, subscriber1} = LoggingSubscriber.start_link("$all")
-{:ok, subscriber2} = LoggingSubscriber.start_link(stream_uuid)
-{:ok, appender} = IntervalAppender.start_link(stream_uuid)
+{:ok, _subscriber1} = LoggingSubscriber.start_link("$all")
+{:ok, _subscriber2} = LoggingSubscriber.start_link(stream_uuid)
+{:ok, _appender} = IntervalAppender.start_link(stream_uuid)
