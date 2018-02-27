@@ -16,19 +16,19 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   #
 
   defstate initial do
-    defevent subscribe(conn, stream_uuid, subscription_name, subscriber, opts),
-      data: %SubscriptionState{} do
+    defevent subscribe(conn, stream_uuid, subscription_name, subscriber, opts) do
       data = %SubscriptionState{
         conn: conn,
         stream_uuid: stream_uuid,
         subscription_name: subscription_name,
         subscriber: subscriber,
+        start_from: Keyword.get(opts, :start_from),
         mapper: opts[:mapper],
         max_size: opts[:max_size] || @max_buffer_size
       }
 
-      with {:ok, subscription} <- create_subscription(data, opts),
-           :ok <- try_acquire_exclusive_lock(conn, subscription) do
+      with {:ok, subscription} <- create_subscription(data),
+           :ok <- try_acquire_exclusive_lock(subscription) do
         last_ack = subscription.last_seen || 0
 
         data = %SubscriptionState{
@@ -210,6 +210,32 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
   end
 
+  defstate disconnected do
+    # reconnect to subscription after lock reacquired
+    defevent reconnect, data: %SubscriptionState{} = data do
+      with {:ok, subscription} <- create_subscription(data) do
+        %Storage.Subscription{
+          subscription_id: subscription_id,
+          last_seen: last_seen
+        } = subscription
+
+        last_ack = last_seen || 0
+
+        data = %SubscriptionState{
+          data
+          | subscription_id: subscription_id,
+            last_seen: last_ack,
+            last_ack: last_ack
+        }
+
+        next_state(:request_catch_up, data)
+      else
+        _ ->
+          next_state(:disconnected, data)
+      end
+    end
+  end
+
   defstate unsubscribed do
     defevent ack(_ack), data: %SubscriptionState{} = data do
       next_state(:unsubscribed, data)
@@ -246,27 +272,44 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defevent disconnect, data: %SubscriptionState{} = data do
-    next_state(:initial, data)
+    next_state(:disconnected, terminate_catch_up(data))
   end
 
   defevent unsubscribe, data: %SubscriptionState{} = data do
     next_state(:unsubscribed, unsubscribe_from_stream(data))
   end
 
-  defp create_subscription(%SubscriptionState{} = data, opts) do
+  defp create_subscription(%SubscriptionState{} = data) do
     %SubscriptionState{
       conn: conn,
+      start_from: start_from,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name
     } = data
 
-    start_from = Keyword.get(opts, :start_from)
-
-    Storage.Subscription.subscribe_to_stream(conn, stream_uuid, subscription_name, start_from)
+    Storage.Subscription.subscribe_to_stream(
+      conn,
+      stream_uuid,
+      subscription_name,
+      start_from,
+      pool: DBConnection.Poolboy
+    )
   end
 
-  defp try_acquire_exclusive_lock(conn, %Storage.Subscription{subscription_id: subscription_id}) do
-    AdvisoryLocks.try_advisory_lock(conn, subscription_id)
+  defp try_acquire_exclusive_lock(%Storage.Subscription{subscription_id: subscription_id}) do
+    subscription = self()
+
+    AdvisoryLocks.try_advisory_lock(
+      subscription_id,
+      lock_released: fn ->
+        # disconnect subscription when lock is released (e.g. database connection down)
+        Subscription.disconnect(subscription)
+      end,
+      lock_reacquired: fn ->
+        # reconnect subscription when lock reacquired
+        Subscription.reconnect(subscription)
+      end
+    )
   end
 
   defp unsubscribe_from_stream(%SubscriptionState{} = data) do
@@ -278,7 +321,12 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
     data = terminate_catch_up(data)
 
-    Storage.Subscription.unsubscribe_from_stream(conn, stream_uuid, subscription_name)
+    Storage.Subscription.unsubscribe_from_stream(
+      conn,
+      stream_uuid,
+      subscription_name,
+      pool: DBConnection.Poolboy
+    )
 
     data
   end
@@ -347,7 +395,13 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defp unseen_event_stream(conn, stream_uuid, last_seen, read_batch_size) do
-    EventStore.Streams.Stream.stream_forward(conn, stream_uuid, last_seen + 1, read_batch_size)
+    EventStore.Streams.Stream.stream_forward(
+      conn,
+      stream_uuid,
+      last_seen + 1,
+      read_batch_size,
+      pool: DBConnection.Poolboy
+    )
   end
 
   # wait until the subscriber ack's the last sent event
@@ -358,17 +412,18 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   # wait until the subscriber ack's the `event_number`
-  defp wait_for_ack(ack) do
+  defp wait_for_ack(ack) when is_integer(ack) do
     receive do
       {:ack, ^ack} ->
         :ok
 
-      {:ack, received_ack} when received_ack < ack ->
+      {:ack, _received_ack} ->
         # loop until expected ack received
         wait_for_ack(ack)
 
       message ->
-        raise RuntimeError, message: "Unexpected ack received: #{inspect(message)}, but expected: #{inspect ack}"
+        raise RuntimeError,
+          message: "Unexpected ack received: #{inspect(message)}, but expected: #{inspect(ack)}"
     end
   end
 
@@ -426,7 +481,14 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       subscription_name: subscription_name
     } = data
 
-    :ok = Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, ack)
+    :ok =
+      Storage.Subscription.ack_last_seen_event(
+        conn,
+        stream_uuid,
+        subscription_name,
+        ack,
+        pool: DBConnection.Poolboy
+      )
 
     %SubscriptionState{data | last_ack: ack}
   end

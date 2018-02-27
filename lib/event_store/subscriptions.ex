@@ -1,17 +1,9 @@
 defmodule EventStore.Subscriptions do
   @moduledoc false
 
-  use Supervisor
-
-  require Logger
-
-  alias EventStore.{Config, MonitoredServer, Subscriptions}
+  alias EventStore.Subscriptions
 
   @all_stream "$all"
-
-  def start_link(config) do
-    Supervisor.start_link(__MODULE__, config)
-  end
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
 
@@ -31,25 +23,6 @@ defmodule EventStore.Subscriptions do
 
   def unsubscribe_from_all_streams(subscription_name) do
     do_unsubscribe_from_stream(@all_stream, subscription_name)
-  end
-
-  def init(config) do
-    subscription_postgrex_config = Config.subscription_postgrex_opts(config)
-
-    children = [
-      {EventStore.AdvisoryLocks, []},
-      MonitoredServer.child_spec([
-        {Postgrex, :start_link, [subscription_postgrex_config]},
-        [
-          after_restart: &Subscriptions.Supervisor.reconnect/0,
-          after_exit: &Subscriptions.Supervisor.disconnect/0,
-          name: EventStore.Subscriptions.Postgrex
-        ]
-      ]),
-      {EventStore.Subscriptions.Supervisor, [EventStore.Subscriptions.Postgrex]}
-    ]
-
-    Supervisor.init(children, strategy: :one_for_all)
   end
 
   defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do

@@ -3,26 +3,40 @@ defmodule EventStore.Supervisor do
 
   use Supervisor
 
-  alias EventStore.{Config, Registration}
+  alias EventStore.{
+    AdvisoryLocks,
+    Config,
+    MonitoredServer,
+    Notifications,
+    Registration,
+    Subscriptions
+  }
 
   def start_link(args) do
     Supervisor.start_link(__MODULE__, args)
   end
 
   def init(config) do
-    postgrex_opts = Config.postgrex_opts(config)
-
     children =
       [
-        {Postgrex, postgrex_opts},
+        {Postgrex, Config.postgrex_opts(config)},
+        MonitoredServer.child_spec([
+          {Postgrex, :start_link, [Config.sync_connect_postgrex_opts(config)]},
+          [
+            after_exit: &AdvisoryLocks.disconnect/0,
+            after_restart: &AdvisoryLocks.reconnect/0,
+            name: AdvisoryLocks.Postgrex
+          ]
+        ]),
+        {AdvisoryLocks, AdvisoryLocks.Postgrex},
+        {Subscriptions.Supervisor, [EventStore.Postgrex]},
         Supervisor.child_spec(
-          {Registry, keys: :unique, name: EventStore.Subscriptions.Subscription},
-          id: EventStore.Subscriptions.Subscription
+          {Registry, keys: :unique, name: Subscriptions.Subscription},
+          id: Subscriptions.Subscription
         ),
-        {EventStore.Subscriptions, config},
-        {EventStore.Notifications.Supervisor, config}
+        {Notifications.Supervisor, config}
       ] ++ Registration.child_spec()
 
-    Supervisor.init(children, strategy: :one_for_one)
+    Supervisor.init(children, strategy: :one_for_all)
   end
 end

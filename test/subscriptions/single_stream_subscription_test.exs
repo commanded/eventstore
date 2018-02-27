@@ -1,23 +1,15 @@
 defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config,EventFactory,ProcessHelper,RecordedEvent}
-  alias EventStore.Storage.{Appender,CreateStream}
+  alias EventStore.{EventFactory, RecordedEvent}
+  alias EventStore.Storage.{Appender, CreateStream}
   alias EventStore.Subscriptions.SubscriptionFsm
 
+  @conn EventStore.Postgrex
   @subscription_name "test_subscription"
 
   setup do
-    config = Config.parsed() |> Config.default_postgrex_opts()
-
-    {:ok, conn} = Postgrex.start_link(config)
-
-    on_exit fn ->
-      ProcessHelper.shutdown(conn)
-    end
-
     [
-      subscription_conn: conn,
       stream_uuid: UUID.uuid4()
     ]
   end
@@ -198,11 +190,11 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)
   end
 
-  defp create_stream(%{conn: conn, stream_uuid: stream_uuid}) do
-    {:ok, stream_id} = CreateStream.execute(conn, stream_uuid)
+  defp create_stream(%{stream_uuid: stream_uuid}) do
+    {:ok, stream_id} = CreateStream.execute(@conn, stream_uuid, pool: DBConnection.Poolboy)
 
     recorded_events = EventFactory.create_recorded_events(3, stream_uuid, 1)
-    :ok = Appender.append(conn, stream_id, recorded_events)
+    :ok = Appender.append(@conn, stream_id, recorded_events, pool: DBConnection.Poolboy)
 
     [
       recorded_events: recorded_events,
@@ -272,9 +264,9 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
    refute_receive {:events, _received_events}
   end
 
-  defp create_subscription(%{subscription_conn: conn, stream_uuid: stream_uuid}, opts \\ []) do
+  defp create_subscription(%{stream_uuid: stream_uuid}, opts \\ []) do
     SubscriptionFsm.new()
-    |> SubscriptionFsm.subscribe(conn, stream_uuid, @subscription_name, self(), opts)
+    |> SubscriptionFsm.subscribe(@conn, stream_uuid, @subscription_name, self(), opts)
   end
 
   def ack(subscription, events) when is_list(events) do

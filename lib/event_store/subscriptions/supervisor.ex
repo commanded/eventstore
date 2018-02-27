@@ -36,18 +36,6 @@ defmodule EventStore.Subscriptions.Supervisor do
     end
   end
 
-  def reconnect do
-    for {_id, subscription, _type, _modules} <- Supervisor.which_children(__MODULE__) do
-      Subscription.reconnect(subscription)
-    end
-  end
-
-  def disconnect do
-    for {_id, subscription, _type, _modules} <- Supervisor.which_children(__MODULE__) do
-      Subscription.disconnect(subscription)
-    end
-  end
-
   def init(args) do
     children = [
       worker(Subscription, args, restart: :temporary)

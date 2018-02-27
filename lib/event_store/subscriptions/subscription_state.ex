@@ -4,6 +4,7 @@ defmodule EventStore.Subscriptions.SubscriptionState do
   defstruct conn: nil,
             catch_up_pid: nil,
             stream_uuid: nil,
+            start_from: nil,
             subscription_name: nil,
             subscriber: nil,
             subscription_id: nil,

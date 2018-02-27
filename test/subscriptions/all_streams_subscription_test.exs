@@ -1,27 +1,13 @@
 defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config,EventFactory,ProcessHelper,RecordedEvent}
+  alias EventStore.{EventFactory,ProcessHelper,RecordedEvent}
   alias EventStore.Storage.{Appender,CreateStream}
   alias EventStore.Subscriptions.SubscriptionFsm
 
+  @conn EventStore.Postgrex
   @all_stream "$all"
   @subscription_name "test_subscription"
-
-  setup do
-    config = Config.parsed() |> Config.default_postgrex_opts()
-
-    {:ok, conn} = Postgrex.start_link(config)
-
-    on_exit fn ->
-      ProcessHelper.shutdown(conn)
-    end
-
-    [
-      postgrex_config: config,
-      subscription_conn: conn
-    ]
-  end
 
   describe "subscribe to all streams" do
     test "create subscription to all streams", context do
@@ -335,46 +321,43 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   end
 
   describe "duplicate subscriptions" do
-    setup [:create_second_connection, :create_two_duplicate_subscriptions]
+    setup [:lock_subscription]
 
-    test "should only allow one subscriber", %{subscription1: subscription1, subscription2: subscription2} do
-      assert subscription1.state == :subscribe_to_events
-      assert subscription2.state == :initial
+    test "should only allow one subscriber", context do
+      subscription = create_subscription(context)
+      assert subscription.state == :initial
     end
 
-    test "should allow second subscriber to takeover when first connection terminates", %{subscription_conn: conn, subscription_conn2: conn2, subscription2: subscription2} do
-      # attempt to resubscribe should fail
-      subscription2 = SubscriptionFsm.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
-      assert subscription2.state == :initial
+    test "should allow second subscriber to takeover when first connection terminates", context do
+      %{conn2: conn2} = context
 
-      # stop subscription1 connection
-      ProcessHelper.shutdown(conn)
+      subscription = create_subscription(context)
+      assert subscription.state == :initial
+
+      # attempt to resubscribe should fail
+      subscription = SubscriptionFsm.subscribe(subscription, @conn, @all_stream, @subscription_name, self(), [])
+      assert subscription.state == :initial
+
+      # stop connection holding lock to release it
+      ProcessHelper.shutdown(conn2)
 
       # attempt to resubscribe should now succeed
-      subscription2 = SubscriptionFsm.subscribe(subscription2, conn2, @all_stream, @subscription_name, self(), [])
-      assert subscription2.state == :subscribe_to_events
+      subscription = SubscriptionFsm.subscribe(subscription, @conn, @all_stream, @subscription_name, self(), [])
+      assert subscription.state == :subscribe_to_events
     end
 
-    defp create_second_connection(%{postgrex_config: config}) do
+    defp lock_subscription(_context) do
+      config = EventStore.Config.parsed() |> EventStore.Config.sync_connect_postgrex_opts()
+
       {:ok, conn} = Postgrex.start_link(config)
+
+      EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1)
 
       on_exit fn ->
         ProcessHelper.shutdown(conn)
       end
 
-      [subscription_conn2: conn]
-    end
-
-    # Create two identically named subscriptions to the same stream, but using
-    # different database connections
-    defp create_two_duplicate_subscriptions(%{subscription_conn: conn1, subscription_conn2: conn2}) do
-      subscription1 = create_subscription(%{subscription_conn: conn1})
-      subscription2 = create_subscription(%{subscription_conn: conn2})
-
-      [
-        subscription1: subscription1,
-        subscription2: subscription2,
-      ]
+      [conn2: conn]
     end
   end
 
@@ -388,9 +371,9 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     [recorded_events: recorded_events]
   end
 
-  defp create_subscription(%{subscription_conn: conn}, opts \\ []) do
+  defp create_subscription(_context, opts \\ []) do
     SubscriptionFsm.new()
-    |> SubscriptionFsm.subscribe(conn, @all_stream, @subscription_name, self(), opts)
+    |> SubscriptionFsm.subscribe(@conn, @all_stream, @subscription_name, self(), opts)
   end
 
   defp ack_refute_receive(subscription, ack, expected_last_ack) do
