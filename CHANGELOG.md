@@ -17,6 +17,20 @@
 - Transient subscriptions ([#105](https://github.com/commanded/eventstore/pull/105)).
 - Transient subscription event mapping function ([#108](https://github.com/commanded/eventstore/pull/108)).
 
+### Upgrading
+
+Upgrade your existing EventStore database by running:
+
+```console
+mix event_store.migrate
+```
+
+Or you can drop and recreate the EventStore database by running:
+
+```console
+mix do event_store.drop, event_store.create, event_store.init
+```
+
 ## v0.13.2
 
 ### Bug fixes
