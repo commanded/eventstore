@@ -27,7 +27,7 @@ Subscribe to events appended to a *single* stream:
 # receive first batch of events
 receive do
   {:events, events} ->
-    IO.puts "Received events: " <> inspect(events)
+    IO.puts("Received events: " <> inspect(events))
 end
 ```
 
@@ -43,7 +43,7 @@ end)
 # receive first batch of mapped event data
 receive do
   {:events, event_data} ->
-    IO.puts "Received event data: " <> inspect(event_data)
+    IO.puts("Received event data: " <> inspect(event_data))
 end
 ```
 
@@ -99,7 +99,7 @@ Subscribe to events appended to all streams:
 # wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
-    IO.puts "Successfully subscribed to all streams"
+    IO.puts("Successfully subscribed to all streams")
 end
 
 receive do
@@ -128,7 +128,7 @@ stream_uuid = UUID.uuid4()
 # wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
-    IO.puts "Successfully subscribed to single stream"
+    IO.puts("Successfully subscribed to single stream")
 end
 
 receive do
@@ -176,7 +176,7 @@ end
 # wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
-    IO.puts "Successfully subscribed to all streams"
+    IO.puts("Successfully subscribed to all streams")
 end
 
 receive do

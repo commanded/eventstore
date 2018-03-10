@@ -19,8 +19,7 @@ PostgreSQL's [advisory locks](https://www.postgresql.org/docs/current/static/exp
 1. Configure the EventStore to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
 
       ```elixir
-      config :eventstore,
-        registry: :distributed
+      config :eventstore, registry: :distributed
       ```
 
 ## Automatic cluster formation
@@ -158,11 +157,14 @@ recorded_events = EventStore.stream_all_forward() |> Enum.to_list()
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example-subscription", self(), start_from: :origin)
 
 receive do
-  {:events, events} ->
-    IO.puts "Received events: #{inspect events}"
-    EventStore.ack(subscription, events)
+  {:subscribed, ^subscription} ->
+    IO.puts("Successfully subscribed to all streams")
+end
 
-  reply ->
-    IO.puts reply
+receive do
+  {:events, events} ->
+    IO.puts("Received events: #{inspect(events)}")
+
+    EventStore.ack(subscription, events)
 end
 ```

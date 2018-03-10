@@ -51,3 +51,26 @@ $ mix do event_store.drop, event_store.create, event_store.init
 ```
 
 *Warning* this will delete all EventStore data.
+
+## Event data and metadata data type
+
+EventStore has support for persisting event data and metadata as either:
+
+  - Binary data, using the [`bytea` data type](https://www.postgresql.org/docs/current/static/datatype-binary.html), designed for storing binary strings.
+  - JSON data, using the [`jsonb` data type](https://www.postgresql.org/docs/current/static/datatype-json.html), specifically designed for storing JSON encoded data.
+
+The default data type is `bytea`. This can be used with any binary serializer, such as the Erlang Term format, JSON data encoded to binary, and other serialization formats.
+
+### Using the `jsonb` data type
+
+The advantage of using this format is that it allows you to execute ad-hoc SQL queries against the event data or metadata.
+
+If you want to use PostgreSQL's native JSON support you need to configure EventStore to use the `jsonb` data type. You must also use the `EventStore.JsonbSerializer` serializer to ensure event data and metadata is correctly serialized to JSON.
+
+```elixir
+# config/config.exs
+config :eventstore, column_data_type: "jsonb"
+config :eventstore, EventStore.Storage, serializer: EventStore.JsonbSerializer
+```
+
+These settings must be configured *before* creating the EventStore database. It's not possible to migrate between `bytea` and `jsonb` data types once you've created the database. This must be decided in advance.

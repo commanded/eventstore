@@ -17,6 +17,9 @@ MIT License
 ### Overview
 
 - [Getting started](guides/Getting%20Started.md)
+  - [Initialize an existing database](guides/Getting%20Started.md#initialize-an-existing-database)
+  - [Reset an existing database](guides/Getting%20Started.md#reset-an-existing-database)
+  - [Event data and metadata data type](guides/Getting%20Started.md#event-data-and-metadata-data-type)
 - [Using the EventStore](guides/Usage.md)
   - [Writing to a stream](guides/Usage.md#writing-to-a-stream)
   - [Reading from a stream](guides/Usage.md#reading-from-a-stream)
@@ -75,14 +78,14 @@ Subscribe to events appended to all streams:
 # wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
-    IO.puts "Successfully subscribed to all streams"
+    IO.puts("Successfully subscribed to all streams")
 end
 
 receive_loop = fn loop ->
   # receive a batch of events appended to the event store
   receive do
     {:events, events} ->
-      IO.puts "Received events: #{inspect events}"
+      IO.puts("Received events: #{inspect events}")
 
       # ack successful receipt of events
       EventStore.ack(subscription, events)

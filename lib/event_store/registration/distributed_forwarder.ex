@@ -12,7 +12,7 @@ defmodule EventStore.Registration.DistributedForwarder do
   """
   def broadcast(topic, message) do
     for node <- Node.list() do
-      send({__MODULE__, node}, {topic, message})
+      Process.send({__MODULE__, node}, {:broadcast, topic, message}, [:noconnect])
     end
 
     :ok
@@ -22,7 +22,7 @@ defmodule EventStore.Registration.DistributedForwarder do
     {:ok, []}
   end
 
-  def handle_info({topic, message}, state) do
+  def handle_info({:broadcast, topic, message}, state) do
     LocalRegistry.broadcast(topic, message)
 
     {:noreply, state}
