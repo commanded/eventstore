@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## 0.14.0-rc.0
 
 - Add JSONB support ([#86](https://github.com/commanded/eventstore/pull/86)).
 - Add `:ssl` and `:ssl_opts` config params ([#88](https://github.com/commanded/eventstore/pull/88)).
@@ -25,7 +25,7 @@ Upgrade your existing EventStore database by running:
 mix event_store.migrate
 ```
 
-Or you can drop and recreate the EventStore database by running:
+You can drop and recreate an EventStore database by running:
 
 ```console
 mix do event_store.drop, event_store.create, event_store.init

@@ -8,10 +8,12 @@ defmodule EventStore.AdvisoryLocks do
   use GenServer
 
   defmodule State do
+    @moduledoc false
     defstruct conn: nil, state: :connected, locks: %{}
   end
 
   defmodule Lock do
+    @moduledoc false
     defstruct key: nil, opts: nil
   end
 

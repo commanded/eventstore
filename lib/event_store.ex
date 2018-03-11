@@ -526,6 +526,11 @@ defmodule EventStore do
     Snapshotter.delete_snapshot(@conn, source_uuid, opts())
   end
 
+  @doc """
+  Get the event store configuration for the environment.
+  """
+  def configuration, do: EventStore.Config.get()
+
   @default_opts [pool: DBConnection.Poolboy]
 
   defp opts(timeout \\ nil) do

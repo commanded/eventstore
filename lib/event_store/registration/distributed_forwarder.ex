@@ -1,4 +1,6 @@
 defmodule EventStore.Registration.DistributedForwarder do
+  @moduledoc false
+
   use GenServer
 
   alias EventStore.Registration.LocalRegistry

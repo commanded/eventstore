@@ -13,6 +13,8 @@ defmodule EventStore.MonitoredServer do
   alias DBConnection.Backoff
 
   defmodule State do
+    @moduledoc false
+
     defstruct [:mfa, :after_exit, :after_restart, :backoff, :pid, :shutdown, :queue]
   end
 
