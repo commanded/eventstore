@@ -17,7 +17,7 @@ defmodule EventStore.Subscriber do
     {:ok, %{receiver: receiver, events: []}}
   end
 
-  def handle_info({:subscribed, subscription} = message, %{receiver: receiver} = state) do
+  def handle_info({:subscribed, _subscription} = message, %{receiver: receiver} = state) do
     # send message to receiving process
     send(receiver, message)
 
