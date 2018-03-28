@@ -6,7 +6,10 @@ Requires Elixir v1.5 and PostgreSQL v9.5 or newer.
 
 EventStore supports [running on a cluster of nodes](guides/Cluster.md).
 
-[Changelog](CHANGELOG.md)
+- [Changelog](CHANGELOG.md)
+- [Wiki](https://github.com/commanded/eventstore/wiki)
+- [Frequently asked questions](https://github.com/commanded/eventstore/wiki/FAQ)
+- [Getting help](https://github.com/commanded/eventstore/wiki/Getting-help)
 
 MIT License
 
