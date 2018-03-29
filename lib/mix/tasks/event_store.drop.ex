@@ -11,7 +11,6 @@ defmodule Mix.Tasks.EventStore.Drop do
   use Mix.Task
 
   alias EventStore.Config
-  alias EventStore.Storage.Database
 
   @shortdoc "Drop the database for the EventStore"
 
@@ -19,20 +18,13 @@ defmodule Mix.Tasks.EventStore.Drop do
   def run(_args) do
     config = Config.parsed()
 
-    if skip_safety_warnings?() or Mix.shell.yes?("Are you sure you want to drop the EventStore database?") do
-      drop_database(config)
+    if skip_safety_warnings?() or
+         Mix.shell().yes?("Are you sure you want to drop the EventStore database?") do
+      EventStore.Tasks.Drop.exec(config, is_mix: true)
     end
   end
 
   defp skip_safety_warnings? do
-    Mix.Project.config[:start_permanent] != true
-  end
-
-  defp drop_database(config) do
-    case Database.drop(config) do
-      :ok -> Mix.shell.info "The EventStore database has been dropped."
-      {:error, :already_down} -> Mix.shell.info "The EventStore database has already been dropped."
-      {:error, term} -> Mix.raise "The EventStore database couldn't be dropped, reason given: #{inspect term}."
-    end
+    Mix.Project.config()[:start_permanent] != true
   end
 end
