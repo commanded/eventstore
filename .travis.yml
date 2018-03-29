@@ -12,7 +12,6 @@ services:
 before_script:
   - MIX_ENV=test mix event_store.setup
   - MIX_ENV=jsonb mix event_store.setup
-  - epmd -daemon
 
 script:
   - mix test.all

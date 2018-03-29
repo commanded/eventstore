@@ -180,6 +180,7 @@ You should include unit tests to cover any changes.
 
 - [Andrey Akulov](https://github.com/astery)
 - [Ben Smith](https://github.com/slashdotdash)
+- [Chris Brodt](https://github.com/uberbrodt)
 - [Craig Savolainen](https://github.com/maedhr)
 - [David Soff](https://github.com/Davidsoff)
 - [Dominik Guzei](https://github.com/DominikGuzei)

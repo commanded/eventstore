@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+- Turn EventStore `mix` tasks into generic tasks for use with Distillery during deployment ([#111](https://github.com/commanded/eventstore/pull/111)).
+
 ## 0.14.0-rc.0
 
 - Add JSONB support ([#86](https://github.com/commanded/eventstore/pull/86)).
