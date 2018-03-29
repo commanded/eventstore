@@ -15,7 +15,7 @@ defmodule Mix.Tasks.EventStore.Create do
   use Mix.Task
 
   alias EventStore.Config
-  alias EventStore.Storage.Database
+  alias EventStore.Tasks.Create
 
   @shortdoc "Create the database for the EventStore"
 
@@ -26,25 +26,8 @@ defmodule Mix.Tasks.EventStore.Create do
     config = Config.parsed()
     {opts, _, _} = OptionParser.parse(args, switches: [quiet: :boolean])
 
-    create_database(config, opts)
+    Create.exec(config, Keyword.put(opts, :is_mix, true))
 
-    Mix.Task.reenable "event_store.create"
-  end
-
-  defp create_database(config, opts) do
-    case Database.create(config) do
-      :ok ->
-        unless opts[:quiet] do
-          Mix.shell.info "The EventStore database has been created."
-        end
-
-      {:error, :already_up} ->
-        unless opts[:quiet] do
-          Mix.shell.info "The EventStore database already exists."
-        end
-
-      {:error, term} ->
-        Mix.raise "The EventStore database couldn't be created, reason given: #{inspect term}."
-    end
+    Mix.Task.reenable("event_store.create")
   end
 end
