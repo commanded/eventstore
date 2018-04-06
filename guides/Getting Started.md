@@ -65,12 +65,14 @@ The default data type is `bytea`. This can be used with any binary serializer, s
 
 The advantage of using this format is that it allows you to execute ad-hoc SQL queries against the event data or metadata.
 
-If you want to use PostgreSQL's native JSON support you need to configure EventStore to use the `jsonb` data type. You must also use the `EventStore.JsonbSerializer` serializer to ensure event data and metadata is correctly serialized to JSON.
+If you want to use PostgreSQL's native JSON support you need to configure EventStore to use the `jsonb` data type. You must also use the `EventStore.JsonbSerializer` serializer to ensure event data and metadata is correctly serialized to JSON and include the Postgres types module (`EventStore.PostgresTypes`) for the Postgrex library to support JSON.
 
 ```elixir
 # config/config.exs
 config :eventstore, column_data_type: "jsonb"
-config :eventstore, EventStore.Storage, serializer: EventStore.JsonbSerializer
+config :eventstore, EventStore.Storage,
+  serializer: EventStore.JsonbSerializer,
+  types: EventStore.PostgresTypes
 ```
 
 These settings must be configured *before* creating the EventStore database. It's not possible to migrate between `bytea` and `jsonb` data types once you've created the database. This must be decided in advance.
