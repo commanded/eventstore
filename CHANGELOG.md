@@ -1,10 +1,6 @@
 # Changelog
 
-## Next release
-
-- Turn EventStore `mix` tasks into generic tasks for use with Distillery during deployment ([#111](https://github.com/commanded/eventstore/pull/111)).
-
-## 0.14.0-rc.0
+## 0.14.0
 
 - Add JSONB support ([#86](https://github.com/commanded/eventstore/pull/86)).
 - Add `:ssl` and `:ssl_opts` config params ([#88](https://github.com/commanded/eventstore/pull/88)).
@@ -20,6 +16,7 @@
 - Subscription notification message once successfully subscribed ([#104](https://github.com/commanded/eventstore/pull/104)).
 - Transient subscriptions ([#105](https://github.com/commanded/eventstore/pull/105)).
 - Transient subscription event mapping function ([#108](https://github.com/commanded/eventstore/pull/108)).
+- Turn EventStore `mix` tasks into generic tasks for use with Distillery during deployment ([#111](https://github.com/commanded/eventstore/pull/111)).
 
 ### Upgrading
 

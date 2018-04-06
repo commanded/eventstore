@@ -1,7 +1,7 @@
 defmodule EventStore.Mixfile do
   use Mix.Project
 
-  @version "0.14.0-rc.0"
+  @version "0.14.0"
 
   def project do
     [
@@ -43,18 +43,20 @@ defmodule EventStore.Mixfile do
 
   defp deps do
     [
-      {:benchfella, "~> 0.3", only: :bench},
-      {:credo, "~> 0.8", only: [:dev, :test]},
-      {:dialyxir, "~> 0.5", only: :dev},
-      {:ex_doc, "~> 0.18", only: :dev},
       {:fsm, "~> 0.3"},
       {:gen_stage, "~> 0.13"},
-      {:markdown, github: "devinus/markdown", only: :dev},
-      {:mix_test_watch, "~> 0.5", only: :dev},
-      {:poison, "~> 2.2 or ~> 3.0", optional: true},
       {:poolboy, "~> 1.5"},
       {:postgrex, "~> 0.13"},
       {:uuid, "~> 1.1"},
+
+      # Test & release tooling
+      {:benchfella, "~> 0.3", only: :bench},
+      {:credo, "~> 0.9", only: [:dev, :test]},
+      {:dialyxir, "~> 0.5", only: :dev},
+      {:ex_doc, "~> 0.18", only: :dev},
+      {:markdown, github: "devinus/markdown", only: :dev},
+      {:mix_test_watch, "~> 0.6", only: :dev},
+      {:poison, "~> 2.2 or ~> 3.0", optional: true}
     ]
   end
 
