@@ -43,6 +43,22 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
 
       assert subscription.data.mapper == mapper
     end
+
+    test "create subscription to a single stream with event selector function", context do
+      selector = fn event -> event.event_number > 0 end
+      subscription = create_subscription(context, selector: selector)
+
+      assert subscription.data.selector == selector 
+    end
+
+    test "create subscription to a single stream with event selector function and mapper function", context do
+      selector = fn event -> event.event_number > 0 end
+      mapper = fn event -> event.event_number end
+      subscription = create_subscription(context, selector: selector, mapper: mapper)
+
+      assert subscription.data.selector == selector 
+      assert subscription.data.mapper == mapper
+    end
   end
 
   describe "catch-up subscription on empty stream" do
