@@ -25,7 +25,11 @@ defmodule EventStore.Registration.DistributedRegistry do
   @doc """
   Subscribes the caller to the given topic.
   """
-  @spec subscribe(binary, mapper: (RecordedEvent.t() -> any())) :: :ok | {:error, term}
+  @spec subscribe(
+          binary,
+          selector: (RecodedEvent.t() -> any()),
+          mapper: (RecordedEvent.t() -> any())
+        ) :: :ok | {:error, term}
   @impl EventStore.Registration
   def subscribe(topic, opts) do
     LocalRegistry.subscribe(topic, opts)

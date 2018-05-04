@@ -24,6 +24,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         subscriber: subscriber,
         start_from: Keyword.get(opts, :start_from),
         mapper: opts[:mapper],
+        selector: opts[:selector],
         max_size: opts[:max_size] || @max_buffer_size
       }
 
@@ -462,7 +463,17 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp chunk_by(%RecordedEvent{stream_uuid: stream_uuid, correlation_id: correlation_id}),
     do: {stream_uuid, correlation_id}
 
+  defp notify_subscriber(%SubscriptionState{subscriber: subscriber, selector: selector, mapper: mapper}, events)
+      when is_function(selector) do
+    notify_subscriber(%SubscriptionState{subscriber: subscriber, mapper: mapper}, Enum.filter(events, selector))
+  end
+
   defp notify_subscriber(%SubscriptionState{}, []), do: nil
+
+  defp notify_subscriber(%SubscriptionState{subscriber: subscriber, selector: selector}, events)
+       when is_function(selector) do
+    send_to_subscriber(subscriber, Enum.map(events, selector))
+  end
 
   defp notify_subscriber(%SubscriptionState{subscriber: subscriber, mapper: mapper}, events)
        when is_function(mapper) do

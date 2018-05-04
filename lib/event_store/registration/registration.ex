@@ -29,7 +29,11 @@ defmodule EventStore.Registration do
   @doc """
   Subscribes the caller to the given topic.
   """
-  @spec subscribe(binary, mapper: (RecordedEvent.t() -> any())) :: :ok | {:error, term}
+  @spec subscribe(
+          binary,
+          selector: (RecordedEvent.t() -> any()),
+          mapper: (RecordedEvent.t() -> any())
+        ) :: :ok | {:error, term}
   def subscribe(topic, opts \\ []), do: registry_provider().subscribe(topic, opts)
 
   @doc """

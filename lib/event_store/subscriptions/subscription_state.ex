@@ -11,6 +11,7 @@ defmodule EventStore.Subscriptions.SubscriptionState do
             last_seen: 0,
             last_ack: 0,
             last_received: nil,
+            selector: nil,
             mapper: nil,
             max_size: nil,
             pending_events: []

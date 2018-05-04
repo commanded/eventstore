@@ -104,6 +104,32 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert received_mapped_events == [1, 2, 3]
     end
 
+    test "subscribe to single stream with selector function should receive all its filtered events", %{subscription_name: subscription_name} do
+      stream_uuid = UUID.uuid4
+      events = EventFactory.create_events(4)
+
+      {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), selector: fn event -> rem(event.event_number, 2) == 0 end)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      assert_receive {:events, received_filtered_events}
+      assert length(received_filtered_events) == 2
+    end
+
+
+    test "subscribe to single stream with selector function and mapper function should receive all its filtered events and mapped events", %{subscription_name: subscription_name} do
+      stream_uuid = UUID.uuid4
+      events = EventFactory.create_events(4)
+
+      selector = fn event -> rem(event.event_number, 2) == 0 end
+      mapper = fn event -> event.event_number end 
+      {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), selector: selector, mapper: mapper)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      assert_receive {:events, [2, 4]}
+    end
+
     test "subscribe to single stream should continue receiving events after ack", %{subscription_name: subscription_name} do
       stream_uuid = UUID.uuid4
       initial_events = EventFactory.create_events(1)
