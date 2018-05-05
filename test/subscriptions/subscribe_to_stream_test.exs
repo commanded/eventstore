@@ -104,7 +104,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert received_mapped_events == [1, 2, 3]
     end
 
-    test "subscribe to single stream with selector function should receive all its filtered events", %{subscription_name: subscription_name} do
+    test "subscribe to single stream with selector function should receive only filtered events", %{subscription_name: subscription_name} do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(4)
 
@@ -114,15 +114,63 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       assert_receive {:events, received_filtered_events}
       assert length(received_filtered_events) == 2
+      assert pluck(received_filtered_events, :event_number) == [2, 4]
     end
 
+    test "subscribe to single stream with selector function should continue to receive only filtered events", %{subscription_name: subscription_name} do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
 
-    test "subscribe to single stream with selector function and mapper function should receive all its filtered events and mapped events", %{subscription_name: subscription_name} do
+      {:ok, subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), selector: fn event -> rem(event.event_number, 2) == 0 end)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      assert_receive {:events, received_filtered_events}
+      assert length(received_filtered_events) == 1
+      assert pluck(received_filtered_events, :event_number) == [2]
+
+      Subscription.ack(subscription, received_filtered_events)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 3, events)
+
+      assert_receive {:events, received_filtered_events}
+      assert length(received_filtered_events) == 2
+      assert pluck(received_filtered_events, :event_number) == [4, 6]
+
+      Subscription.ack(subscription, received_filtered_events)
+
+      refute_receive {:events, _received_filtered_events}
+    end
+
+    test "subscribe to single stream with selector function during catch-up should continue to receive only filtered events", %{subscription_name: subscription_name} do
+      stream_uuid = UUID.uuid4()
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, EventFactory.create_events(3))
+      :ok = EventStore.append_to_stream(stream_uuid, 3, EventFactory.create_events(3))
+
+      {:ok, subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), selector: fn event -> rem(event.event_number, 2) == 0 end)
+
+      assert_receive {:events, received_filtered_events}
+      assert length(received_filtered_events) == 1
+      assert pluck(received_filtered_events, :event_number) == [2]
+
+      Subscription.ack(subscription, received_filtered_events)
+
+      assert_receive {:events, received_filtered_events}
+      assert length(received_filtered_events) == 2
+      assert pluck(received_filtered_events, :event_number) == [4, 6]
+
+      Subscription.ack(subscription, received_filtered_events)
+
+      refute_receive {:events, _received_filtered_events}
+    end
+
+    test "subscribe to single stream with selector function and mapper function should receive only filtered events and mapped events", %{subscription_name: subscription_name} do
       stream_uuid = UUID.uuid4
       events = EventFactory.create_events(4)
 
       selector = fn event -> rem(event.event_number, 2) == 0 end
-      mapper = fn event -> event.event_number end 
+      mapper = fn event -> event.event_number end
       {:ok, _subscription} = subscribe_to_stream(stream_uuid, subscription_name, self(), selector: selector, mapper: mapper)
 
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
@@ -176,6 +224,35 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       Subscription.ack(subscription, 2)
 
       refute_receive {:events, _received_events}
+    end
+
+    test "should catch-up from unseen events", %{subscription_name: subscription_name} do
+      stream_uuid = UUID.uuid4()
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, EventFactory.create_events(1))
+      :ok = EventStore.append_to_stream(stream_uuid, 1, EventFactory.create_events(2))
+      :ok = EventStore.append_to_stream(stream_uuid, 3, EventFactory.create_events(3))
+      :ok = EventStore.append_to_stream(stream_uuid, 6, EventFactory.create_events(4))
+
+      {:ok, subscription} = subscribe_to_stream(stream_uuid, subscription_name, self())
+
+      assert_receive_events(subscription, [1])
+      assert_receive_events(subscription, [2, 3])
+      assert_receive_events(subscription, [4, 5, 6])
+      assert_receive_events(subscription, [7, 8, 9, 10])
+
+      :ok = EventStore.append_to_stream(stream_uuid, 10, EventFactory.create_events(5))
+
+      assert_receive_events(subscription, [11, 12, 13, 14, 15])
+
+      refute_receive {:events, _received_filtered_events}
+    end
+
+    defp assert_receive_events(subscription, expected_event_numbers) do
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :event_number) == expected_event_numbers
+
+      Subscription.ack(subscription, received_events)
     end
   end
 
