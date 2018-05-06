@@ -79,11 +79,6 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc false
-  def caught_up(subscription, last_seen) do
-    GenServer.cast(subscription, {:caught_up, last_seen})
-  end
-
-  @doc false
   def unsubscribe(subscription) do
     GenServer.call(subscription, :unsubscribe)
   end
@@ -135,12 +130,6 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
-  def handle_cast({:caught_up, last_seen}, %Subscription{subscription: subscription} = state) do
-    subscription = SubscriptionFsm.caught_up(subscription, last_seen)
-
-    {:noreply, apply_subscription_to_state(subscription, state)}
-  end
-
   def handle_cast(:disconnect, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " disconnected" end)
 
@@ -182,15 +171,15 @@ defmodule EventStore.Subscriptions.Subscription do
   defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :subscribe_to_events}} = state) do
     _ = Logger.debug(fn -> describe(state) <> " subscribing to events" end)
 
-    GenServer.cast(self(), :subscribe_to_events)
+    :ok = GenServer.cast(self(), :subscribe_to_events)
 
     state
   end
 
   defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :request_catch_up}} = state) do
-    _ = Logger.debug(fn -> describe(state) <> " requesting catch-up" end)
+    _ = Logger.debug(fn -> describe(state) <> " catching-up" end)
 
-    GenServer.cast(self(), :catch_up)
+    :ok = GenServer.cast(self(), :catch_up)
 
     state
   end
@@ -240,6 +229,7 @@ defmodule EventStore.Subscriptions.Subscription do
   # notify the subscriber that this subscription has successfully subscribed to events
   defp notify_subscribed(%Subscription{subscriber: subscriber}) do
     send(subscriber, {:subscribed, self()})
+
     :ok
   end
 
