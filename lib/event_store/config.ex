@@ -22,21 +22,21 @@ defmodule EventStore.Config do
   Normalizes the application configuration.
   """
   def parse(config) do
-    {url, config} = Keyword.pop(config, :url)
-
     config
-    |> Keyword.merge(parse_url(url || ""))
+    |> Enum.reduce([], fn
+      {:url, value}, config -> Keyword.merge(config, value |> get_config_value() |> parse_url())
+      {:port, value}, config -> Keyword.put(config, :port, get_config_integer(value))
+      {key, value}, config -> Keyword.put(config, key, get_config_value(value))
+    end)
     |> Keyword.merge(pool: DBConnection.Poolboy)
   end
 
   @doc """
   Converts a database url into a Keyword list
   """
-  def parse_url(""), do: []
+  def parse_url(url)
 
-  def parse_url({:system, env}) when is_binary(env) do
-    parse_url(System.get_env(env) || "")
-  end
+  def parse_url(""), do: []
 
   def parse_url(url) do
     info = url |> URI.decode() |> URI.parse()
@@ -133,5 +133,41 @@ defmodule EventStore.Config do
     |> default_postgrex_opts()
     |> Keyword.put(:backoff_type, :stop)
     |> Keyword.put(:sync_connect, true)
+  end
+
+  def get_config_value(value, default \\ nil)
+
+  def get_config_value({:system, env_var}, default) do
+    case System.get_env(env_var) do
+      nil -> default
+      val -> val
+    end
+  end
+
+  def get_config_value({:system, env_var, default}, _default) do
+    case System.get_env(env_var) do
+      nil -> default
+      val -> val
+    end
+  end
+
+  def get_config_value(nil, default), do: default
+
+  def get_config_value(value, _default), do: value
+
+  def get_config_integer(value, default \\ nil) do
+    case get_config_value(value) do
+      nil ->
+        default
+
+      n when is_integer(n) ->
+        n
+
+      n ->
+        case Integer.parse(n) do
+          {i, _} -> i
+          :error -> default
+        end
+    end
   end
 end
