@@ -201,6 +201,39 @@ defmodule EventStoreTest do
 
       assert_receive {:events, [1]}
     end
+
+    test "should map events using optional `selector` function" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(4)
+
+      assert :ok = EventStore.subscribe(stream_uuid, selector: fn
+        %RecordedEvent{event_number: event_number} -> rem(event_number, 2) == 0
+      end)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      assert_receive {:events, filtered_events}
+      assert length(filtered_events) == div(length(events), 2)
+    end
+
+    test "should map events using optional `mapper` and `selector` function together" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(4)
+
+      mapper = fn
+        %RecordedEvent{event_number: event_number} -> event_number
+      end
+
+      selector = fn
+        %RecordedEvent{event_number: event_number} -> rem(event_number, 2) == 0
+      end
+
+      assert :ok = EventStore.subscribe(stream_uuid, selector: selector, mapper: mapper)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      assert_receive {:events, [2, 4]}
+    end
   end
 
   describe "persistent subscription" do

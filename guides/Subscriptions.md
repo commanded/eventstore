@@ -31,6 +31,23 @@ receive do
 end
 ```
 
+#### Filtering events
+
+You can provide an event selector function that filters each `RecordedEvent` before sending it to the subscriber:
+
+```elixir
+EventStore.subscribe(stream_uuid, selector: fn
+  %EventStore.RecordedEvent{data: data} -> data != nil
+end)
+
+# receive first batch of mapped event data
+receive do
+  {:events, %EventStore.RecordedEvent{} = event_data} ->
+    IO.puts("Received non nil event data: " <> inspect(event_data))
+end
+```
+
+
 #### Mapping events
 
 You can provide an event mapping function that maps each `RecordedEvent` before sending it to the subscriber:
@@ -160,6 +177,34 @@ Example all stream subscription that will receive new events appended after the 
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), start_from: :current)
 ```
 
+#### Event Filtering
+
+You can provide an event selector function that run in the subscription process, before sending the event to your mapper and subscriber. You can use this to filter events before dispatching to a subscriber.
+
+Subscribe to all streams and provide a `selector` function that only sends data that the selector function returns `true` for.
+
+```elixir
+selector = fn %EventStore.RecordedEvent{event_number: event_number} ->
+  rem(event_number) == 0
+end
+
+{:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), selector: selector)
+
+# wait for the subscription confirmation
+receive do
+  {:subscribed, ^subscription} ->
+    IO.puts("Successfully subscribed to all streams")
+end
+
+receive do
+  {:events, filtered_events} ->
+    # ... process events & ack receipt using last `event_number`
+    RecordedEvent{event_number: event_number} = List.last(filtered_events)
+
+    EventStore.ack(subscription, event_number)
+end
+```
+
 #### Mapping events
 
 You can provide an event mapping function that runs in the subscription process, before sending the event to your subscriber. You can use this to change the data received.
@@ -187,6 +232,7 @@ receive do
     EventStore.ack(subscription, event_number)
 end
 ```
+
 
 ### Example persistent subscriber
 

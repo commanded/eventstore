@@ -291,6 +291,8 @@ defmodule EventStore do
       Use the `$all` identifier to subscribe to events from all streams.
 
     - `opts` is an optional map providing additional subscription configuration:
+      - `selector` to define a function to filter each event, i.e. returns
+        only those elements for which fun returns a truthy value
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
 
@@ -319,7 +321,11 @@ defmodule EventStore do
       end
 
   """
-  @spec subscribe(String.t(), mapper: (RecordedEvent.t() -> any())) :: :ok | {:error, term}
+  @spec subscribe(
+          String.t(),
+          selector: (RecordedEvent.t() -> any()),
+          mapper: (RecordedEvent.t() -> any())
+        ) :: :ok | {:error, term}
 
   def subscribe(stream_uuid, opts \\ [])
 
@@ -345,8 +351,11 @@ defmodule EventStore do
           - `:current` for any new events appended to the stream after the
             subscription has been created.
           - any positive integer for a stream version to receive events after.
+      - `selector` to define a function to filter each event, i.e. returns
+        only those elements for which fun returns a truthy value
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
+      
 
   The subscription will resume from the last acknowledged event if it already
   exists. It will ignore the `start_from` argument in this case.
@@ -416,6 +425,8 @@ defmodule EventStore do
             subscription has been created.
           - any positive integer for an event id to receive events after that
             exact event.
+      - `selector` to define a function to filter each event, i.e. returns
+        only those elements for which fun returns a truthy value
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
 
