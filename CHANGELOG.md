@@ -4,6 +4,7 @@
 
 - Support system environment variables for all config ([#115](https://github.com/commanded/eventstore/pull/115)).
 - Allow subscriptions to filter the events they receive ([#114](https://github.com/commanded/eventstore/pull/114)).
+- Allow callers to omit `event_type` when event data is a struct ([#118](https://github.com/commanded/eventstore/pull/118)).
 
 ## 0.14.0
 
