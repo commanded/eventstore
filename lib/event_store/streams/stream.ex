@@ -145,6 +145,18 @@ defmodule EventStore.Streams.Stream do
     end)
   end
 
+  defp map_to_recorded_event(
+         %EventData{
+           data: %{__struct__: event_type},
+           event_type: nil
+         } = event,
+         created_at,
+         serializer
+       ) do
+    %{event | event_type: Atom.to_string(event_type)}
+    |> map_to_recorded_event(created_at, serializer)
+  end
+
   defp map_to_recorded_event(%EventData{
       causation_id: causation_id,
       correlation_id: correlation_id,
