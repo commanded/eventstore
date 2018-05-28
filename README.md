@@ -193,6 +193,7 @@ You should include unit tests to cover any changes.
 - [Floris Huetink](https://github.com/florish)
 - [Jan Vereecken](https://github.com/javereec)
 - [Olafur Arason](https://github.com/olafura)
+- [Ole Michaelis](https://github.com/OleMchls)
 - [Paul Iannazzo](https://github.com/boxxxie)
 - [Raphaël Lustin](https://github.com/rlustin)
 - [Simon Harris](https://github.com/harukizaemon)
