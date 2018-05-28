@@ -120,6 +120,21 @@ defmodule EventStore.Streams.SingleStreamTest do
 
       assert {:error, :duplicate_event} = Stream.link_to_stream(conn, target_stream_uuid, 4, source_events)
     end
+
+    test "should guess the event type when not passed", context do
+      %{conn: conn, stream_uuid: stream_uuid} = context
+
+      {:ok, _subscription} = EventStore.subscribe_to_stream(stream_uuid, @subscription_name, self(), start_from: :current)
+      wait_for_event_store()
+
+      event = %EventStore.EventData{
+        data: %EventStore.EventFactory.Event{event: "foo"}
+      }
+      :ok = Stream.append_to_stream(conn, stream_uuid, :any_version, [event])
+
+      assert_receive {:events, [received_event | _]}
+      assert received_event.event_type == "Elixir.EventStore.EventFactory.Event"
+    end
   end
 
   test "attempt to read an unknown stream forward should error stream not found", %{conn: conn} do
