@@ -1,4 +1,5 @@
-BEGIN;
+DO $$
+BEGIN
 
   CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -29,4 +30,5 @@ BEGIN;
   ALTER TABLE events DROP CONSTRAINT events_pkey;
   ALTER TABLE events ADD COLUMN event_id uuid PRIMARY KEY default uuid_generate_v4();
 
-COMMIT;
+END;
+$$ LANGUAGE plpgsql;

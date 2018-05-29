@@ -1,4 +1,5 @@
-BEGIN;
+DO $$
+BEGIN
 
   -- seed `$all` stream using event counter as its stream version
   INSERT INTO streams (stream_id, stream_uuid, stream_version)
@@ -51,7 +52,7 @@ BEGIN;
 
   -- event pub/sub notification function
   CREATE OR REPLACE FUNCTION notify_events()
-    RETURNS trigger AS $$
+    RETURNS trigger AS $function$
   DECLARE
     payload text;
   BEGIN
@@ -62,7 +63,7 @@ BEGIN;
 
       RETURN NULL;
   END;
-  $$ LANGUAGE plpgsql;
+  $function$ LANGUAGE plpgsql;
 
   -- event pub/sub table trigger
   CREATE TRIGGER event_notification
@@ -75,4 +76,5 @@ BEGIN;
   -- record schema migration
   INSERT INTO schema_migrations (major_version, minor_version, patch_version) VALUES (0, 14, 0);
 
-COMMIT;
+END;
+$$ LANGUAGE plpgsql;
