@@ -1,4 +1,5 @@
-BEGIN;
+DO $$
+BEGIN
 
   -- create `schema_migrations` table
   CREATE TABLE IF NOT EXISTS schema_migrations
@@ -35,4 +36,5 @@ BEGIN;
   -- prevent deletion from events table
   CREATE RULE no_delete_events AS ON DELETE TO events DO INSTEAD NOTHING;
 
-COMMIT;
+END;
+$$ LANGUAGE plpgsql;

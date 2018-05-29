@@ -1,4 +1,5 @@
-BEGIN;
+DO $$
+BEGIN
 
   -- create `schema_migrations` table
   CREATE TABLE IF NOT EXISTS schema_migrations
@@ -16,4 +17,5 @@ BEGIN;
   --- add `causation_id` to `events` table
   ALTER TABLE events ADD causation_id text;
 
-COMMIT;
+END;
+$$ LANGUAGE plpgsql;

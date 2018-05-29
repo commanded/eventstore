@@ -1,40 +1,19 @@
 defmodule EventStore.Storage.Database do
   @moduledoc false
-  
+
   require Logger
 
-  def create(config) do
-    database = Keyword.fetch!(config, :database)
-    encoding = Keyword.get(config, :encoding, "UTF8")
+  def create(config), do: storage_up(config)
 
-    {output, status} =
-      run_with_psql(config, "template1", "CREATE DATABASE \"#{database}\" ENCODING='#{encoding}'")
+  def drop(config), do: storage_down(config)
 
-    cond do
-      status == 0 -> :ok
-      String.contains?(output, "42P04") -> {:error, :already_up}
-      true -> {:error, output}
-    end
-  end
+  def migrate(opts, migration) do
+    case run_query(migration, opts) do
+      {:ok, _} ->
+        :ok
 
-  def drop(config) do
-    database = Keyword.fetch!(config, :database)
-
-    {output, status} = run_with_psql(config, "template1", "DROP DATABASE \"#{database}\"")
-
-    cond do
-      status == 0 -> :ok
-      String.contains?(output, "3D000") -> {:error, :already_down}
-      true -> {:error, output}
-    end
-  end
-
-  def migrate(config, migration) do
-    database = Keyword.fetch!(config, :database)
-
-    case run_with_psql(config, database, migration) do
-      {_output, 0} -> :ok
-      {output, _status} -> {:error, output}
+      {:error, error} ->
+        {:error, Exception.message(error)}
     end
   end
 
@@ -50,32 +29,6 @@ defmodule EventStore.Storage.Database do
     env = parse_env(config)
 
     System.cmd("pg_dump", args, env: env, into: File.stream!(target_path))
-  end
-
-  defp run_with_psql(config, database, sql_command) do
-    unless System.find_executable("psql") do
-      raise "could not find executable `psql` in path, " <>
-              "please guarantee it is available before running event_store mix commands"
-    end
-
-    args =
-      parse_default_args(config) ++
-        [
-          "--quiet",
-          "--set",
-          "ON_ERROR_STOP=1",
-          "--set",
-          "VERBOSITY=verbose",
-          "--no-psqlrc",
-          "-d",
-          database,
-          "-c",
-          sql_command
-        ]
-
-    env = parse_env(config)
-
-    System.cmd("psql", args, env: env, stderr_to_stdout: true)
   end
 
   defp parse_env(config) do
@@ -112,5 +65,132 @@ defmodule EventStore.Storage.Database do
         host,
         "--no-password"
       ]
+  end
+
+  # Taken from ecto/adapters/postgres.ex
+  defp storage_up(opts) do
+    database =
+      Keyword.fetch!(opts, :database) || raise ":database is nil in repository configuration"
+
+    encoding = opts[:encoding] || "UTF8"
+    opts = Keyword.put(opts, :database, "postgres")
+
+    command =
+      ~s(CREATE DATABASE "#{database}" ENCODING '#{encoding}')
+      |> concat_if(opts[:template], &"TEMPLATE=#{&1}")
+      |> concat_if(opts[:lc_ctype], &"LC_CTYPE='#{&1}'")
+      |> concat_if(opts[:lc_collate], &"LC_COLLATE='#{&1}'")
+
+    case run_query(command, opts) do
+      {:ok, _} ->
+        :ok
+
+      {:error, %{postgres: %{code: :duplicate_database}}} ->
+        {:error, :already_up}
+
+      {:error, error} ->
+        {:error, Exception.message(error)}
+    end
+  end
+
+  defp concat_if(content, nil, _fun), do: content
+  defp concat_if(content, value, fun), do: content <> " " <> fun.(value)
+
+  defp storage_down(opts) do
+    database =
+      Keyword.fetch!(opts, :database) || raise ":database is nil in repository configuration"
+
+    command = "DROP DATABASE \"#{database}\""
+    opts = Keyword.put(opts, :database, "postgres")
+
+    case run_query(command, opts) do
+      {:ok, _} ->
+        :ok
+
+      {:error, %{postgres: %{code: :invalid_catalog_name}}} ->
+        {:error, :already_down}
+
+      {:error, error} ->
+        {:error, Exception.message(error)}
+    end
+  end
+
+  defp run_query(sql, opts) do
+    {:ok, _} = Application.ensure_all_started(:postgrex)
+
+    opts =
+      opts
+      |> Keyword.drop([:name, :log])
+      |> Keyword.put(:pool, DBConnection.Connection)
+      |> Keyword.put(:backoff_type, :stop)
+
+    {:ok, pid} = Task.Supervisor.start_link()
+
+    task =
+      Task.Supervisor.async_nolink(pid, fn ->
+        {:ok, conn} = Postgrex.start_link(opts)
+
+        value = execute(conn, sql, [], opts)
+        GenServer.stop(conn)
+        value
+      end)
+
+    timeout = Keyword.get(opts, :timeout, 15_000)
+
+    case Task.yield(task, timeout) || Task.shutdown(task) do
+      {:ok, {:ok, result}} ->
+        {:ok, result}
+
+      {:ok, {:error, error}} ->
+        {:error, error}
+
+      {:exit, {%{__struct__: struct} = error, _}}
+      when struct in [Postgrex.Error, DBConnection.Error] ->
+        {:error, error}
+
+      {:exit, reason} ->
+        {:error, RuntimeError.exception(Exception.format_exit(reason))}
+
+      nil ->
+        {:error, RuntimeError.exception("command timed out")}
+    end
+  end
+
+  # Taken from ecto/adapters/postgres/connection.ex
+  defp execute(conn, sql, params, opts) when is_binary(sql) or is_list(sql) do
+    query = %Postgrex.Query{name: "", statement: sql}
+    opts = [function: :prepare_execute] ++ opts
+
+    case DBConnection.prepare_execute(conn, query, params, opts) do
+      {:ok, _, result} ->
+        {:ok, result}
+
+      {:error, %Postgrex.Error{}} = error ->
+        error
+
+      {:error, err} ->
+        raise err
+    end
+  end
+
+  defp execute(conn, %{} = query, params, opts) do
+    opts = [function: :execute] ++ opts
+
+    case DBConnection.execute(conn, query, params, opts) do
+      {:ok, _} = ok ->
+        ok
+
+      {:error, %ArgumentError{} = err} ->
+        {:reset, err}
+
+      {:error, %Postgrex.Error{postgres: %{code: :feature_not_supported}} = err} ->
+        {:reset, err}
+
+      {:error, %Postgrex.Error{}} = error ->
+        error
+
+      {:error, err} ->
+        raise err
+    end
   end
 end

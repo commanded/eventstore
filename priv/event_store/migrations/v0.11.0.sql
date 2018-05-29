@@ -1,4 +1,5 @@
-BEGIN;
+DO $$
+BEGIN
 
   CREATE TABLE IF NOT EXISTS schema_migrations
   (
@@ -28,4 +29,5 @@ BEGIN;
   -- enforce `stream_version` is not NULL
   ALTER TABLE streams ALTER COLUMN stream_version SET NOT NULL;
 
-COMMIT;
+END;
+$$ LANGUAGE plpgsql;
