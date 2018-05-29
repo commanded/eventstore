@@ -7,12 +7,13 @@ defmodule EventStore.Storage.Database do
 
   def drop(config), do: storage_down(config)
 
-  def migrate(config, migration) do
-    database = Keyword.fetch!(config, :database)
+  def migrate(opts, migration) do
+    case run_query(migration, opts) do
+      {:ok, _} ->
+        :ok
 
-    case run_with_psql(config, database, migration) do
-      {_output, 0} -> :ok
-      {output, _status} -> {:error, output}
+      {:error, error} ->
+        {:error, Exception.message(error)}
     end
   end
 
@@ -28,32 +29,6 @@ defmodule EventStore.Storage.Database do
     env = parse_env(config)
 
     System.cmd("pg_dump", args, env: env, into: File.stream!(target_path))
-  end
-
-  defp run_with_psql(config, database, sql_command) do
-    unless System.find_executable("psql") do
-      raise "could not find executable `psql` in path, " <>
-              "please guarantee it is available before running event_store mix commands"
-    end
-
-    args =
-      parse_default_args(config) ++
-        [
-          "--quiet",
-          "--set",
-          "ON_ERROR_STOP=1",
-          "--set",
-          "VERBOSITY=verbose",
-          "--no-psqlrc",
-          "-d",
-          database,
-          "-c",
-          sql_command
-        ]
-
-    env = parse_env(config)
-
-    System.cmd("psql", args, env: env, stderr_to_stdout: true)
   end
 
   defp parse_env(config) do
