@@ -196,6 +196,7 @@ You should include unit tests to cover any changes.
 - [Ole Michaelis](https://github.com/OleMchls)
 - [Paul Iannazzo](https://github.com/boxxxie)
 - [Raphaël Lustin](https://github.com/rlustin)
+- [Samuel Roze](https://github.com/sroze)
 - [Simon Harris](https://github.com/harukizaemon)
 - [Stuart Corbishley](https://github.com/stuartc)
 - [Victor Oliveira Nascimento](https://github.com/victorolinasc)
