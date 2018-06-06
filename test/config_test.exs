@@ -35,6 +35,22 @@ defmodule EventStore.ConfigTest do
            ]
   end
 
+  test "parse url with query parameters" do
+    original = [url: "postgres://username:password@localhost/database?ssl=true&pool_size=5"]
+
+    config = Config.parse(original)
+
+    assert config == [
+             username: "username",
+             password: "password",
+             database: "database",
+             hostname: "localhost",
+             pool_size: 5,
+             ssl: true,
+             pool: DBConnection.Poolboy
+           ]
+  end
+
   test "parse database url from environment variable" do
     set_envs(%{"ES_URL" => "postgres://username:password@localhost/database"})
 
