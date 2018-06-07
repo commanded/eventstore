@@ -17,8 +17,8 @@ defmodule EventStore.EventData do
     correlation_id: uuid() | nil,
     causation_id: uuid() | nil,
     event_type: String.t,
-    data: binary,
-    metadata: binary
+    data: term,
+    metadata: term | nil
   }
 
   def fetch(map, key) when is_map(map) do
