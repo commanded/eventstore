@@ -52,7 +52,7 @@ defmodule EventStore.Mixfile do
       # Test & release tooling
       {:benchfella, "~> 0.3", only: :bench},
       {:credo, "~> 0.9", only: [:dev, :test]},
-      {:dialyxir, "~> 0.5", only: :dev},
+      {:dialyxir, "~> 0.5", only: [:dev, :test]},
       {:ex_doc, "~> 0.18", only: :dev},
       {:markdown, github: "devinus/markdown", only: :dev},
       {:mix_test_watch, "~> 0.6", only: :dev},

@@ -16,6 +16,7 @@ before_script:
 
 script:
   - mix test.all
+  - mix dialyzer
 
 sudo: required
 dist: trusty
