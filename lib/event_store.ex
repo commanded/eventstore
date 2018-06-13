@@ -21,7 +21,7 @@ defmodule EventStore do
   @type expected_version :: :any_version | :no_stream | :stream_exists | non_neg_integer()
   @type start_from :: :origin | :current | non_neg_integer()
 
-  alias EventStore.{Config, EventData, RecordedEvent, Registration, Subscriptions}
+  alias EventStore.{Config, EventData, Registration, Subscriptions}
   alias EventStore.Snapshots.{SnapshotData, Snapshotter}
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Streams.Stream
