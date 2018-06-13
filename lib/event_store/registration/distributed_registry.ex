@@ -27,8 +27,8 @@ defmodule EventStore.Registration.DistributedRegistry do
   """
   @spec subscribe(
           binary,
-          selector: (RecodedEvent.t() -> any()),
-          mapper: (RecordedEvent.t() -> any())
+          selector: (EventStore.RecordedEvent.t() -> any()),
+          mapper: (EventStore.RecordedEvent.t() -> any())
         ) :: :ok | {:error, term}
   @impl EventStore.Registration
   def subscribe(topic, opts) do

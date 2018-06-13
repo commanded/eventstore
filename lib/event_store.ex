@@ -125,7 +125,7 @@ defmodule EventStore do
   @spec link_to_stream(
           String.t(),
           expected_version,
-          list(RecordedEvent.t()) | list(non_neg_integer),
+          list(EventStore.RecordedEvent.t()) | list(non_neg_integer),
           timeout() | nil
         ) ::
           :ok
@@ -172,7 +172,7 @@ defmodule EventStore do
 
   """
   @spec read_stream_forward(String.t(), non_neg_integer, non_neg_integer, timeout() | nil) ::
-          {:ok, list(RecordedEvent.t())}
+          {:ok, list(EventStore.RecordedEvent.t())}
           | {:error, reason :: term}
 
   def read_stream_forward(
@@ -235,7 +235,7 @@ defmodule EventStore do
 
   """
   @spec read_all_streams_forward(non_neg_integer, non_neg_integer, timeout() | nil) ::
-          {:ok, list(RecordedEvent.t())} | {:error, reason :: term}
+          {:ok, list(EventStore.RecordedEvent.t())} | {:error, reason :: term}
 
   def read_all_streams_forward(
         start_event_number \\ 0,
@@ -323,8 +323,8 @@ defmodule EventStore do
   """
   @spec subscribe(
           String.t(),
-          selector: (RecordedEvent.t() -> any()),
-          mapper: (RecordedEvent.t() -> any())
+          selector: (EventStore.RecordedEvent.t() -> any()),
+          mapper: (EventStore.RecordedEvent.t() -> any())
         ) :: :ok | {:error, term}
 
   def subscribe(stream_uuid, opts \\ [])
@@ -355,7 +355,7 @@ defmodule EventStore do
         only those elements for which fun returns a truthy value
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
-      
+
 
   The subscription will resume from the last acknowledged event if it already
   exists. It will ignore the `start_from` argument in this case.
@@ -472,7 +472,7 @@ defmodule EventStore do
   Accepts a `RecordedEvent`, a list of `RecordedEvent`s, or the event number of
   the recorded event to acknowledge.
   """
-  @spec ack(pid, RecordedEvent.t() | list(RecordedEvent.t()) | non_neg_integer()) ::
+  @spec ack(pid, EventStore.RecordedEvent.t() | list(EventStore.RecordedEvent.t()) | non_neg_integer()) ::
           :ok | {:error, reason :: term}
   def ack(subscription, ack) do
     Subscription.ack(subscription, ack)

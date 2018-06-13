@@ -29,7 +29,7 @@ defmodule EventStore.RecordedEvent do
 
   @type uuid :: String.t()
 
-  @type t :: %RecordedEvent{
+  @type t :: %__MODULE__{
           event_number: non_neg_integer(),
           event_id: uuid(),
           stream_uuid: String.t(),
