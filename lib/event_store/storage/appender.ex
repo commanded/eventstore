@@ -204,13 +204,5 @@ defmodule EventStore.Storage.Appender do
     end
   end
 
-  defp handle_response({:error, reason}) do
-    Logger.warn(fn ->
-      "Failed to append events to stream due to: #{inspect(reason)}"
-    end)
-
-    {:error, reason}
-  end
-
   defp stream_uuid([event | _]), do: event.stream_uuid
 end
