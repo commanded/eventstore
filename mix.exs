@@ -121,7 +121,6 @@ EventStore using PostgreSQL for persistence.
 
   defp dialyzer do
     [
-      ignore_warnings: ".dialyzer.ignore-warnings",
       plt_add_apps: [:poison],
       plt_add_deps: :app_tree
     ]
