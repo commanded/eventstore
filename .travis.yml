@@ -16,7 +16,7 @@ before_script:
 
 script:
   - mix test.all
-  - mix dialyzer
+  - mix dialyzer --halt-exit-status
 
 sudo: required
 dist: trusty
