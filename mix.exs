@@ -18,7 +18,7 @@ defmodule EventStore.Mixfile do
       consolidate_protocols: Mix.env == :prod,
       aliases: aliases(),
       preferred_cli_env: preferred_cli_env(),
-      dialyzer: [plt_add_deps: :app_tree, plt_add_apps: [:poison]],
+      dialyzer: dialyzer(),
       name: "EventStore",
       source_url: "https://github.com/commanded/eventstore",
     ]
@@ -116,6 +116,14 @@ EventStore using PostgreSQL for persistence.
       "test.registries":  :test,
       "test.distributed": :test,
       "test.local":       :test,
+    ]
+  end
+
+  defp dialyzer do
+    [
+      ignore_warnings: ".dialyzer.ignore-warnings",
+      plt_add_apps: [:poison],
+      plt_add_deps: :app_tree
     ]
   end
 
