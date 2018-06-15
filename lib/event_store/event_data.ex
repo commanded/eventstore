@@ -17,7 +17,7 @@ defmodule EventStore.EventData do
     correlation_id: uuid() | nil,
     causation_id: uuid() | nil,
     event_type: String.t,
-    data: binary,
+    data: term,
     metadata: binary
   }
 
