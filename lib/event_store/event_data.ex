@@ -18,7 +18,7 @@ defmodule EventStore.EventData do
     causation_id: uuid() | nil,
     event_type: String.t,
     data: term,
-    metadata: binary
+    metadata: term
   }
 
   def fetch(map, key) when is_map(map) do
