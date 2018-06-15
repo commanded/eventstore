@@ -28,8 +28,8 @@ defmodule EventStore.Registration.LocalRegistry do
   """
   @spec subscribe(
           binary,
-          selector: (RecordedEvent.t() -> any()),
-          mapper: (RecordedEvent.t() -> any())
+          selector: (EventStore.RecordedEvent.t() -> any()),
+          mapper: (EventStore.RecordedEvent.t() -> any())
         ) :: :ok | {:error, term}
   @impl EventStore.Registration
   def subscribe(topic, opts) do

@@ -42,7 +42,7 @@ defmodule EventStore.AdvisoryLocks do
   `{:error, :lock_already_taken}` if the lock cannot be acquired immediately.
 
   """
-  @spec try_advisory_lock(key :: non_neg_integer(), opts :: []) ::
+  @spec try_advisory_lock(key :: non_neg_integer(), opts :: list) ::
           :ok | {:error, :lock_already_taken} | {:error, term}
   def try_advisory_lock(key, opts \\ []) when is_integer(key) do
     GenServer.call(__MODULE__, {:try_advisory_lock, key, self(), opts})

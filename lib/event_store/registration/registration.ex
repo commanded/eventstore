@@ -13,7 +13,7 @@ defmodule EventStore.Registration do
   @doc """
   Subscribes the caller to the given topic.
   """
-  @callback subscribe(binary, mapper: (RecordedEvent.t() -> any())) :: :ok | {:error, term}
+  @callback subscribe(binary, mapper: (EventStore.RecordedEvent.t() -> any())) :: :ok | {:error, term}
 
   @doc """
   Broadcasts message on given topic.
@@ -31,8 +31,8 @@ defmodule EventStore.Registration do
   """
   @spec subscribe(
           binary,
-          selector: (RecordedEvent.t() -> any()),
-          mapper: (RecordedEvent.t() -> any())
+          selector: (EventStore.RecordedEvent.t() -> any()),
+          mapper: (EventStore.RecordedEvent.t() -> any())
         ) :: :ok | {:error, term}
   def subscribe(topic, opts \\ []), do: registry_provider().subscribe(topic, opts)
 
