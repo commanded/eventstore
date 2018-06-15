@@ -7,6 +7,7 @@
 - Allow callers to omit `event_type` when event data is a struct ([#118](https://github.com/commanded/eventstore/pull/118)).
 - Remove dependency on `psql` for `event_store.create`, `event_store.init`, `event_store.migrate`, and `event_store.drop` mix tasks ([#117](https://github.com/commanded/eventstore/pull/117)).
 - Supports query parameters in URL for database connection ([#119](https://github.com/commanded/eventstore/pull/119)).
+- Improve typespecs and include Dialyzer in Travis CI build ([#121](https://github.com/commanded/eventstore/pull/121)).
 
 ## 0.14.0
 
