@@ -122,7 +122,8 @@ EventStore using PostgreSQL for persistence.
   defp dialyzer do
     [
       plt_add_apps: [:poison, :ex_unit],
-      plt_add_deps: :app_tree
+      plt_add_deps: :app_tree,
+      plt_file: {:no_warn, "priv/plts/eventstore.plt"}
     ]
   end
 

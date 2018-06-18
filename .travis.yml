@@ -1,5 +1,9 @@
 language: elixir
 
+cache:
+  directories:
+  - priv/plts
+
 elixir:
   - 1.6.5
 
