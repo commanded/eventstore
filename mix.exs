@@ -18,7 +18,7 @@ defmodule EventStore.Mixfile do
       consolidate_protocols: Mix.env == :prod,
       aliases: aliases(),
       preferred_cli_env: preferred_cli_env(),
-      dialyzer: [plt_add_deps: :project],
+      dialyzer: dialyzer(),
       name: "EventStore",
       source_url: "https://github.com/commanded/eventstore",
     ]
@@ -52,7 +52,7 @@ defmodule EventStore.Mixfile do
       # Test & release tooling
       {:benchfella, "~> 0.3", only: :bench},
       {:credo, "~> 0.9", only: [:dev, :test]},
-      {:dialyxir, "~> 0.5", only: :dev},
+      {:dialyxir, "~> 0.5", only: [:dev, :test]},
       {:ex_doc, "~> 0.18", only: :dev},
       {:markdown, github: "devinus/markdown", only: :dev},
       {:mix_test_watch, "~> 0.6", only: :dev},
@@ -116,6 +116,13 @@ EventStore using PostgreSQL for persistence.
       "test.registries":  :test,
       "test.distributed": :test,
       "test.local":       :test,
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_add_apps: [:poison, :ex_unit],
+      plt_add_deps: :app_tree
     ]
   end
 

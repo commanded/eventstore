@@ -21,6 +21,7 @@ defmodule EventStore.Tasks.Output do
     end
   end
 
+  @spec do_raise(msg :: String.t(), boolean()) :: no_return()
   defp do_raise(msg, true) do
     Mix.raise(msg)
   end
