@@ -37,7 +37,7 @@ defmodule EventStore.RecordedEvent do
           correlation_id: uuid() | nil,
           causation_id: uuid() | nil,
           event_type: String.t(),
-          data: binary(),
+          data: term,
           metadata: binary() | nil,
           created_at: NaiveDateTime.t()
         }
