@@ -4,6 +4,8 @@
 /cover
 /deps
 /doc
+/priv/plts/*.plt
+/priv/plts/*.plt.hash
 erl_crash.dump
 *.ez
 *.dump
