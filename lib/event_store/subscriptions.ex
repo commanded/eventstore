@@ -42,7 +42,7 @@ defmodule EventStore.Subscriptions do
             {:error, :subscription_already_exists}
 
           concurrency when is_number(concurrency) ->
-            Subscription.subscribe(subscription, subscriber, opts)
+            Subscription.connect(subscription, subscriber, opts)
         end
     end
   end

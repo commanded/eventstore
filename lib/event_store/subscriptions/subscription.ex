@@ -36,8 +36,11 @@ defmodule EventStore.Subscriptions.Subscription do
     }, opts)
   end
 
-  def subscribe(subscription, subscriber, subscription_opts) do
-    {:ok, subscription}
+  @doc """
+  Connect a new subscriber to an already started subscription.
+  """
+  def connect(subscription, subscriber, subscription_opts) do
+    GenServer.call(subscription, {:connect, subscriber, subscription_opts})
   end
 
   @doc """
@@ -146,6 +149,14 @@ defmodule EventStore.Subscriptions.Subscription do
     subscription = SubscriptionFsm.ack(subscription, ack)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
+  end
+
+  def handle_call({:connect, subscriber, opts}, _from, %Subscription{subscription: subscription} = state) do
+    subscription = SubscriptionFsm.connect_subscriber(subscription, subscriber, opts)
+
+    state = %Subscription{state | subscription: subscription}
+
+    {:reply, {:ok, self()}, state}
   end
 
   def handle_call(:unsubscribe, _from, %Subscription{subscriber: subscriber, subscription: subscription} = state) do
