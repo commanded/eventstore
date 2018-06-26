@@ -2,6 +2,7 @@ defmodule EventStore.Subscriptions do
   @moduledoc false
 
   alias EventStore.Subscriptions
+  alias EventStore.Subscriptions.Subscription
 
   @all_stream "$all"
 
@@ -35,8 +36,14 @@ defmodule EventStore.Subscriptions do
       {:ok, subscription} ->
         {:ok, subscription}
 
-      {:error, {:already_started, _subscription}} ->
-        {:error, :subscription_already_exists}
+      {:error, {:already_started, subscription}} ->
+        case Keyword.get(opts, :concurrency, 1) do
+          1 ->
+            {:error, :subscription_already_exists}
+
+          concurrency when is_number(concurrency) ->
+            Subscription.subscribe(subscription, subscriber, opts)
+        end
     end
   end
 

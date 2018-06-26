@@ -36,6 +36,10 @@ defmodule EventStore.Subscriptions.Subscription do
     }, opts)
   end
 
+  def subscribe(subscription, subscriber, subscription_opts) do
+    {:ok, subscription}
+  end
+
   @doc """
   Confirm receipt of an event by its event number.
   """
