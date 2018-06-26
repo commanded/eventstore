@@ -4,14 +4,9 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
   alias EventStore.EventFactory
   alias EventStore.Subscriptions.Subscription
 
-  setup do
-    subscription_name = UUID.uuid4()
-
-    {:ok, %{subscription_name: subscription_name}}
-  end
-
   describe "concurrent subscription" do
-    test "should allow multiple subscribers", %{subscription_name: subscription_name} do
+    test "should allow multiple subscribers" do
+      subscription_name = UUID.uuid4()
       subscriber = self()
 
       {:ok, subscription} =
@@ -24,8 +19,8 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       refute_receive {:subscribed, ^subscription}
     end
 
-    @tag :wip
-    test "should send events to all subscribers", %{subscription_name: subscription_name} do
+    test "should send events to all subscribers" do
+      subscription_name = UUID.uuid4()
       stream_uuid = UUID.uuid4()
 
       subscriber1 = start_subscriber(:subscriber1)
@@ -43,10 +38,115 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
 
       append_to_stream(stream_uuid, 3)
 
-      assert_receive {:events, received_events, :subscriber1}
-      assert_receive {:events, received_events, :subscriber2}
-      assert_receive {:events, received_events, :subscriber3}
+      assert_receive_events([1], :subscriber1)
+      assert_receive_events([2], :subscriber2)
+      assert_receive_events([3], :subscriber3)
+
+      refute_receive {:events, _received_events, _subscriber}
     end
+
+    test "should send event to next available subscriber after ack" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency: 2)
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency: 2)
+
+      append_to_stream(stream_uuid, 6)
+
+      assert_receive_events([1], :subscriber1)
+      assert_receive_events([2], :subscriber2)
+
+      Subscription.ack(subscription, 2, subscriber2)
+      assert_receive_events([3], :subscriber2)
+
+      Subscription.ack(subscription, 3, subscriber2)
+      assert_receive_events([4], :subscriber2)
+
+      Subscription.ack(subscription, 4, subscriber2)
+      assert_receive_events([5], :subscriber2)
+
+      Subscription.ack(subscription, 1, subscriber1)
+      assert_receive_events([6], :subscriber1)
+
+      refute_receive {:events, _received_events, _subscriber}
+    end
+
+    test "should ack events in order" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+      subscriber3 = start_subscriber(:subscriber3)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency: 3)
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency: 3)
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber3, concurrency: 3)
+
+      append_to_stream(stream_uuid, 8)
+
+      assert_receive_events([1], :subscriber1)
+      assert_receive_events([2], :subscriber2)
+      assert_receive_events([3], :subscriber3)
+
+      Subscription.ack(subscription, 1, subscriber1)
+      assert_receive_events([4], :subscriber1)
+      assert_last_ack(subscription, 1)
+
+      Subscription.ack(subscription, 2, subscriber2)
+      assert_receive_events([5], :subscriber2)
+      assert_last_ack(subscription, 2)
+
+      Subscription.ack(subscription, 3, subscriber3)
+      assert_receive_events([6], :subscriber3)
+      assert_last_ack(subscription, 3)
+
+      # Ack for event number 6 received, but next ack to store is event number 4
+      Subscription.ack(subscription, 6, subscriber3)
+      assert_receive_events([7], :subscriber3)
+      assert_last_ack(subscription, 3)
+
+      Subscription.ack(subscription, 5, subscriber2)
+      assert_receive_events([8], :subscriber2)
+      assert_last_ack(subscription, 3)
+
+      Subscription.ack(subscription, 4, subscriber1)
+      assert_last_ack(subscription, 6)
+      refute_receive {:events, _received_events, _subscriber}
+
+      Subscription.ack(subscription, 7, subscriber3)
+      assert_last_ack(subscription, 7)
+      refute_receive {:events, _received_events, _subscriber}
+
+      Subscription.ack(subscription, 8, subscriber2)
+      assert_last_ack(subscription, 8)
+      refute_receive {:events, _received_events, _subscriber}
+    end
+  end
+
+  defp assert_receive_events(expected_event_numbers, expected_subscriber) do
+    assert_receive {:events, received_events, ^expected_subscriber}
+
+    actual_event_numbers = Enum.map(received_events, & &1.event_number)
+    assert expected_event_numbers == actual_event_numbers
+  end
+
+  defp assert_last_ack(subscription, expected_ack) do
+    last_seen = Subscription.last_seen(subscription)
+
+    assert last_seen == expected_ack
   end
 
   defp start_subscriber(name) do
@@ -77,14 +177,5 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
     events = EventFactory.create_events(event_count)
 
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-  end
-
-  # Subscribe to all streams and wait for the subscription to be subscribed.
-  defp subscribe_to_all_streams(subscription_name, subscriber, opts) do
-    {:ok, subscription} = EventStore.subscribe_to_all_streams(subscription_name, subscriber, opts)
-
-    assert_receive {:subscribed, ^subscription}
-
-    {:ok, subscription}
   end
 end

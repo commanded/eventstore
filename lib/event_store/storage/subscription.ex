@@ -106,7 +106,7 @@ defmodule EventStore.Storage.Subscription do
     end
 
     defp handle_response({:error, %Postgrex.Error{postgres: %{code: :unique_violation}}}, stream_uuid, subscription_name) do
-      _ = Logger.debug(fn -> "Failed to create subscription on stream #{stream_uuid} named #{subscription_name}, already exists" end)
+      _ = Logger.debug(fn -> "Failed to create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\", already exists" end)
       {:error, :subscription_already_exists}
     end
 

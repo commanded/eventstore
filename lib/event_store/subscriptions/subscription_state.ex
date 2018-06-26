@@ -15,6 +15,7 @@ defmodule EventStore.Subscriptions.SubscriptionState do
     last_ack: 0,
     subscribers: %{},
     pending_events: :queue.new(),
+    processed_event_ids: MapSet.new(),
     filtered_event_numbers: []
   ]
 end

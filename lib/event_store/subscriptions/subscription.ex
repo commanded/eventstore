@@ -11,7 +11,7 @@ defmodule EventStore.Subscriptions.Subscription do
   require Logger
 
   alias EventStore.{RecordedEvent, Registration}
-  alias EventStore.Subscriptions.{SubscriptionFsm, Subscription}
+  alias EventStore.Subscriptions.{SubscriptionFsm, Subscription, SubscriptionState}
 
   defstruct [
     conn: nil,
@@ -44,10 +44,17 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc """
+  Confirm receipt of an event by its event number for a given subscriber.
+  """
+  def ack(subscription, ack, subscriber) when is_integer(ack) and is_pid(subscriber) do
+    GenServer.cast(subscription, {:ack, ack, subscriber})
+  end
+
+  @doc """
   Confirm receipt of an event by its event number.
   """
   def ack(subscription, ack) when is_integer(ack) do
-    GenServer.cast(subscription, {:ack, ack})
+    GenServer.cast(subscription, {:ack, ack, self()})
   end
 
   @doc """
@@ -61,7 +68,7 @@ defmodule EventStore.Subscriptions.Subscription do
   Confirm receipt of the given event.
   """
   def ack(subscription, %RecordedEvent{event_number: event_number}) do
-    GenServer.cast(subscription, {:ack, event_number})
+    Subscription.ack(subscription, event_number)
   end
 
   @doc """
@@ -88,6 +95,11 @@ defmodule EventStore.Subscriptions.Subscription do
   @doc false
   def unsubscribe(subscription) do
     GenServer.call(subscription, :unsubscribe)
+  end
+
+  @doc false
+  def last_seen(subscription) do
+    GenServer.call(subscription, :last_seen)
   end
 
   @doc false
@@ -145,8 +157,8 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
-  def handle_cast({:ack, ack}, %Subscription{subscription: subscription} = state) do
-    subscription = SubscriptionFsm.ack(subscription, ack)
+  def handle_cast({:ack, ack, subscriber}, %Subscription{subscription: subscription} = state) do
+    subscription = SubscriptionFsm.ack(subscription, ack, subscriber)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
@@ -165,6 +177,12 @@ defmodule EventStore.Subscriptions.Subscription do
     subscription = SubscriptionFsm.unsubscribe(subscription)
 
     {:reply, :ok, apply_subscription_to_state(subscription, state)}
+  end
+
+  def handle_call(:last_seen, _from, %Subscription{subscription: subscription} = state) do
+    %SubscriptionFsm{data: %SubscriptionState{last_ack: last_seen}} = subscription
+
+    {:reply, last_seen, state}
   end
 
   defp apply_subscription_to_state(%SubscriptionFsm{} = subscription, %Subscription{} = state) do
