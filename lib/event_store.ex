@@ -346,16 +346,24 @@ defmodule EventStore do
       notification messages.
 
     - `opts` is an optional map providing additional subscription configuration:
-      - `start_from` is a pointer to the first event to receive. It must be one of:
+
+      - `start_from` is a pointer to the first event to receive.
+        It must be one of:
           - `:origin` for all events from the start of the stream (default).
           - `:current` for any new events appended to the stream after the
             subscription has been created.
           - any positive integer for a stream version to receive events after.
+
       - `selector` to define a function to filter each event, i.e. returns
-        only those elements for which fun returns a truthy value
+        only those elements for which fun returns a truthy value.
+
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
 
+      - `concurrency_limit` defines the maximum number of concurrent subscribers
+        allowed to connect to the subscription. By default only one subscriber
+        may connect. If too many subscribers attempt to connect to the
+        subscription an `{:error, :too_many_subscribers}` is returned.
 
   The subscription will resume from the last acknowledged event if it already
   exists. It will ignore the `start_from` argument in this case.
@@ -393,6 +401,7 @@ defmodule EventStore do
   @spec subscribe_to_stream(String.t(), String.t(), pid, keyword) ::
           {:ok, subscription :: pid}
           | {:error, :subscription_already_exists}
+          | {:error, :too_many_subscribers}
           | {:error, reason :: term}
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
@@ -419,16 +428,25 @@ defmodule EventStore do
       notification messages.
 
     - `opts` is an optional map providing additional subscription configuration:
-      - `start_from` is a pointer to the first event to receive. It must be one of:
+
+      - `start_from` is a pointer to the first event to receive.
+        It must be one of:
           - `:origin` for all events from the start of the stream (default).
           - `:current` for any new events appended to the stream after the
             subscription has been created.
           - any positive integer for an event id to receive events after that
             exact event.
+
       - `selector` to define a function to filter each event, i.e. returns
         only those elements for which fun returns a truthy value
+
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
+
+      - `concurrency_limit` defines the maximum number of concurrent subscribers
+        allowed to connect to the subscription. By default only one subscriber
+        may connect. If too many subscribers attempt to connect to the
+        subscription an `{:error, :too_many_subscribers}` is returned.
 
   The subscription will resume from the last acknowledged event if it already
   exists. It will ignore the `start_from` argument in this case.
@@ -457,6 +475,7 @@ defmodule EventStore do
   @spec subscribe_to_all_streams(String.t(), pid, keyword) ::
           {:ok, subscription :: pid}
           | {:error, :subscription_already_exists}
+          | {:error, :too_many_subscribers}
           | {:error, reason :: term}
 
   def subscribe_to_all_streams(subscription_name, subscriber, opts \\ [])

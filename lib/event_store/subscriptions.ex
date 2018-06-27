@@ -37,11 +37,11 @@ defmodule EventStore.Subscriptions do
         {:ok, subscription}
 
       {:error, {:already_started, subscription}} ->
-        case Keyword.get(opts, :concurrency, 1) do
-          1 ->
+        case Keyword.get(opts, :concurrency_limit) do
+          nil ->
             {:error, :subscription_already_exists}
 
-          concurrency when is_number(concurrency) ->
+          concurrency_limit when is_number(concurrency_limit) ->
             Subscription.connect(subscription, subscriber, opts)
         end
     end

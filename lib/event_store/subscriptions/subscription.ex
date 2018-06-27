@@ -94,7 +94,7 @@ defmodule EventStore.Subscriptions.Subscription do
 
   @doc false
   def unsubscribe(subscription) do
-    GenServer.call(subscription, :unsubscribe)
+    GenServer.call(subscription, {:unsubscribe, self()})
   end
 
   @doc false
@@ -103,7 +103,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc false
-  def init(%Subscription{subscriber: subscriber} = state) do
+  def init(%Subscription{} = state) do
     send(self(), :subscribe_to_stream)
 
     {:ok, state}
@@ -135,14 +135,12 @@ defmodule EventStore.Subscriptions.Subscription do
   def handle_info({:DOWN, _ref, :process, pid, reason}, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " subscriber #{inspect(pid)} down due to: #{inspect(reason)}" end)
 
-    subscription = SubscriptionFsm.subscriber_down(subscription, pid)
+    subscription = SubscriptionFsm.unsubscribe(subscription, pid)
 
-    state = %Subscription{state | subscription: subscription}
+    state = apply_subscription_to_state(subscription, state)
 
     case subscription do
-      %SubscriptionFsm{state: :shutdown} ->
-        _ = Logger.debug(fn -> describe(state) <> " has no subscribers, terminating" end)
-
+      %SubscriptionFsm{state: :unsubscribed} ->
         {:stop, reason, state}
 
       %SubscriptionFsm{} ->
@@ -180,17 +178,31 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def handle_call({:connect, subscriber, opts}, _from, %Subscription{subscription: subscription} = state) do
-    subscription = SubscriptionFsm.connect_subscriber(subscription, subscriber, opts)
+    concurrency_limit = Keyword.get(opts, :concurrency_limit, 1)
 
-    state = %Subscription{state | subscription: subscription}
+    if subscriber_count(subscription) < concurrency_limit do
+      subscription = SubscriptionFsm.connect_subscriber(subscription, subscriber, opts)
 
-    {:reply, {:ok, self()}, state}
+      state = %Subscription{state | subscription: subscription}
+
+      {:reply, {:ok, self()}, state}
+    else
+      {:reply, {:error, :too_many_subscribers}, state}
+    end
   end
 
-  def handle_call(:unsubscribe, _from, %Subscription{subscriber: subscriber, subscription: subscription} = state) do
-    subscription = SubscriptionFsm.unsubscribe(subscription, subscriber)
+  def handle_call({:unsubscribe, pid}, _from, %Subscription{subscription: subscription} = state) do
+    subscription = SubscriptionFsm.unsubscribe(subscription, pid)
 
-    {:reply, :ok, apply_subscription_to_state(subscription, state)}
+    state = apply_subscription_to_state(subscription, state)
+
+    case subscription do
+      %SubscriptionFsm{state: :unsubscribed} ->
+        {:stop, :shutdown, :ok, state}
+
+      %SubscriptionFsm{} ->
+        {:reply, :ok, state}
+    end
   end
 
   def handle_call(:last_seen, _from, %Subscription{subscription: subscription} = state) do
@@ -238,12 +250,12 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :unsubscribed}} = state) do
-    _ = Logger.debug(fn -> describe(state) <> " has unsubscribed" end)
+    _ = Logger.debug(fn -> describe(state) <> " has no subscribers, shutting down" end)
 
     state
   end
 
-  # no-op for all other subscription states
+  # No-op for all other subscription states.
   defp handle_subscription_state(state), do: state
 
   defp subscribe_to_stream(%Subscription{} = state) do
@@ -294,6 +306,9 @@ defmodule EventStore.Subscriptions.Subscription do
         60_000
     end
   end
+
+  defp subscriber_count(%SubscriptionFsm{data: %SubscriptionState{subscribers: subscribers}}),
+    do: map_size(subscribers)
 
   defp describe(%Subscription{stream_uuid: stream_uuid, subscription_name: name}),
     do: "Subscription #{inspect name}@#{inspect stream_uuid}"
