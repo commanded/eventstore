@@ -21,12 +21,13 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         conn: conn,
         stream_uuid: stream_uuid,
         subscription_name: subscription_name,
-        subscribers: Map.put(%{}, subscriber, %Subscriber{pid: subscriber}),
         start_from: Keyword.get(opts, :start_from),
         mapper: opts[:mapper],
         selector: opts[:selector],
         max_size: opts[:max_size] || @max_buffer_size
       }
+
+      data = monitor_subscriber(subscriber, data)
 
       with {:ok, subscription} <- create_subscription(data),
            :ok <- try_acquire_exclusive_lock(subscription) do
@@ -220,9 +221,12 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       next_state(:unsubscribed, data)
     end
 
-    defevent unsubscribe, data: %SubscriptionState{} = data do
+    defevent unsubscribe(subscriber), data: %SubscriptionState{} = data do
       next_state(:unsubscribed, data)
     end
+  end
+
+  defstate shutdown do
   end
 
   # Catch-all event handlers
@@ -230,12 +234,22 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defevent connect_subscriber(subscriber, opts),
     data: %SubscriptionState{subscribers: subscribers} = data,
     state: state do
-    data = %SubscriptionState{
-      data
-      | subscribers: Map.put(subscribers, subscriber, %Subscriber{pid: subscriber})
-    }
+    # TODO: Send events to new subscriber
+    next_state(state, monitor_subscriber(subscriber, data))
+  end
 
-    next_state(state, data)
+  defevent subscriber_down(pid),
+    data: %SubscriptionState{subscribers: subscribers} = data,
+    state: state do
+    data = data |> remove_subscriber(pid) |> notify_subscribers()
+
+    case has_subscribers?(data) do
+      true ->
+        next_state(state, data)
+
+      false ->
+        next_state(:shutdown, data)
+    end
   end
 
   defevent subscribe(_conn, _stream_uuid, _subscription_name, _subscriber, _opts),
@@ -261,7 +275,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     next_state(:disconnected, data)
   end
 
-  defevent unsubscribe, data: %SubscriptionState{} = data do
+  defevent unsubscribe(subscriber), data: %SubscriptionState{} = data do
     next_state(:unsubscribed, unsubscribe_from_stream(data))
   end
 
@@ -314,6 +328,35 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
     data
   end
+
+  defp monitor_subscriber(pid, %SubscriptionState{subscribers: subscribers} = data)
+       when is_pid(pid) do
+    subscriber = %Subscriber{pid: pid, ref: Process.monitor(pid)}
+
+    %SubscriptionState{data | subscribers: Map.put(subscribers, pid, subscriber)}
+  end
+
+  defp remove_subscriber(%SubscriptionState{} = data, pid) when is_pid(pid) do
+    %SubscriptionState{subscribers: subscribers, pending_events: pending_events} = data
+
+    case Map.get(subscribers, pid) do
+      nil ->
+        data
+
+      %Subscriber{in_flight: in_flight} ->
+        # Prepend in-flight events for the down subscriber to the pending
+        # event queue so they will be resent to another available subscriber.
+        pending_events = Enum.reduce(in_flight, pending_events, &:queue.in_r/2)
+
+        %SubscriptionState{
+          data
+          | subscribers: Map.delete(subscribers, pid),
+            pending_events: pending_events
+        }
+    end
+  end
+
+  defp has_subscribers?(%SubscriptionState{subscribers: subscribers}), do: subscribers != %{}
 
   defp track_last_received(events, %SubscriptionState{} = data) do
     %SubscriptionState{data | last_received: last_event_number(events)}
@@ -428,6 +471,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp notify_subscribers(%SubscriptionState{} = data) do
     %SubscriptionState{
       pending_events: pending_events,
+      processed_event_ids: processed_event_ids,
       subscribers: subscribers
     } = data
 
@@ -436,18 +480,29 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       %RecordedEvent{event_number: event_number} = event
       %Subscriber{pid: subscriber_pid} = subscriber
 
-      # Send filtered & mapped events to subscriber
-      send_to_subscriber(subscriber_pid, map([event], data))
+      data =
+        case selected?(event, data) do
+          true ->
+            # Send filtered & mapped events to subscriber
+            send_to_subscriber(subscriber_pid, map([event], data))
 
-      subscriber = Subscriber.track_in_flight(subscriber, event)
-      subscribers = Map.put(subscribers, subscriber_pid, subscriber)
+            subscriber = Subscriber.track_in_flight(subscriber, event)
+            subscribers = Map.put(subscribers, subscriber_pid, subscriber)
 
-      data = %SubscriptionState{
-        data
-        | pending_events: pending_events,
-          last_sent: event_number,
-          subscribers: subscribers
-      }
+            %SubscriptionState{
+              data
+              | pending_events: pending_events,
+                last_sent: event_number,
+                subscribers: subscribers
+            }
+
+          false ->
+            %SubscriptionState{
+              data
+              | pending_events: pending_events,
+                processed_event_ids: MapSet.put(processed_event_ids, event_number)
+            }
+        end
 
       notify_subscribers(data)
     else
@@ -495,6 +550,11 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   defp filter(events, _selector), do: events
 
+  defp selected?(event, %SubscriptionState{selector: selector}) when is_function(selector, 1),
+    do: selector.(event)
+
+  defp selected?(event, %SubscriptionState{}), do: true
+
   defp map(events, %SubscriptionState{mapper: mapper}) when is_function(mapper, 1),
     do: Enum.map(events, mapper)
 
@@ -510,7 +570,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       subscription_name: subscription_name,
       subscribers: subscribers,
       processed_event_ids: processed_event_ids,
-      filtered_event_numbers: filtered_event_numbers,
       last_ack: last_ack
     } = data
 

@@ -134,6 +134,67 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       assert_last_ack(subscription, 8)
       refute_receive {:events, _received_events, _subscriber}
     end
+
+    test "should resend in-flight events when subscriber process terminates" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency: 2)
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency: 2)
+
+      append_to_stream(stream_uuid, 6)
+
+      assert_receive_events([1], :subscriber1)
+      assert_receive_events([2], :subscriber2)
+
+      Process.unlink(subscriber1)
+      Process.exit(subscriber1, :shutdown)
+      assert_last_ack(subscription, 0)
+
+      Subscription.ack(subscription, 2, subscriber2)
+      assert_receive_events([1], :subscriber2)
+      assert_last_ack(subscription, 0)
+
+      Subscription.ack(subscription, 1, subscriber2)
+      assert_receive_events([3], :subscriber2)
+      assert_last_ack(subscription, 2)
+
+      refute_receive {:events, _received_events, _subscriber}
+    end
+
+    test "should shutdown subscription when all subscribers down" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency: 2)
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency: 2)
+
+      append_to_stream(stream_uuid, 6)
+
+      assert_receive_events([1], :subscriber1)
+      assert_receive_events([2], :subscriber2)
+
+      Process.unlink(subscriber1)
+      Process.unlink(subscriber2)
+
+      Process.exit(subscriber1, :shutdown)
+      Process.exit(subscriber2, :shutdown)
+
+      ref = Process.monitor(subscription)
+      assert_receive {:DOWN, ^ref, _, _, _}
+    end
   end
 
   defp assert_receive_events(expected_event_numbers, expected_subscriber) do

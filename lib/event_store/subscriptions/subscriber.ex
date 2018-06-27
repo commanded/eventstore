@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.Subscriber do
   @moduledoc false
 
-  defstruct [:pid, in_flight: []]
+  defstruct [:pid, :ref, in_flight: []]
 
   alias EventStore.Subscriptions.Subscriber
 

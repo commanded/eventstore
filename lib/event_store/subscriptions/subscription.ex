@@ -104,8 +104,6 @@ defmodule EventStore.Subscriptions.Subscription do
 
   @doc false
   def init(%Subscription{subscriber: subscriber} = state) do
-    Process.link(subscriber)
-
     send(self(), :subscribe_to_stream)
 
     {:ok, state}
@@ -132,6 +130,24 @@ defmodule EventStore.Subscriptions.Subscription do
     subscription = SubscriptionFsm.reconnect(subscription)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
+  end
+
+  def handle_info({:DOWN, _ref, :process, pid, reason}, %Subscription{subscription: subscription} = state) do
+    _ = Logger.debug(fn -> describe(state) <> " subscriber #{inspect(pid)} down due to: #{inspect(reason)}" end)
+
+    subscription = SubscriptionFsm.subscriber_down(subscription, pid)
+
+    state = %Subscription{state | subscription: subscription}
+
+    case subscription do
+      %SubscriptionFsm{state: :shutdown} ->
+        _ = Logger.debug(fn -> describe(state) <> " has no subscribers, terminating" end)
+
+        {:stop, reason, state}
+
+      %SubscriptionFsm{} ->
+        {:noreply, state}
+    end
   end
 
   def handle_cast(:subscribe_to_events, %Subscription{subscription: subscription} = state) do
@@ -172,9 +188,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def handle_call(:unsubscribe, _from, %Subscription{subscriber: subscriber, subscription: subscription} = state) do
-    Process.unlink(subscriber)
-
-    subscription = SubscriptionFsm.unsubscribe(subscription)
+    subscription = SubscriptionFsm.unsubscribe(subscription, subscriber)
 
     {:reply, :ok, apply_subscription_to_state(subscription, state)}
   end
