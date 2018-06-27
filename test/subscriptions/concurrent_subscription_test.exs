@@ -195,6 +195,54 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       ref = Process.monitor(subscription)
       assert_receive {:DOWN, ^ref, _, _, _}
     end
+
+    test "should exclude events filtered by selector function" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+
+      # Select every 3rd event
+      selector = fn event -> rem(event.event_number, 3) == 0 end
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(
+          subscription_name,
+          subscriber1,
+          concurrency: 2,
+          selector: selector
+        )
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(
+          subscription_name,
+          subscriber2,
+          concurrency: 2,
+          selector: selector
+        )
+
+      append_to_stream(stream_uuid, 12)
+
+      assert_receive_events([3], :subscriber1)
+      assert_receive_events([6], :subscriber2)
+
+      Subscription.ack(subscription, 3, subscriber1)
+      assert_last_ack(subscription, 5)
+      assert_receive_events([9], :subscriber1)
+
+      Subscription.ack(subscription, 9, subscriber1)
+      assert_last_ack(subscription, 5)
+      assert_receive_events([12], :subscriber1)
+
+      Subscription.ack(subscription, 6, subscriber2)
+      assert_last_ack(subscription, 11)
+      refute_receive {:events, _received_events, _subscriber}
+
+      Subscription.ack(subscription, 12, subscriber1)
+      assert_last_ack(subscription, 12)
+      refute_receive {:events, _received_events, _subscriber}
+    end
   end
 
   defp assert_receive_events(expected_event_numbers, expected_subscriber) do

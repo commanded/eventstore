@@ -367,10 +367,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp last_event_number([%RecordedEvent{event_number: event_number}]), do: event_number
   defp last_event_number([_event | events]), do: last_event_number(events)
 
-  defp map_to_event_number(events) do
-    Enum.map(events, fn %RecordedEvent{event_number: event_number} -> event_number end)
-  end
-
   @empty_queue :queue.new()
 
   def catch_up_from_stream(%SubscriptionState{pending_events: @empty_queue} = data) do
@@ -425,33 +421,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     )
   end
 
-  # Send next chunk of pending events to subscriber if ready to receive them
-  defp notify_pending_events(%SubscriptionState{pending_events: @empty_queue} = data), do: data
-
-  defp notify_pending_events(%SubscriptionState{} = data) do
-    # %SubscriptionState{pending_events: pending_events, last_ack: last_ack} = data
-    #
-    # [[%RecordedEvent{event_number: event_number} | _events] | _chunks] = pending_events
-    #
-    # next_ack = last_ack + 1
-    #
-    # case event_number do
-    #   ^next_ack ->
-    #     # Subscriber has ack'd last received event, so send pending.
-    #     [initial | pending] = pending_events
-    #
-    #     data = %SubscriptionState{data | pending_events: pending}
-    #
-    #     notify_subscriber(initial, data)
-    #
-    #   _ ->
-    #     # Subscriber has not yet ack'd last received event, don't send any more.
-    #     data
-    # end
-
-    data
-  end
-
   defp chunk_by(%RecordedEvent{stream_uuid: stream_uuid, correlation_id: correlation_id}),
     do: {stream_uuid, correlation_id}
 
@@ -475,38 +444,51 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       subscribers: subscribers
     } = data
 
-    with {{:value, event}, pending_events} <- :queue.out(pending_events),
-         {:ok, subscriber} <- available_subscriber(subscribers, event) do
-      %RecordedEvent{event_number: event_number} = event
-      %Subscriber{pid: subscriber_pid} = subscriber
+    case :queue.out(pending_events) do
+      {{:value, event}, pending_events} ->
+        %RecordedEvent{event_number: event_number} = event
 
-      data =
         case selected?(event, data) do
           true ->
-            # Send filtered & mapped events to subscriber
-            send_to_subscriber(subscriber_pid, map([event], data))
+            case available_subscriber(subscribers, event) do
+              {:ok, subscriber} ->
+                %Subscriber{pid: subscriber_pid} = subscriber
 
-            subscriber = Subscriber.track_in_flight(subscriber, event)
-            subscribers = Map.put(subscribers, subscriber_pid, subscriber)
+                # Send filtered & mapped events to subscriber.
+                send_to_subscriber(subscriber_pid, map([event], data))
 
-            %SubscriptionState{
-              data
-              | pending_events: pending_events,
-                last_sent: event_number,
-                subscribers: subscribers
-            }
+                subscriber = Subscriber.track_in_flight(subscriber, event)
+                subscribers = Map.put(subscribers, subscriber_pid, subscriber)
+
+                data = %SubscriptionState{
+                  data
+                  | pending_events: pending_events,
+                    last_sent: event_number,
+                    subscribers: subscribers
+                }
+
+                notify_subscribers(data)
+
+              _ ->
+                # No available subscriber, stop notifying.
+                data
+            end
 
           false ->
+            # Filtered event, don't send to subscriber but track it as processed
+            # and remove from pending event queue.
             %SubscriptionState{
               data
               | pending_events: pending_events,
                 processed_event_ids: MapSet.put(processed_event_ids, event_number)
             }
+            |> checkpoint_last_seen()
+            |> notify_subscribers()
         end
 
-      notify_subscribers(data)
-    else
-      _ -> data
+      {:empty, _pending_events} ->
+        # No pending events.
+        data
     end
   end
 
@@ -514,34 +496,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     case Enum.find(subscribers, fn {_pid, subscriber} -> Subscriber.available?(subscriber) end) do
       nil -> {:error, :not_available}
       {_pid, subscriber} -> {:ok, subscriber}
-    end
-  end
-
-  defp notify_subscriber([], %SubscriptionState{} = data), do: data
-
-  defp notify_subscriber(events, %SubscriptionState{} = data) do
-    %SubscriptionState{subscribers: subscribers, filtered_event_numbers: filtered_event_numbers} =
-      data
-
-    case filter(events, data) do
-      [] ->
-        # All events filtered, so just ack last event and continue notifying pending events.
-        data
-        |> ack_events(last_event_number(events))
-        |> notify_pending_events()
-
-      events_to_send ->
-        # Send filtered & mapped events to subscriber
-        # send_to_subscriber(subscriber, map(events_to_send, data))
-
-        filtered_event_numbers =
-          filtered_event_numbers ++
-            (map_to_event_number(events) -- map_to_event_number(events_to_send))
-
-        %SubscriptionState{
-          data
-          | filtered_event_numbers: filtered_event_numbers
-        }
     end
   end
 
@@ -569,8 +523,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
       subscribers: subscribers,
-      processed_event_ids: processed_event_ids,
-      last_ack: last_ack
+      processed_event_ids: processed_event_ids
     } = data
 
     %Subscriber{pid: subscriber_pid, in_flight: in_flight} =
@@ -580,7 +533,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
            event_number <= ack
          end) do
       [] ->
-        # Not an in-flight event, ignore
+        # Not an in-flight event, ignore ack.
         data
 
       acknowledged_events ->
@@ -594,65 +547,34 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
             MapSet.put(acc, event_id)
           end)
 
-        data = %SubscriptionState{
+        %SubscriptionState{
           data
           | subscribers: subscribers,
             processed_event_ids: processed_event_ids
         }
-
-        checkpoint_last_seen(data, last_ack)
-
-        # %SubscriptionState{
-        #   data
-        #   | last_ack: ack,
-        #     filtered_event_numbers:
-        #       Enum.filter(filtered_event_numbers, fn event_number -> event_number <= ack end),
-        #     subscribers: subscribers
-        # }
+        |> checkpoint_last_seen()
     end
-
-    # case Enum.member?(filtered_event_numbers, ack + 1) do
-    #   true ->
-    #     # Next event was filtered, attempt to ack
-    #     ack_events(data, ack + 1, subscriber)
-    #
-    #   false ->
-    #     :ok =
-    #       Storage.Subscription.ack_last_seen_event(
-    #         conn,
-    #         stream_uuid,
-    #         subscription_name,
-    #         ack,
-    #         pool: DBConnection.Poolboy
-    #       )
-    #
-    #     %SubscriptionState{
-    #       data
-    #       | last_ack: ack,
-    #         filtered_event_numbers:
-    #           Enum.filter(filtered_event_numbers, fn event_number -> event_number <= ack end)
-    #     }
-    # end
   end
 
-  defp checkpoint_last_seen(%SubscriptionState{} = data, last_ack, persist \\ false) do
+  defp checkpoint_last_seen(%SubscriptionState{} = data, persist \\ false) do
     %SubscriptionState{
       conn: conn,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
-      processed_event_ids: processed_event_ids
+      processed_event_ids: processed_event_ids,
+      last_ack: last_ack
     } = data
 
     ack = last_ack + 1
 
     cond do
       MapSet.member?(processed_event_ids, ack) ->
-        data = %SubscriptionState{
+        %SubscriptionState{
           data
-          | processed_event_ids: MapSet.delete(processed_event_ids, ack)
+          | processed_event_ids: MapSet.delete(processed_event_ids, ack),
+            last_ack: ack
         }
-
-        checkpoint_last_seen(data, ack, true)
+        |> checkpoint_last_seen(true)
 
       persist ->
         Storage.Subscription.ack_last_seen_event(
@@ -663,7 +585,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           pool: DBConnection.Poolboy
         )
 
-        %SubscriptionState{data | last_ack: last_ack}
+        data
 
       true ->
         data
