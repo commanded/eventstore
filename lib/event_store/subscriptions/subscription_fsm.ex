@@ -28,7 +28,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           selector: opts[:selector],
           max_size: opts[:max_size] || @max_buffer_size
         }
-        |> monitor_subscriber(subscriber)
+        |> monitor_subscriber(subscriber, opts)
 
       with {:ok, subscription} <- create_subscription(data),
            :ok <- try_acquire_exclusive_lock(subscription) do
@@ -202,10 +202,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   # Catch-all event handlers
 
-  defevent connect_subscriber(subscriber, _opts),
+  defevent connect_subscriber(subscriber, opts),
     data: %SubscriptionState{} = data,
     state: state do
-    data = data |> monitor_subscriber(subscriber) |> notify_subscribers()
+    data = data |> monitor_subscriber(subscriber, opts) |> notify_subscribers()
 
     next_state(state, data)
   end
@@ -295,9 +295,13 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     data
   end
 
-  defp monitor_subscriber(%SubscriptionState{subscribers: subscribers} = data, pid)
+  defp monitor_subscriber(%SubscriptionState{subscribers: subscribers} = data, pid, opts)
        when is_pid(pid) do
-    subscriber = %Subscriber{pid: pid, ref: Process.monitor(pid)}
+    subscriber = %Subscriber{
+      pid: pid,
+      ref: Process.monitor(pid),
+      buffer_size: Keyword.get(opts, :buffer_size, 1)
+    }
 
     %SubscriptionState{data | subscribers: Map.put(subscribers, pid, subscriber)}
   end
@@ -392,7 +396,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end)
   end
 
-  defp notify_subscribers(%SubscriptionState{} = data) do
+  defp notify_subscribers(%SubscriptionState{} = data, events_to_send \\ []) do
     %SubscriptionState{
       pending_events: pending_events,
       processed_event_ids: processed_event_ids,
@@ -406,12 +410,11 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
         case selected?(event, data) do
           true ->
-            case available_subscriber(subscribers, event) do
+            case next_available_subscriber(subscribers, event) do
               {:ok, subscriber} ->
                 %Subscriber{pid: subscriber_pid} = subscriber
 
-                # Send filtered & mapped events to subscriber.
-                send_to_subscriber(subscriber_pid, map([event], data))
+                events_to_send = [{subscriber_pid, event} | events_to_send]
 
                 subscriber = Subscriber.track_in_flight(subscriber, event)
                 subscribers = Map.put(subscribers, subscriber_pid, subscriber)
@@ -423,10 +426,12 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
                     subscribers: subscribers
                 }
 
-                notify_subscribers(data)
+                notify_subscribers(data, events_to_send)
 
               _ ->
                 # No available subscriber, stop notifying.
+                send_queued_events(events_to_send, data)
+
                 data
             end
 
@@ -439,18 +444,38 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
                 processed_event_ids: MapSet.put(processed_event_ids, event_number)
             }
             |> checkpoint_last_seen()
-            |> notify_subscribers()
+            |> notify_subscribers(events_to_send)
         end
 
       {:empty, _pending_events} ->
         # No pending events.
+        send_queued_events(events_to_send, data)
+
         data
     end
   end
 
+  # Send events to the subscriber
+  defp send_queued_events(events_to_send, data) do
+    events_to_send
+    |> Enum.group_by(fn {pid, _event} -> pid end, fn {_pid, event} -> event end)
+    |> Enum.each(fn {pid, events} ->
+      mapped_events = events |> Enum.reverse() |> map(data)
+
+      send_to_subscriber(pid, mapped_events)
+    end)
+  end
+
+  # Select the next available subscriber based upon their buffer size and
+  # in-flight events. Use a round robbin strategy for balancing of events
+  # between subscribers.
+  #
   # TODO: Partition event to subscriber
-  def available_subscriber(subscribers, _event) do
-    case Enum.find(subscribers, fn {_pid, subscriber} -> Subscriber.available?(subscriber) end) do
+  def next_available_subscriber(subscribers, _event) do
+    subscribers
+    |> Enum.sort_by(fn {_pid, %Subscriber{last_sent: last_sent}} -> last_sent end)
+    |> Enum.find(fn {_pid, subscriber} -> Subscriber.available?(subscriber) end)
+    |> case do
       nil -> {:error, :not_available}
       {_pid, subscriber} -> {:ok, subscriber}
     end

@@ -278,7 +278,7 @@ defmodule EventStoreTest do
       events = EventFactory.create_events(3)
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-      {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self())
+      {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self(), buffer_size: 10)
 
       # should receive events appended before subscription created
       assert_receive {:subscribed, ^subscription}

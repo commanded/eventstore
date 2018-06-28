@@ -325,6 +325,71 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
     end
   end
 
+  describe "concurrent subscriber buffer size" do
+    test "should allow subscriber to set event buffer size" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(
+          subscription_name,
+          subscriber1,
+          concurrency_limit: 2,
+          buffer_size: 2
+        )
+
+      append_to_stream(stream_uuid, 6)
+
+      assert_receive_events([1, 2], :subscriber1)
+      Subscription.ack(subscription, 2, subscriber1)
+
+      assert_receive_events([3, 4], :subscriber1)
+      Subscription.ack(subscription, 4, subscriber1)
+
+      assert_receive_events([5, 6], :subscriber1)
+      Subscription.ack(subscription, 6, subscriber1)
+
+      refute_receive {:events, _received_events, _subscriber}
+    end
+
+    test "should distribute events to subscribers using round robbin balancing" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency_limit: 2, buffer_size: 2)
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 2, buffer_size: 3)
+
+      append_to_stream(stream_uuid, 12)
+
+      assert_receive_events([1, 3], :subscriber1)
+      assert_receive_events([2, 4, 5], :subscriber2)
+
+      Subscription.ack(subscription, 1, subscriber1)
+      assert_receive_events([6], :subscriber1)
+
+      Subscription.ack(subscription, 5, subscriber2)
+      assert_receive_events([7, 8, 9], :subscriber2)
+
+      Subscription.ack(subscription, 6, subscriber1)
+      assert_receive_events([10, 11], :subscriber1)
+
+      Subscription.ack(subscription, 7, subscriber2)
+      assert_receive_events([12], :subscriber2)
+
+      Subscription.ack(subscription, 12, subscriber2)
+
+      refute_receive {:events, _received_events, _subscriber}
+    end
+  end
+
   describe "concurrent subscription catch-up" do
     test "should send event to next available subscriber after ack" do
       subscription_name = UUID.uuid4()

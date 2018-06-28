@@ -44,7 +44,14 @@ defmodule EventStore.Streams.AllStreamTest do
     setup [:append_events_to_streams]
 
     test "from origin should receive all events" do
-      {:ok, subscription} = EventStore.subscribe_to_stream(@all_stream, @subscription_name, self(), start_from: :origin)
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(
+          @all_stream,
+          @subscription_name,
+          self(),
+          start_from: :origin,
+          buffer_size: 3
+        )
 
       assert_receive {:events, received_events1}
       Subscription.ack(subscription, received_events1)
@@ -60,7 +67,14 @@ defmodule EventStore.Streams.AllStreamTest do
     test "from current should receive only new events", context do
       %{conn: conn, stream1_uuid: stream1_uuid} = context
 
-      {:ok, _subscription} = EventStore.subscribe_to_stream(@all_stream, @subscription_name, self(), start_from: :current)
+      {:ok, _subscription} =
+        EventStore.subscribe_to_stream(
+          @all_stream,
+          @subscription_name,
+          self(),
+          start_from: :current,
+          buffer_size: 2
+        )
 
       refute_receive {:events, _received_events}
 
@@ -72,7 +86,14 @@ defmodule EventStore.Streams.AllStreamTest do
     end
 
     test "from given event id should receive only later events" do
-      {:ok, subscription} = EventStore.subscribe_to_stream(@all_stream, @subscription_name, self(), start_from: 2)
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(
+          @all_stream,
+          @subscription_name,
+          self(),
+          start_from: 2,
+          buffer_size: 2
+        )
 
       assert_receive {:events, received_events1}
       Subscription.ack(subscription, received_events1)
@@ -94,12 +115,12 @@ defmodule EventStore.Streams.AllStreamTest do
       stream1_uuid: stream1_uuid,
       stream1_events: stream1_events,
       stream2_uuid: stream2_uuid,
-      stream2_events: stream2_events,
+      stream2_events: stream2_events
     ]
   end
 
   defp append_events_to_stream(conn) do
-    stream_uuid = UUID.uuid4
+    stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
     :ok = Stream.append_to_stream(conn, stream_uuid, 0, events)
