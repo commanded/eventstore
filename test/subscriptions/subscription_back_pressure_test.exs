@@ -4,20 +4,15 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
   alias EventStore.EventFactory
   alias EventStore.Subscriptions.Subscription
 
-  setup do
-    subscription_name = UUID.uuid4()
-
-    {:ok, %{subscription_name: subscription_name}}
-  end
-
   describe "subscription over capacity" do
-    test "should receive events once caught up", %{subscription_name: subscription_name} do
+    test "should receive events once caught up" do
+      subscription_name = UUID.uuid4()
       stream1_uuid = UUID.uuid4()
       stream2_uuid = UUID.uuid4()
       stream3_uuid = UUID.uuid4()
       stream4_uuid = UUID.uuid4()
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), max_size: 5)
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), buffer_size: 5, max_size: 5)
 
       append_to_stream(stream1_uuid, 5)
       append_to_stream(stream2_uuid, 5)
@@ -34,19 +29,20 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
       refute_receive {:events, _events}
     end
 
-    test "should handle unexpected event", %{subscription_name: subscription_name} do
+    test "should handle unexpected event" do
+      subscription_name = UUID.uuid4()
       stream1_uuid = UUID.uuid4()
       stream2_uuid = UUID.uuid4()
       stream3_uuid = UUID.uuid4()
       stream4_uuid = UUID.uuid4()
       stream5_uuid = UUID.uuid4()
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), max_size: 5)
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), buffer_size: 3, max_size: 5)
 
       append_to_stream(stream1_uuid, 3)
       append_to_stream(stream2_uuid, 3)
 
-      # notify the subscription with unexpected events
+      # Notify the subscription with unexpected events
       unexpected_events = EventFactory.create_recorded_events(5, stream1_uuid, 999)
       send(subscription, {:events, unexpected_events})
 

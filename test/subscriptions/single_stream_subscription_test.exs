@@ -22,7 +22,6 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
 
       assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
-      assert subscription.data.subscriber == self()
       assert subscription.data.last_sent == 0
       assert subscription.data.last_ack == 0
     end
@@ -32,7 +31,6 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
 
       assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
-      assert subscription.data.subscriber == self()
       assert subscription.data.last_sent == 2
       assert subscription.data.last_ack == 2
     end
@@ -238,17 +236,14 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
       |> SubscriptionFsm.notify_events(initial_events)
       |> SubscriptionFsm.notify_events(remaining_events)
 
-    assert subscription.data.last_sent == 6
+    assert subscription.data.last_sent == 3
     assert subscription.data.last_ack == 0
 
-    # only receive initial events
+    # Only receive initial events
     assert_receive {:events, received_events}
     refute_receive {:events, _received_events}
 
-    assert length(received_events) == 3
-    assert pluck(received_events, :correlation_id) == pluck(initial_events, :correlation_id)
-    assert pluck(received_events, :causation_id) == pluck(initial_events, :causation_id)
-    assert pluck(received_events, :data) == pluck(initial_events, :data)
+    assert_events(initial_events, received_events)
 
     subscription = ack(subscription, received_events)
 
@@ -256,29 +251,42 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
     assert subscription.data.last_sent == 6
     assert subscription.data.last_ack == 3
 
-    # now receive all remaining events
+    # Now receive all remaining events
     assert_receive {:events, received_events}
 
-    assert length(received_events) == 3
-    assert pluck(received_events, :correlation_id) == pluck(remaining_events, :correlation_id)
-    assert pluck(received_events, :causation_id) == pluck(remaining_events, :causation_id)
-    assert pluck(received_events, :data) == pluck(remaining_events, :data)
+    assert_events(remaining_events, received_events)
 
     ack(subscription, received_events)
     refute_receive {:events, _received_events}
   end
 
   defp create_subscription(%{stream_uuid: stream_uuid}, opts \\ []) do
+    opts = Keyword.put_new(opts, :buffer_size, 3)
+
     SubscriptionFsm.new()
     |> SubscriptionFsm.subscribe(@conn, stream_uuid, @subscription_name, self(), opts)
   end
 
-  def ack(subscription, events) when is_list(events) do
+  defp assert_event(expected_event, actual_event) do
+    assert expected_event.correlation_id == actual_event.correlation_id
+    assert expected_event.causation_id == actual_event.causation_id
+    assert expected_event.data == actual_event.data
+  end
+
+  defp assert_events(expected_events, actual_events) do
+    assert length(expected_events) == length(actual_events)
+
+    for {expected, actual} <- Enum.zip(expected_events, actual_events) do
+      assert_event(expected, actual)
+    end
+  end
+
+  defp ack(subscription, events) when is_list(events) do
     ack(subscription, List.last(events))
   end
 
-  def ack(subscription, %RecordedEvent{event_number: event_number}) do
-    SubscriptionFsm.ack(subscription, event_number)
+  defp ack(subscription, %RecordedEvent{event_number: event_number}) do
+    SubscriptionFsm.ack(subscription, event_number, self())
   end
 
   defp pluck(enumerable, field) do

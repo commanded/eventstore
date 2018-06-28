@@ -35,13 +35,14 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         %Storage.Subscription{subscription_id: subscription_id, last_seen: last_seen} =
           subscription
 
-        last_ack = last_seen || 0
+        last_seen = last_seen || 0
 
         data = %SubscriptionState{
           data
           | subscription_id: subscription_id,
-            last_sent: last_ack,
-            last_ack: last_ack
+            last_received: last_seen,
+            last_sent: last_seen,
+            last_ack: last_seen
         }
 
         next_state(:subscribe_to_events, data)
@@ -345,7 +346,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
     case read_stream_forward(data) do
       {:ok, []} ->
-        if is_nil(last_received) || last_sent == last_received do
+        if last_sent == last_received do
           # Subscriber is up-to-date with latest published events
           next_state(:subscribed, data)
         else
@@ -386,12 +387,12 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp enqueue_events(%SubscriptionState{} = data, events) do
     Enum.reduce(events, data, fn event, data ->
       %RecordedEvent{event_number: event_number} = event
-      %SubscriptionState{pending_events: pending_events} = data
+      %SubscriptionState{pending_events: pending_events, last_received: last_received} = data
 
       %SubscriptionState{
         data
         | pending_events: :queue.in(event, pending_events),
-          last_received: event_number
+          last_received: max(last_received, event_number)
       }
     end)
   end
@@ -461,7 +462,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     |> Enum.group_by(fn {pid, _event} -> pid end, fn {_pid, event} -> event end)
     |> Enum.each(fn {pid, events} ->
       mapped_events = events |> Enum.reverse() |> map(data)
-
+      
       send_to_subscriber(pid, mapped_events)
     end)
   end

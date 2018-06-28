@@ -15,10 +15,9 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
       assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
-      assert subscription.data.subscriber == self()
       assert subscription.data.last_sent == 0
       assert subscription.data.last_ack == 0
-      assert subscription.data.last_received == nil
+      assert subscription.data.last_received == 0
     end
 
     test "create subscription to all streams from starting event id", context do
@@ -26,10 +25,9 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
       assert subscription.state == :subscribe_to_events
       assert subscription.data.subscription_name == @subscription_name
-      assert subscription.data.subscriber == self()
       assert subscription.data.last_sent == 2
       assert subscription.data.last_ack == 2
-      assert subscription.data.last_received == nil
+      assert subscription.data.last_received == 2
     end
   end
 
@@ -41,7 +39,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
     assert subscription.state == :subscribed
     assert subscription.data.last_sent == 0
-    assert subscription.data.last_received == nil
+    assert subscription.data.last_received == 0
   end
 
   test "catch-up subscription, unseen persisted events", context do
@@ -59,7 +57,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
 
     assert subscription.state == :subscribed
     assert subscription.data.last_sent == 3
-    assert subscription.data.last_received == nil
+    assert subscription.data.last_received == 3
 
     expected_events = EventFactory.deserialize_events(recorded_events)
 
@@ -123,20 +121,20 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
       assert subscription.state == :subscribed
       assert subscription.data.last_sent == 3
       assert subscription.data.last_ack == 3
-      assert subscription.data.last_received == nil
+      assert subscription.data.last_received == 3
 
       subscription =
         create_subscription(context)
         |> SubscriptionFsm.subscribed()
         |> SubscriptionFsm.catch_up()
 
-      # should not receive already seen events
+      # Should not receive already seen events.
       refute_receive {:events, _received_events}
 
       assert subscription.state == :subscribed
       assert subscription.data.last_sent == 3
       assert subscription.data.last_ack == 3
-      assert subscription.data.last_received == nil
+      assert subscription.data.last_received == 3
     end
 
     test "should replay events when catching up and events had not been acknowledged", context do
@@ -145,7 +143,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
         |> SubscriptionFsm.subscribed()
         |> SubscriptionFsm.catch_up()
 
-      # should receive already seen events
+      # Should receive already seen events
       assert_receive {:events, received_events}
       assert length(received_events) == 3
 
@@ -154,10 +152,10 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
       assert subscription.state == :subscribed
       assert subscription.data.last_sent == 3
       assert subscription.data.last_ack == 3
-      assert subscription.data.last_received == nil
+      assert subscription.data.last_received == 3
     end
 
-    def create_caught_up_subscription(context) do
+    def create_caught_up_subscription(%{recorded_events: recorded_events} = context) do
       subscription =
         create_subscription(context)
         |> SubscriptionFsm.subscribed()
@@ -166,7 +164,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
       assert subscription.state == :catching_up
       assert subscription.data.last_sent == 3
       assert subscription.data.last_ack == 0
-      assert subscription.data.last_received == nil
+      assert subscription.data.last_received == length(recorded_events)
 
       assert_receive {:events, received_events}
       assert length(received_events) == 3
@@ -175,7 +173,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     end
   end
 
-  test "should not notify events until ack received", context do
+  test "should notify events after acknowledged", context do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_recorded_events(6, stream_uuid)
     initial_events = Enum.take(events, 3)
@@ -191,32 +189,29 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
     assert subscription.state == :subscribed
     assert subscription.data.last_received == 6
 
-    # only receive initial events
-    assert_receive {:events, received_events}
+    # Only receive initial events
+    assert_receive {:events, [event1, event2, event3] = received_events}
     refute_receive {:events, _received_events}
 
-    assert length(received_events) == 3
     assert pluck(received_events, :correlation_id) == pluck(initial_events, :correlation_id)
     assert pluck(received_events, :causation_id) == pluck(initial_events, :causation_id)
     assert pluck(received_events, :data) == pluck(initial_events, :data)
 
-    [event1, event2, _event3] = received_events
+    # Start receiving remaining events acknowledge received events
+    subscription = assert_ack(subscription, event1, expected_last_sent: 4, expected_last_ack: 1)
+    assert_receive {:events, [received_event]}
+    assert_event(Enum.at(events, 3), received_event)
 
-    # don't receive remaining events until ack received for all initial events
-    subscription = ack_refute_receive(subscription, event1, 1)
-    subscription = ack_refute_receive(subscription, event2, 2)
+    subscription = assert_ack(subscription, event2, expected_last_sent: 5, expected_last_ack: 2)
+    assert_receive {:events, [received_event]}
+    assert_event(Enum.at(events, 4), received_event)
 
-    subscription = ack(subscription, received_events)
+    subscription = assert_ack(subscription, event3, expected_last_sent: 6, expected_last_ack: 3)
+    assert_receive {:events, [received_event]}
+    assert_event(Enum.at(events, 5), received_event)
 
     assert subscription.state == :subscribed
-
-    # now receive all remaining events
-    assert_receive {:events, received_events}
-
-    assert length(received_events) == 3
-    assert pluck(received_events, :correlation_id) == pluck(remaining_events, :correlation_id)
-    assert pluck(received_events, :causation_id) == pluck(remaining_events, :causation_id)
-    assert pluck(received_events, :data) == pluck(remaining_events, :data)
+    refute_receive {:events, _received_events}
   end
 
   describe "pending event buffer limit" do
@@ -273,30 +268,41 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
       assert subscription.state == :max_capacity
       assert subscription.data.last_received == 6
 
-      subscription = ack(subscription, hd(initial_events))
+      assert_receive {:events, [received_event1, received_event2, received_event3]}
+
+      subscription = ack(subscription, received_event1)
 
       assert subscription.state == :max_capacity
 
-      assert_receive {:events, received_events}
+      assert_receive {:events, [received_event4]}
       refute_receive {:events, _received_events}
 
-      assert length(received_events) == 3
-
-      subscription = ack(subscription, Enum.take(received_events, 2))
+      subscription = ack(subscription, received_event2)
 
       assert subscription.state == :max_capacity
 
-      subscription = ack(subscription, List.last(received_events))
+      subscription = ack(subscription, received_event3)
 
       assert subscription.state == :request_catch_up
 
-      # now receive all remaining events
-      assert_receive {:events, received_events}
+      # Now receive all remaining events
+      assert_receive {:events, [received_event5]}
+      assert_receive {:events, [received_event6]}
+      refute_receive {:events, _received_events}
 
-      assert length(received_events) == 3
-      assert pluck(received_events, :correlation_id) == pluck(remaining_events, :correlation_id)
-      assert pluck(received_events, :causation_id) == pluck(remaining_events, :causation_id)
-      assert pluck(received_events, :data) == pluck(remaining_events, :data)
+      assert_events(events, [
+        received_event1,
+        received_event2,
+        received_event3,
+        received_event4,
+        received_event5,
+        received_event6
+      ])
+
+      # assert length(received_events) == 3
+      # assert pluck(received_events, :correlation_id) == pluck(remaining_events, :correlation_id)
+      # assert pluck(received_events, :causation_id) == pluck(remaining_events, :causation_id)
+      # assert pluck(received_events, :data) == pluck(remaining_events, :data)
     end
   end
 
@@ -370,30 +376,43 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   end
 
   defp create_subscription(_context, opts \\ []) do
+    opts = Keyword.put_new(opts, :buffer_size, 3)
+
     SubscriptionFsm.new()
     |> SubscriptionFsm.subscribe(@conn, @all_stream, @subscription_name, self(), opts)
   end
 
-  defp ack_refute_receive(subscription, ack, expected_last_ack) do
+  defp assert_event(expected_event, actual_event) do
+    assert expected_event.correlation_id == actual_event.correlation_id
+    assert expected_event.causation_id == actual_event.causation_id
+    assert expected_event.data == actual_event.data
+  end
+
+  defp assert_events(expected_events, actual_events) do
+    assert length(expected_events) == length(actual_events)
+
+    for {expected, actual} <- Enum.zip(expected_events, actual_events) do
+      assert_event(expected, actual)
+    end
+  end
+
+  defp assert_ack(subscription, ack, opts) do
     subscription = ack(subscription, ack)
 
     assert subscription.state == :subscribed
-    assert subscription.data.last_sent == 6
-    assert subscription.data.last_ack == expected_last_ack
+    assert subscription.data.last_sent == opts[:expected_last_sent]
+    assert subscription.data.last_ack == opts[:expected_last_ack]
     assert subscription.data.last_received == 6
-
-    # don't receive remaining events until ack received for all initial events
-    refute_receive {:events, _received_events}
 
     subscription
   end
 
-  def ack(subscription, events) when is_list(events) do
+  defp ack(subscription, events) when is_list(events) do
     ack(subscription, List.last(events))
   end
 
-  def ack(subscription, %RecordedEvent{event_number: event_number}) do
-    SubscriptionFsm.ack(subscription, event_number)
+  defp ack(subscription, %RecordedEvent{event_number: event_number}) do
+    SubscriptionFsm.ack(subscription, event_number, self())
   end
 
   defp pluck(enumerable, field) do

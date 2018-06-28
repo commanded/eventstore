@@ -18,7 +18,7 @@ defmodule EventStore.Subscriptions.SubscriptionCatchUpTest do
       append_to_stream(stream3_uuid, 10)
       append_to_stream(stream4_uuid, 10)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), buffer_size: 10)
 
       append_to_stream(stream1_uuid, 10, 10)
 
@@ -47,8 +47,8 @@ defmodule EventStore.Subscriptions.SubscriptionCatchUpTest do
     :ok = EventStore.append_to_stream(stream_uuid, expected_version, events)
   end
 
-  # subscribe to all streams and wait for the subscription to be subscribed
-  defp subscribe_to_all_streams(subscription_name, subscriber, opts \\ []) do
+  # Subscribe to all streams and wait for the subscription to be subscribed.
+  defp subscribe_to_all_streams(subscription_name, subscriber, opts) do
     {:ok, subscription} = EventStore.subscribe_to_all_streams(subscription_name, subscriber, opts)
 
     assert_receive {:subscribed, ^subscription}
@@ -67,8 +67,8 @@ defmodule EventStore.Subscriptions.SubscriptionCatchUpTest do
 
       assert event_number == expected_event_number
       assert event.stream_uuid == expected_stream_uuid
-
-      Subscription.ack(subscription, event)
     end)
+
+    Subscription.ack(subscription, received_events)
   end
 end
