@@ -10,11 +10,13 @@ defmodule EventStore.Subscriptions.SubscriptionState do
     :selector,
     :mapper,
     :max_size,
+    :partition_by,
     last_received: 0,
     last_sent: 0,
     last_ack: 0,
+    queue_size: 0,
     subscribers: %{},
-    pending_events: :queue.new(),
+    partitions: %{},
     processed_event_ids: MapSet.new()
   ]
 end
