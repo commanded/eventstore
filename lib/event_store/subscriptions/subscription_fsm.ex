@@ -436,12 +436,23 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       when is_function(partition_by, 1),
       do: partition_by.(data)
 
+  # Attempt to notify subscribers with any pending events. Partitions are
+  # selected by peeking at the event number of their queue to ensure earlier
+  # events are sent first.
   defp notify_subscribers(%SubscriptionState{partitions: partitions} = data) do
     partitions
+    |> Enum.sort_by(fn {_partition_key, pending_events} -> peek_event_number(pending_events) end)
     |> Enum.reduce(data, fn {partition_key, _pending_events}, data ->
       notify_partition_subscriber(data, partition_key)
     end)
     |> checkpoint_last_seen()
+  end
+
+  defp peek_event_number(pending_events) do
+    case :queue.peek(pending_events) do
+      {:value, %RecordedEvent{event_number: event_number}} -> event_number
+      _ -> nil
+    end
   end
 
   defp notify_partition_subscriber(data, partition_key, events_to_send \\ []) do
@@ -452,7 +463,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       queue_size: queue_size
     } = data
 
-    with pending_events <- Map.get(partitions, partition_key),
+    with pending_events when not is_nil(pending_events) <- Map.get(partitions, partition_key),
          {{:value, event}, pending_events} <- :queue.out(pending_events),
          {:ok, subscriber} <- next_available_subscriber(data, partition_key) do
       %RecordedEvent{event_number: event_number} = event
@@ -460,9 +471,15 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
       subscriber = Subscriber.track_in_flight(subscriber, event, partition_key)
 
+      partitions =
+        case :queue.is_empty(pending_events) do
+          true -> Map.delete(partitions, partition_key)
+          false -> Map.put(partitions, partition_key, pending_events)
+        end
+
       %SubscriptionState{
         data
-        | partitions: Map.put(partitions, partition_key, pending_events),
+        | partitions: partitions,
           last_sent: max(last_sent, event_number),
           subscribers: Map.put(subscribers, subscriber_pid, subscriber),
           queue_size: max(queue_size - 1, 0)
@@ -500,12 +517,12 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   # when a `partition_by/1` function is been provided. This is used to guarantee
   # ordering or event receipt for each partition (e.g. stream/aggregate
   # identity).
-  def next_available_subscriber(%SubscriptionState{} = data, partition_Key) do
+  defp next_available_subscriber(%SubscriptionState{} = data, partition_key) do
     %SubscriptionState{subscribers: subscribers} = data
 
     partition_subscriber =
       Enum.find(subscribers, fn {_pid, subscriber} ->
-        Subscriber.in_partition?(subscriber, partition_Key)
+        Subscriber.in_partition?(subscriber, partition_key)
       end)
 
     subscribers =
