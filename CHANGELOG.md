@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## 0.15.0
 
 - Support system environment variables for all config ([#115](https://github.com/commanded/eventstore/pull/115)).
 - Allow subscriptions to filter the events they receive ([#114](https://github.com/commanded/eventstore/pull/114)).
