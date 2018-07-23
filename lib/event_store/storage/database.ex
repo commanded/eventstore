@@ -8,6 +8,8 @@ defmodule EventStore.Storage.Database do
   def drop(config), do: storage_down(config)
 
   def migrate(opts, migration) do
+    opts = Keyword.put(opts, :timeout, :infinity)
+
     case run_query(migration, opts) do
       {:ok, _} ->
         :ok

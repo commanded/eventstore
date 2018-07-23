@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+- Use a timeout of `:infinity` for the migration task (`mix event_store.migrate`) to allow database migration to run longer than the default 15 seconds.
+
 ## 0.15.0
 
 - Support system environment variables for all config ([#115](https://github.com/commanded/eventstore/pull/115)).
