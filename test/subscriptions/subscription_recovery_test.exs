@@ -1,6 +1,8 @@
 defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
   use EventStore.StorageCase
 
+  @moduletag :slow
+
   alias EventStore.{EventFactory, RecordedEvent}
   alias EventStore.Subscriptions.Subscription
 
@@ -22,7 +24,7 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
 
       refute_receive {:events, _events}
 
-      Process.sleep(6000)
+      wait_socket()
 
       append_to_stream(stream1_uuid, 10, 20)
 
@@ -34,16 +36,42 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
   end
 
   defp kill_socket do
-    {_, port} =
+    port = wait_until(&get_port/0)
+    :erlang.monitor(:port, port)
+    :erlang.port_close(port)
+    assert_receive {:DOWN, _monitor_ref, _type, _object, _info}
+  end
+
+  defp wait_socket() do
+    # This is because MonitoredServer has some problem if we
+    # do :sys.get_state very often. So we set a high step
+    # so we leave time for MonitoredServer to start again
+    wait_until(
+      50_000,
+      5_000,
+      fn ->
+        refute :undefined == :erlang.port_info(get_port())
+      end
+    )
+  end
+
+  defp get_port do
+    pid =
       GenServer.whereis(EventStore.Notifications.Listener.Postgrex)
       |> :sys.get_state()
       |> Map.get(:pid)
+
+    refute is_nil(pid)
+    assert Process.alive?(pid)
+
+    {_, port} =
+      pid
       |> :sys.get_state()
       |> Map.get(:mod_state)
       |> Map.get(:protocol)
       |> Map.get(:sock)
 
-    :erlang.port_close(port)
+    port
   end
 
   defp append_to_stream(stream_uuid, event_count, expected_version \\ 0) do
@@ -75,5 +103,22 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
 
       Subscription.ack(subscription, event)
     end)
+  end
+
+  def wait_until(timeout \\ 1000, step \\ 50, fun)
+  def wait_until(timeout, _step, fun) when timeout <= 0, do: fun.()
+
+  def wait_until(timeout, step, fun) do
+    try do
+      fun.()
+    catch
+      :exit, _ ->
+        Process.sleep(step)
+        wait_until(max(0, timeout - step), step, fun)
+    end
+  rescue
+    _ ->
+      Process.sleep(step)
+      wait_until(max(0, timeout - step), step, fun)
   end
 end
