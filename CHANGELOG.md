@@ -2,7 +2,13 @@
 
 ## Next release
 
+### Enhancements
+
 - Use a timeout of `:infinity` for the migration task (`mix event_store.migrate`) to allow database migration to run longer than the default 15 seconds.
+
+### Bug fixes
+
+- Fix: socket closing causes the eventstore to never receive notifications ([#130](https://github.com/commanded/eventstore/pull/130)).
 
 ## 0.15.0
 
