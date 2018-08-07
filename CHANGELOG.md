@@ -9,6 +9,7 @@
 ### Bug fixes
 
 - Fix: socket closing causes the eventstore to never receive notifications ([#130](https://github.com/commanded/eventstore/pull/130)).
+- Subscription should notifying pending events after all filtered ([#131](https://github.com/commanded/eventstore/pull/131/files)).
 
 ## 0.15.0
 
