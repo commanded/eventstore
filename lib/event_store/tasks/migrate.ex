@@ -11,6 +11,8 @@ defmodule EventStore.Tasks.Migrate do
     "0.14.0"
   ]
 
+  @dialyzer {:no_return, exec: 2, handle_response: 1}
+
   @doc """
   Run task
 
