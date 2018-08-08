@@ -28,6 +28,8 @@ defmodule EventStore.Config do
     |> Enum.reduce([], fn
       {:url, value}, config -> Keyword.merge(config, value |> get_config_value() |> parse_url())
       {:port, value}, config -> Keyword.put(config, :port, get_config_integer(value))
+      {:socket, value}, config -> Keyword.put(config, :socket, get_config_value(value))
+      {:socket_dir, value}, config -> Keyword.put(config, :socket_dir, get_config_value(value))
       {key, value}, config -> Keyword.put(config, key, get_config_value(value))
     end)
     |> Keyword.merge(pool: DBConnection.Poolboy)
@@ -138,6 +140,8 @@ defmodule EventStore.Config do
     :hostname,
     :port,
     :types,
+    :socket,
+    :socket_dir,
     :ssl,
     :ssl_opts
   ]

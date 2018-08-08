@@ -59,7 +59,7 @@ defmodule EventStore.Storage.Database do
         port -> ["-p", to_string(port) | args]
       end
 
-    host = config[:hostname] || System.get_env("PGHOST") || "localhost"
+    host = config[:socket_dir] || config[:hostname] || System.get_env("PGHOST") || "localhost"
 
     args ++
       [
