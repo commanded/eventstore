@@ -1,7 +1,7 @@
 defmodule EventStore.Mixfile do
   use Mix.Project
 
-  @version "0.15.0"
+  @version "0.15.1"
 
   def project do
     [
@@ -51,11 +51,11 @@ defmodule EventStore.Mixfile do
 
       # Test & release tooling
       {:benchfella, "~> 0.3", only: :bench},
-      {:credo, "~> 0.9", only: [:dev, :test]},
+      {:credo, "~> 0.10", only: [:dev, :test]},
       {:dialyxir, "~> 0.5", only: [:dev, :test]},
-      {:ex_doc, "~> 0.18", only: :dev},
+      {:ex_doc, "~> 0.19", only: :dev},
       {:markdown, github: "devinus/markdown", only: :dev},
-      {:mix_test_watch, "~> 0.6", only: :dev},
+      {:mix_test_watch, "~> 0.8", only: :dev},
       {:poison, "~> 2.2 or ~> 3.0", optional: true}
     ]
   end

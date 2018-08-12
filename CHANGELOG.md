@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## 0.15.1
 
 ### Enhancements
 
@@ -8,8 +8,8 @@
 
 ### Bug fixes
 
-- Fix: socket closing causes the eventstore to never receive notifications ([#130](https://github.com/commanded/eventstore/pull/130)).
-- Subscription should notifying pending events after all filtered ([#131](https://github.com/commanded/eventstore/pull/131/files)).
+- Socket closing causes the event store to never receive notifications ([#130](https://github.com/commanded/eventstore/pull/130)).
+- Subscription with selector function should notify pending events after all filtered ([#131](https://github.com/commanded/eventstore/pull/131)).
 
 ## 0.15.0
 
