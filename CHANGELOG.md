@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Enhancements
+
+- Add `:socket` and `:socket_dir` config options ([#132](https://github.com/commanded/eventstore/pull/132)).
+
 ## 0.15.1
 
 ### Enhancements

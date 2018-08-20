@@ -183,6 +183,7 @@ You should include unit tests to cover any changes.
 
 - [Andrey Akulov](https://github.com/astery)
 - [Ben Smith](https://github.com/slashdotdash)
+- [Bruce Williams](https://github.com/bruce)
 - [Chris Brodt](https://github.com/uberbrodt)
 - [Christian Green](https://github.com/Arthien)
 - [Craig Savolainen](https://github.com/maedhr)
