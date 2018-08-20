@@ -21,6 +21,42 @@ defmodule EventStore.ConfigTest do
            ]
   end
 
+  test "parse socket" do
+    original = [
+      username: "postgres",
+      socket: "/path/to/socket",
+      database: "eventstore_test",
+      password: "postgres",
+      pool: DBConnection.Poolboy
+    ]
+
+    assert Config.parse(original) == [
+             password: "postgres",
+             database: "eventstore_test",
+             socket: "/path/to/socket",
+             username: "postgres",
+             pool: DBConnection.Poolboy
+           ]
+  end
+
+  test "parse socket_dir" do
+    original = [
+      username: "postgres",
+      socket_dir: "/path/to/socket_dir",
+      database: "eventstore_test",
+      password: "postgres",
+      pool: DBConnection.Poolboy
+    ]
+
+    assert Config.parse(original) == [
+             password: "postgres",
+             database: "eventstore_test",
+             socket_dir: "/path/to/socket_dir",
+             username: "postgres",
+             pool: DBConnection.Poolboy
+           ]
+  end
+
   test "parse url" do
     original = [url: "postgres://username:password@localhost/database"]
 
