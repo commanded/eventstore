@@ -242,7 +242,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         next_state(state, data)
 
       false ->
-        next_state(:unsubscribed, data)
+        next_state(:unsubscribed, unsubscribe_from_stream(data))
     end
   end
 
@@ -384,14 +384,18 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp enqueue_events(%SubscriptionState{} = data, []), do: data
 
   defp enqueue_events(%SubscriptionState{} = data, [event | events]) do
-    %SubscriptionState{processed_event_ids: processed_event_ids, last_received: last_received} =
-      data
+    %SubscriptionState{
+      processed_event_ids: processed_event_ids,
+      last_sent: last_sent,
+      last_received: last_received
+    } = data
 
     %RecordedEvent{event_number: event_number} = event
 
     data =
       case selected?(event, data) do
         true ->
+          # Unfiltered event, enqueue to send to a subscriber
           enqueue_event(data, event)
 
         false ->
@@ -399,21 +403,16 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           %SubscriptionState{
             data
             | processed_event_ids: MapSet.put(processed_event_ids, event_number),
-              last_received: max(last_received, event_number)
+              last_sent: max(last_sent, event_number)
           }
       end
 
-    enqueue_events(data, events)
+    %SubscriptionState{data | last_received: max(last_received, event_number)}
+    |> enqueue_events(events)
   end
 
   defp enqueue_event(%SubscriptionState{} = data, event, enqueue \\ &:queue.in/2) do
-    %SubscriptionState{
-      partitions: partitions,
-      last_received: last_received,
-      queue_size: queue_size
-    } = data
-
-    %RecordedEvent{event_number: event_number} = event
+    %SubscriptionState{partitions: partitions, queue_size: queue_size} = data
 
     partition_key = partition_key(data, event)
 
@@ -422,12 +421,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       |> Map.put_new(partition_key, :queue.new())
       |> Map.update!(partition_key, fn pending_events -> enqueue.(event, pending_events) end)
 
-    %SubscriptionState{
-      data
-      | partitions: partitions,
-        last_received: max(last_received, event_number),
-        queue_size: queue_size + 1
-    }
+    %SubscriptionState{data | partitions: partitions, queue_size: queue_size + 1}
   end
 
   def partition_key(%SubscriptionState{partition_by: nil}, %RecordedEvent{}), do: nil
@@ -511,12 +505,12 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   # Select the next available subscriber based upon their partition key, buffer
   # size and number of currently in-flight events.
   #
-  # Uses a round robbin strategy for balancing of events between subscribers.
+  # Uses a round robin strategy for balancing events between subscribers.
   #
   # Events will be distributed to subscribers based upon their partition key
-  # when a `partition_by/1` function is been provided. This is used to guarantee
-  # ordering or event receipt for each partition (e.g. stream/aggregate
-  # identity).
+  # when a `partition_by/1` function is provided. This is used to guarantee
+  # ordering of events for each partition (e.g. stream/aggregate identity).
+  #
   defp next_available_subscriber(%SubscriptionState{} = data, partition_key) do
     %SubscriptionState{subscribers: subscribers} = data
 
@@ -539,11 +533,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       {_pid, subscriber} -> {:ok, subscriber}
     end
   end
-
-  defp filter(events, %SubscriptionState{selector: selector}) when is_function(selector, 1),
-    do: Enum.filter(events, selector)
-
-  defp filter(events, _selector), do: events
 
   defp selected?(event, %SubscriptionState{selector: selector}) when is_function(selector, 1),
     do: selector.(event)

@@ -175,12 +175,6 @@ defmodule EventStore.Subscriptions.SubscriptionPartitioningTest do
     assert expected_event_numbers == actual_event_numbers
   end
 
-  defp assert_last_ack(subscription, expected_ack) do
-    last_seen = Subscription.last_seen(subscription)
-
-    assert last_seen == expected_ack
-  end
-
   defp start_subscriber(name) do
     reply_to = self()
 

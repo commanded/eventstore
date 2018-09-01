@@ -44,7 +44,7 @@ defmodule EventStore.Mixfile do
   defp deps do
     [
       {:fsm, "~> 0.3"},
-      {:gen_stage, "~> 0.13"},
+      {:gen_stage, "~> 0.14"},
       {:poolboy, "~> 1.5"},
       {:postgrex, "~> 0.13"},
       {:elixir_uuid, "~> 1.2"},
@@ -56,7 +56,7 @@ defmodule EventStore.Mixfile do
       {:ex_doc, "~> 0.19", only: :dev},
       {:markdown, github: "devinus/markdown", only: :dev},
       {:mix_test_watch, "~> 0.8", only: :dev},
-      {:poison, "~> 2.2 or ~> 3.0", optional: true}
+      {:poison, "~> 2.2 or ~> 3.0 or ~> 4.0", optional: true}
     ]
   end
 
