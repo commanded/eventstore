@@ -35,15 +35,26 @@ defmodule EventStore.SelectorSubscriber do
         selector: &test_selector/1
       )
 
-    {:ok, %{state | subscription: subscription}}
+    {:ok, %State{state | subscription: subscription}}
+  end
+
+  def handle_info(
+        {:subscribed, subscription} = message,
+        %State{subscription: subscription} = state
+      ) do
+    %State{reply_to: reply_to} = state
+
+    send(reply_to, message)
+
+    {:noreply, state}
   end
 
   def handle_info({:events, events} = message, %State{} = state) do
     %State{subscription: subscription, reply_to: reply_to} = state
 
-    processing_delay(state)
-
     send(reply_to, message)
+
+    processing_delay(state)
 
     :ok = EventStore.ack(subscription, events)
 
@@ -51,10 +62,6 @@ defmodule EventStore.SelectorSubscriber do
   end
 
   def handle_info(_message, state), do: {:noreply, state}
-
-  def handle_call(:received_events, _from, %State{} = state) do
-    %State{} = state
-  end
 
   def test_selector(%EventStore.RecordedEvent{data: %{event: event}}) when is_odd(event), do: true
   def test_selector(_recorded_event), do: false

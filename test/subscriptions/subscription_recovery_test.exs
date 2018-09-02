@@ -14,7 +14,7 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
 
       append_to_stream(stream1_uuid, 10)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), buffer_size: 10)
 
       receive_and_ack(subscription, stream1_uuid, 1)
 
@@ -80,8 +80,8 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
     :ok = EventStore.append_to_stream(stream_uuid, expected_version, events)
   end
 
-  # subscribe to all streams and wait for the subscription to be subscribed
-  defp subscribe_to_all_streams(subscription_name, subscriber, opts \\ []) do
+  # Subscribe to all streams and wait for the subscription to be subscribed.
+  defp subscribe_to_all_streams(subscription_name, subscriber, opts) do
     {:ok, subscription} = EventStore.subscribe_to_all_streams(subscription_name, subscriber, opts)
 
     assert_receive {:subscribed, ^subscription}
@@ -89,20 +89,20 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
     {:ok, subscription}
   end
 
-  def receive_and_ack(subscription, expected_stream_uuid, expected_intial_event_number) do
+  def receive_and_ack(subscription, expected_stream_uuid, expected_initial_event_number) do
     assert_receive {:events, received_events}
     assert length(received_events) == 10
 
     received_events
-    |> Enum.with_index(expected_intial_event_number)
+    |> Enum.with_index(expected_initial_event_number)
     |> Enum.each(fn {event, expected_event_number} ->
       %RecordedEvent{event_number: event_number} = event
 
       assert event_number == expected_event_number
       assert event.stream_uuid == expected_stream_uuid
-
-      Subscription.ack(subscription, event)
     end)
+
+    Subscription.ack(subscription, received_events)
   end
 
   def wait_until(timeout \\ 1000, step \\ 50, fun)

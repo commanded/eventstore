@@ -50,7 +50,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
       |> SubscriptionFsm.subscribed()
       |> SubscriptionFsm.catch_up()
 
-    assert subscription.state == :catching_up
+    assert subscription.state == :request_catch_up
 
     assert_receive {:events, received_events}
     subscription = ack(subscription, received_events)
@@ -95,7 +95,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
         |> SubscriptionFsm.subscribed()
         |> SubscriptionFsm.catch_up()
 
-      assert subscription.state == :catching_up
+      assert subscription.state == :request_catch_up
 
       stream_uuid = UUID.uuid4()
       recorded_events = EventFactory.create_recorded_events(3, stream_uuid, 4)
@@ -103,7 +103,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
       # Notify events while subscription is catching up
       subscription = SubscriptionFsm.notify_events(subscription, recorded_events)
 
-      assert subscription.state == :catching_up
+      assert subscription.state == :request_catch_up
       assert subscription.data.last_received == 6
       assert subscription.data.last_sent == 3
       assert subscription.data.last_ack == 0
@@ -161,7 +161,7 @@ defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
         |> SubscriptionFsm.subscribed()
         |> SubscriptionFsm.catch_up()
 
-      assert subscription.state == :catching_up
+      assert subscription.state == :request_catch_up
       assert subscription.data.last_sent == 3
       assert subscription.data.last_ack == 0
       assert subscription.data.last_received == length(recorded_events)

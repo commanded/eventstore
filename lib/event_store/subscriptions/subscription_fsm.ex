@@ -354,7 +354,13 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       {:ok, events} ->
         data = data |> enqueue_events(events) |> notify_subscribers()
 
-        next_state(:catching_up, data)
+        if empty_queue?(data) do
+          # Request next batch of events
+          next_state(:request_catch_up, data)
+        else
+          # Wait until subscribers have ack'd in-flight events
+          next_state(:catching_up, data)
+        end
 
       {:error, :stream_not_found} ->
         next_state(:subscribed, data)

@@ -83,7 +83,7 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
         |> SubscriptionFsm.subscribed()
         |> SubscriptionFsm.catch_up()
 
-      assert subscription.state == :catching_up
+      assert subscription.state == :request_catch_up
       assert subscription.data.last_sent == 3
 
       assert_receive {:events, received_events}
@@ -104,7 +104,7 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
         |> SubscriptionFsm.subscribed()
         |> SubscriptionFsm.catch_up()
 
-      assert subscription.state == :catching_up
+      assert subscription.state == :request_catch_up
       assert subscription.data.last_sent == 3
       assert subscription.data.last_ack == 0
 
@@ -171,7 +171,7 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
         |> SubscriptionFsm.subscribed()
         |> SubscriptionFsm.catch_up()
 
-      assert subscription.state == :catching_up
+      assert subscription.state == :request_catch_up
       assert subscription.data.last_sent == 3
       assert subscription.data.last_ack == 0
 
@@ -212,12 +212,11 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
       |> SubscriptionFsm.subscribed()
       |> SubscriptionFsm.catch_up()
 
-    assert subscription.state == :catching_up
+    assert subscription.state == :request_catch_up
 
     assert_receive {:events, received_events}
     assert length(received_events) == 3
 
-    assert subscription.state == :catching_up
     assert subscription.data.last_sent == 3
     assert subscription.data.last_ack == 0
 

@@ -7,33 +7,49 @@ defmodule EventStore.Subscriptions.SubscriptionSelectorTest do
   alias EventStore.{RecordedEvent, SelectorSubscriber}
   alias EventStore.EventFactory.Event
 
-  for delay <- [0, 1, 100] do
+  describe "subscription selector with no processing delay" do
+    test "should catch up and receive only selected events" do
+      assert_catch_up()
+    end
+
+    test "should catch up and resume receiving only selected events" do
+      assert_catch_up_and_resume()
+    end
+
+    test "should subscribe and receive only selected events" do
+      assert_selector_subscriber()
+    end
+  end
+
+  for delay <- [1, 10, 100] do
     @delay delay
 
     describe "subscription selector with #{@delay}ms processing delay" do
+      @tag :slow
       test "should catch up and receive only selected events" do
         assert_catch_up(@delay)
       end
 
+      @tag :slow
       test "should catch up and resume receiving only selected events" do
         assert_catch_up_and_resume(@delay)
       end
 
+      @tag :slow
       test "should subscribe and receive only selected events" do
         assert_selector_subscriber(@delay)
       end
     end
   end
 
-  defp assert_catch_up(delay) do
-    subscription_name = UUID.uuid4()
+  defp assert_catch_up(delay \\ 0) do
     stream_uuid = UUID.uuid4()
 
     for i <- 1..100 do
       :ok = append_to_stream(stream_uuid, 1, i - 1)
     end
 
-    SelectorSubscriber.start_link(stream_uuid, subscription_name, self(), delay)
+    start_selector_subscriber(stream_uuid, delay)
 
     for i <- 1..100, is_odd(i) do
       assert_receive {:events, [%RecordedEvent{data: %Event{event: ^i}}]}
@@ -42,15 +58,14 @@ defmodule EventStore.Subscriptions.SubscriptionSelectorTest do
     refute_receive {:events, _events}
   end
 
-  defp assert_catch_up_and_resume(delay) do
-    subscription_name = UUID.uuid4()
+  defp assert_catch_up_and_resume(delay \\ 0) do
     stream_uuid = UUID.uuid4()
 
     for i <- 1..100 do
       :ok = append_to_stream(stream_uuid, 1, i - 1)
     end
 
-    SelectorSubscriber.start_link(stream_uuid, subscription_name, self(), delay)
+    start_selector_subscriber(stream_uuid, delay)
 
     for i <- 1..100, is_odd(i) do
       assert_receive {:events, [%RecordedEvent{data: %Event{event: ^i}}]}
@@ -69,11 +84,10 @@ defmodule EventStore.Subscriptions.SubscriptionSelectorTest do
     refute_receive {:events, _events}
   end
 
-  defp assert_selector_subscriber(delay) do
-    subscription_name = UUID.uuid4()
+  defp assert_selector_subscriber(delay \\ 0) do
     stream_uuid = UUID.uuid4()
 
-    SelectorSubscriber.start_link(stream_uuid, subscription_name, self(), delay)
+    start_selector_subscriber(stream_uuid, delay)
 
     for i <- 1..100 do
       :ok = append_to_stream(stream_uuid, 1, i - 1)
@@ -84,5 +98,13 @@ defmodule EventStore.Subscriptions.SubscriptionSelectorTest do
     end
 
     refute_receive {:events, _events}
+  end
+
+  defp start_selector_subscriber(stream_uuid, delay) do
+    subscription_name = UUID.uuid4()
+
+    {:ok, _pid} = SelectorSubscriber.start_link(stream_uuid, subscription_name, self(), delay)
+
+    assert_receive {:subscribed, _subscription}
   end
 end
