@@ -34,11 +34,11 @@ defmodule EventStore.Mixfile do
     ]
   end
 
-  defp elixirc_paths(:bench), do: ["lib", "test/support"]
-  defp elixirc_paths(:jsonb), do: ["lib", "test/support"]
-  defp elixirc_paths(:distributed), do: ["lib", "test/support"]
-  defp elixirc_paths(:local), do: ["lib", "test/support"]
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:bench), do: ["lib", "test/support", "test/subscriptions/support"]
+  defp elixirc_paths(:jsonb), do: ["lib", "test/support", "test/subscriptions/support"]
+  defp elixirc_paths(:distributed), do: ["lib", "test/support", "test/subscriptions/support"]
+  defp elixirc_paths(:local), do: ["lib", "test/support", "test/subscriptions/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/subscriptions/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do

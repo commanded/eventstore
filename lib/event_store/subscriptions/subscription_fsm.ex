@@ -242,7 +242,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         next_state(state, data)
 
       false ->
-        next_state(:unsubscribed, unsubscribe_from_stream(data))
+        next_state(:unsubscribed, data)
     end
   end
 
