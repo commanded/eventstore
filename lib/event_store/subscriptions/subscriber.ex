@@ -41,21 +41,41 @@ defmodule EventStore.Subscriptions.Subscriber do
     }
   end
 
-  def acknowledge(%Subscriber{in_flight: in_flight} = subscriber, ack) do
-    acknowledged_events =
-      Enum.filter(in_flight, fn %RecordedEvent{event_number: event_number} ->
-        event_number <= ack
-      end)
+  @doc """
+  Acknowledge the in-flight event by number and all events sent to the
+  subscriber before the ack'd event.
+  """
+  def acknowledge(%Subscriber{} = subscriber, ack) do
+    %Subscriber{in_flight: in_flight} = subscriber
 
-    subscriber =
-      case in_flight -- acknowledged_events do
-        [] ->
-          %Subscriber{subscriber | in_flight: [], partition_key: nil}
+    case ack_event_index(in_flight, ack) do
+      nil ->
+        {subscriber, []}
 
-        in_flight ->
-          %Subscriber{subscriber | in_flight: in_flight}
-      end
+      index ->
+        # All in-flight events up to the ack'd event number are also ack'd
+        acknowledged_events =
+          in_flight
+          |> Enum.reverse()
+          |> Enum.take(length(in_flight) - index)
 
-    {subscriber, acknowledged_events}
+        subscriber =
+          case in_flight -- acknowledged_events do
+            [] ->
+              %Subscriber{subscriber | in_flight: [], partition_key: nil}
+
+            in_flight ->
+              %Subscriber{subscriber | in_flight: in_flight}
+          end
+
+        {subscriber, acknowledged_events}
+    end
+  end
+
+  defp ack_event_index(in_flight, ack) do
+    Enum.find_index(in_flight, fn
+      %RecordedEvent{event_number: ^ack} -> true
+      _event -> false
+    end)
   end
 end

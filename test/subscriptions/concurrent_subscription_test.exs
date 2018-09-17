@@ -219,6 +219,45 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       refute_receive {:events, _received_events, _subscriber}
     end
 
+    test "should not ack resent in-flight events when subscriber process terminates" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber1,
+          concurrency_limit: 2,
+          buffer_size: 2
+        )
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber2,
+          concurrency_limit: 2,
+          buffer_size: 2
+        )
+
+      append_to_stream(stream_uuid, 3)
+
+      assert_receive_events([1, 3], :subscriber1)
+      assert_receive_events([2], :subscriber2)
+
+      Process.unlink(subscriber1)
+      Process.exit(subscriber1, :shutdown)
+      assert_last_ack(subscription, 0)
+
+      assert_receive_events([1], :subscriber2)
+      Subscription.ack(subscription, 2, subscriber2)
+      assert_last_ack(subscription, 0)
+
+      Subscription.ack(subscription, 1, subscriber2)
+      assert_receive_events([3], :subscriber2)
+      assert_last_ack(subscription, 2)
+
+      refute_receive {:events, _received_events, _subscriber}
+    end
+
     test "should shutdown subscription when all subscribers down" do
       subscription_name = UUID.uuid4()
       stream_uuid = UUID.uuid4()

@@ -301,7 +301,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         # event queue so they will be resent to another available subscriber.
         data =
           in_flight
-          |> Enum.reverse()
+          |> Enum.sort_by(fn %RecordedEvent{event_number: event_number} -> -event_number end)
           |> Enum.reduce(data, fn event, data ->
             enqueue_event(data, event, &:queue.in_r/2)
           end)
