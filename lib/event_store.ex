@@ -365,6 +365,31 @@ defmodule EventStore do
         may connect. If too many subscribers attempt to connect to the
         subscription an `{:error, :too_many_subscribers}` is returned.
 
+      - `buffer_size` limits how many in-flight events will be sent to the
+        subscriber process before acknowledgement of successful processing. This
+        limits the number of messages sent to the subscriber and stops their
+        message queue from getting filled with events. Defaults to one in-flight
+        event.
+
+      - `partition_by` is an optional function used to partition events to
+        subscribers. It can be used to guarantee processing order when multiple
+        subscribers have subscribed to a single subscription. The function is
+        passed a single argument (an `EventStore.RecordedEvent` struct) and must
+        return the partition key. As an example to guarantee events for a single
+        stream are processed serially, but different streams are processed
+        concurrently, you could use the `stream_uuid` as the partition key.
+
+            alias EventStore.RecordedEvent
+
+            by_stream = fn %RecordedEvent{stream_uuid: stream_uuid} -> stream_uuid end
+
+            {:ok, _subscription} =
+              EventStore.subscribe_to_stream(stream_uuid, "example", self(),
+                concurrency_limit: 10,
+                partition_by: by_stream
+              )
+
+
   The subscription will resume from the last acknowledged event if it already
   exists. It will ignore the `start_from` argument in this case.
 
@@ -400,6 +425,7 @@ defmodule EventStore do
   """
   @spec subscribe_to_stream(String.t(), String.t(), pid, keyword) ::
           {:ok, subscription :: pid}
+          | {:error, :already_subscribed}
           | {:error, :subscription_already_exists}
           | {:error, :too_many_subscribers}
           | {:error, reason :: term}
@@ -474,6 +500,7 @@ defmodule EventStore do
   """
   @spec subscribe_to_all_streams(String.t(), pid, keyword) ::
           {:ok, subscription :: pid}
+          | {:error, :already_subscribed}
           | {:error, :subscription_already_exists}
           | {:error, :too_many_subscribers}
           | {:error, reason :: term}

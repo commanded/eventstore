@@ -60,6 +60,16 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
                )
     end
 
+    test "should refuse same subscriber process twice" do
+      subscription_name = UUID.uuid4()
+
+      assert {:ok, _subscription} =
+               EventStore.subscribe_to_all_streams(subscription_name, self(), concurrency_limit: 2)
+
+      assert {:error, :already_subscribed} =
+               EventStore.subscribe_to_all_streams(subscription_name, self(), concurrency_limit: 2)
+    end
+
     test "should send events to all subscribers" do
       subscription_name = UUID.uuid4()
       stream_uuid = UUID.uuid4()

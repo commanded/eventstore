@@ -187,16 +187,16 @@ defmodule EventStore.Subscriptions.Subscription do
   def handle_call({:connect, subscriber, opts}, _from, %Subscription{} = state) do
     %Subscription{subscription: subscription} = state
 
-    concurrency_limit = Keyword.get(opts, :concurrency_limit, 1)
-
-    if subscriber_count(subscription) < concurrency_limit do
+    with :ok <- ensure_not_already_subscribed(subscription, subscriber),
+         :ok <- ensure_within_concurrency_limit(subscription, opts) do
       subscription = SubscriptionFsm.connect_subscriber(subscription, subscriber, opts)
 
       state = %Subscription{state | subscription: subscription}
 
       {:reply, {:ok, self()}, state}
     else
-      {:reply, {:error, :too_many_subscribers}, state}
+      {:error, _error} = reply ->
+        {:reply, reply, state}
     end
   end
 
@@ -230,11 +230,6 @@ defmodule EventStore.Subscriptions.Subscription do
          %Subscription{subscription: %SubscriptionFsm{state: :initial}} = state
        ) do
     %Subscription{retry_interval: retry_interval} = state
-
-    _ =
-      Logger.debug(fn ->
-        describe(state) <> " failed to subscribe, will retry in #{retry_interval}ms"
-      end)
 
     retry_ref = Process.send_after(self(), :subscribe_to_stream, retry_interval)
 
@@ -330,6 +325,29 @@ defmodule EventStore.Subscriptions.Subscription do
       _ ->
         # default to 60s
         60_000
+    end
+  end
+
+  # Prevent duplicate subscriptions from same process.
+  defp ensure_not_already_subscribed(%SubscriptionFsm{} = subscription, pid) do
+    unless subscribed?(subscription, pid) do
+      :ok
+    else
+      {:error, :already_subscribed}
+    end
+  end
+
+  defp subscribed?(%SubscriptionFsm{data: %SubscriptionState{subscribers: subscribers}}, pid),
+    do: Map.has_key?(subscribers, pid)
+
+  # Prevent more subscribers than requested concurrency limit.
+  defp ensure_within_concurrency_limit(%SubscriptionFsm{} = subscription, opts) do
+    concurrency_limit = Keyword.get(opts, :concurrency_limit, 1)
+
+    if subscriber_count(subscription) < concurrency_limit do
+      :ok
+    else
+      {:error, :too_many_subscribers}
     end
   end
 

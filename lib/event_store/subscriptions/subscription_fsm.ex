@@ -415,9 +415,9 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   def partition_key(%SubscriptionState{partition_by: nil}, %RecordedEvent{}), do: nil
 
-  def partition_key(%SubscriptionState{partition_by: partition_by}, %RecordedEvent{data: data})
+  def partition_key(%SubscriptionState{partition_by: partition_by}, %RecordedEvent{} = event)
       when is_function(partition_by, 1),
-      do: partition_by.(data)
+      do: partition_by.(event)
 
   # Attempt to notify subscribers with any pending events. Partitions are
   # selected by peeking at the event number of their queue to ensure earlier

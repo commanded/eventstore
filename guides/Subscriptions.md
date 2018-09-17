@@ -66,13 +66,11 @@ end
 
 ## Persistent subscriptions
 
-Persistent subscriptions to a stream will guarantee *at least once* delivery of every persisted event. Each subscription may be independently paused, then later resumed from where it stopped. The last received and acknowledged event is stored by the EventStore to support resuming at a later time later or whenever the subscriber process restarts.
+Persistent subscriptions to a stream will guarantee *at least once* delivery of every persisted event. Each subscription may be independently paused, then later resumed from where it stopped. The last received and acknowledged event is stored by the EventStore to support resuming at a later time or whenever the subscriber process restarts.
 
 A subscription can be created to receive events appended to a single or all streams.
 
-Events are received in batches after being persisted to storage. A batch contains the events appended to a single stream using `EventStore.append_to_stream/4`.
-
-Subscriptions must be uniquely named and support a single subscriber. Attempting to connect two subscribers to the same subscription will return an `{:error, :subscription_already_exists}` error.
+Subscriptions must be uniquely named and by default only support a single subscriber. Attempting to connect two subscribers to the same subscription will return `{:error, :subscription_already_exists}`. You can optionally create a [competing consumer subscription with multiple subscribers](#subscription-concurrency).
 
 ### `:subscribed` message
 
@@ -167,7 +165,7 @@ You can choose to receive events from a given starting position.
 
 The supported options are:
 
-  - `:origin` - Start receiving events from the beginning of the stream or all streams.
+  - `:origin` - Start receiving events from the beginning of the stream or all streams (default).
   - `:current` - Subscribe to newly appended events only, skipping already persisted events.
   - `event_number` (integer) - Specify an exact event number to subscribe from. This will be the same as the stream version for single stream subscriptions.
 
@@ -233,6 +231,45 @@ receive do
 end
 ```
 
+### Subscription concurrency
+
+A single persistent subscription can support multiple subscribers. Events will be distributed to subscribers evenly using a round-robin algorithm. The [competing consumers pattern](https://docs.microsoft.com/en-us/azure/architecture/patterns/competing-consumers) enables multiple subscribers to process events concurrently to optimise throughput, to improve scalability and availability, and to balance the workload.
+
+By default a subscription will only allow a single subscriber but you can opt-in to concurrent subscriptions be providing a non-negative `concurrency_limit` as a subscription option.
+
+#### Subscription concurrency configuration options
+
+- `concurrency_limit` defines the maximum number of concurrent subscribers allowed to connect to the subscription. By default only one subscriber may connect. If too many subscribers attempt to connect to the
+  subscription an `{:error, :too_many_subscribers}` is returned.
+
+- `buffer_size` limits how many in-flight events will be sent to the subscriber process before acknowledgement of successful processing. This limits the number of messages sent to the subscriber and stops their message queue from getting filled with events. Defaults to one in-flight event.
+
+- `partition_by` is an optional function used to partition events to subscribers. It can be used to guarantee processing order when multiple subscribers have subscribed to a single subscription as described in [Ordering guarantee](#ordering-guarantee) below. The function is passed a single argument (an `EventStore.RecordedEvent` struct) and must return the partition key. As an example to guarantee events for a single stream are processed serially, but different streams are processed concurrently, you could use the `stream_uuid` as the partition key.
+
+### Ordering guarantee
+
+With multiple subscriber processes connected to a single subscription the ordering of event processing is no longer guaranteed since events may be processed in differing amounts of time. This can cause problems if your event handling code expects events to be processed in the order they were originally appended to a steam.
+
+You can use a `partition_by` function to guarantee ordering of events within a particular group (e.g. per stream) but still allow events for different groups to be processed concurrently.
+
+
+Partitioning gives you the benefits of competing consumers but still allows event ordering by partition where required.
+
+#### Partition by example
+
+```elixir
+alias EventStore.RecordedEvent
+
+by_stream = fn %RecordedEvent{stream_uuid: stream_uuid} -> stream_uuid end
+
+{:ok, _subscription} =
+  EventStore.subscribe_to_stream(stream_uuid, "example", self(),
+    concurrency_limit: 10,
+    partition_by: by_stream
+  )
+```
+
+The above subscription would ensure that events for each stream are processed serially (by a single subscriber) in the order they were appended to the stream, but events for any other stream can be processed concurrently by another subscriber.
 
 ### Example persistent subscriber
 

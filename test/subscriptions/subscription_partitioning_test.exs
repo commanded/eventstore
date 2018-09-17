@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.SubscriptionPartitioningTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, RecordedEvent}
   alias EventStore.Subscriptions.Subscription
 
   describe "subscription partitioning" do
@@ -13,7 +13,9 @@ defmodule EventStore.Subscriptions.SubscriptionPartitioningTest do
       subscriber2 = start_subscriber(:subscriber2)
       subscriber3 = start_subscriber(:subscriber3)
 
-      partition_by = fn %EventStore.EventFactory.Event{event: number} -> rem(number, 2) end
+      partition_by = fn %RecordedEvent{data: %EventFactory.Event{event: number}} ->
+        rem(number, 2)
+      end
 
       {:ok, subscription} =
         EventStore.subscribe_to_all_streams(
@@ -57,7 +59,9 @@ defmodule EventStore.Subscriptions.SubscriptionPartitioningTest do
       subscriber2 = start_subscriber(:subscriber2)
       subscriber3 = start_subscriber(:subscriber3)
 
-      partition_by = fn %EventStore.EventFactory.Event{event: number} -> rem(number, 3) end
+      partition_by = fn %RecordedEvent{data: %EventFactory.Event{event: number}} ->
+        rem(number, 3)
+      end
 
       {:ok, subscription} =
         EventStore.subscribe_to_all_streams(
@@ -113,7 +117,9 @@ defmodule EventStore.Subscriptions.SubscriptionPartitioningTest do
       subscriber2 = start_subscriber(:subscriber2)
       subscriber3 = start_subscriber(:subscriber3)
 
-      partition_by = fn %EventStore.EventFactory.Event{event: number} -> rem(number, 4) end
+      partition_by = fn %RecordedEvent{data: %EventFactory.Event{event: number}} ->
+        rem(number, 4)
+      end
 
       {:ok, subscription} =
         EventStore.subscribe_to_all_streams(
