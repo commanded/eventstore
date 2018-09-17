@@ -5,6 +5,7 @@
 ### Enhancements
 
 - Add `:socket` and `:socket_dir` config options ([#132](https://github.com/commanded/eventstore/pull/132)).
+- Rename `uuid` dependency to `elixir_uuid` ([#135](https://github.com/commanded/eventstore/pull/135)).
 
 ## 0.15.1
 
