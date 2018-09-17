@@ -5,6 +5,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Support.CollectingSubscriber
 
+  @conn EventStore.Postgrex
+
   setup do
     subscription_name = UUID.uuid4()
 
@@ -589,8 +591,58 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     end
   end
 
-  # append events to another stream so that for single stream subscription tests the
-  # event id does not match the stream version
+  describe "unsubscribe from stream" do
+    test "should shutdown subscription process", %{
+      subscription_name: subscription_name
+    } do
+      stream_uuid = UUID.uuid4()
+      initial_events = EventFactory.create_events(1)
+      new_events = EventFactory.create_events(1, 2)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
+
+      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(initial_events, :data)
+
+      :ok = Subscription.ack(subscription, received_events)
+
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(new_events, :data)
+
+      :ok = EventStore.unsubscribe_from_stream(stream_uuid, subscription_name)
+      refute Process.alive?(subscription)
+
+      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(new_events, :data)
+
+      :ok = Subscription.ack(subscription, received_events)
+
+      refute_receive {:events, _received_events}
+    end
+  end
+
+  describe "delete subscription" do
+    test "should be deleted", %{subscription_name: subscription_name} do
+      stream_uuid = UUID.uuid4()
+
+      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
+
+      assert :ok = EventStore.delete_subscription(stream_uuid, subscription_name)
+      refute Process.alive?(subscription)
+
+      assert {:ok, []} = EventStore.Storage.subscriptions(@conn, pool: DBConnection.Poolboy)
+    end
+  end
+
+  # Append events to another stream so that for single stream subscription tests
+  # the event id does not match the stream version.
   def append_events_to_another_stream(_context) do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
@@ -598,7 +650,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)
   end
 
-  # subscribe to a single stream and wait for the subscription to be subscribed
+  # Subscribe to a single stream and wait for the subscription to be subscribed
   defp subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ []) do
     opts = Keyword.put_new(opts, :buffer_size, 3)
 

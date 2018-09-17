@@ -323,6 +323,48 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       assert_last_ack(subscription, 12)
       refute_receive {:events, _received_events, _subscriber}
     end
+
+    test "should ack events when all filtered by selector function" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+
+      # Exclude all events
+      selector = fn _event -> false end
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(
+          subscription_name,
+          subscriber1,
+          concurrency_limit: 2,
+          selector: selector
+        )
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(
+          subscription_name,
+          subscriber2,
+          concurrency_limit: 2,
+          selector: selector
+        )
+
+      append_to_stream(stream_uuid, 1)
+
+      refute_receive {:events, _received_events, _subscriber}
+      assert_last_ack(subscription, 1)
+
+      append_to_stream(stream_uuid, 2, 1)
+
+      refute_receive {:events, _received_events, _subscriber}
+      assert_last_ack(subscription, 3)
+
+      append_to_stream(stream_uuid, 3, 3)
+
+      refute_receive {:events, _received_events, _subscriber}
+      assert_last_ack(subscription, 6)
+    end
   end
 
   describe "concurrent subscriber buffer size" do
@@ -362,10 +404,16 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       subscriber2 = start_subscriber(:subscriber2)
 
       {:ok, subscription} =
-        EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency_limit: 2, buffer_size: 2)
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber1,
+          concurrency_limit: 2,
+          buffer_size: 2
+        )
 
       {:ok, ^subscription} =
-        EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 2, buffer_size: 3)
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber2,
+          concurrency_limit: 2,
+          buffer_size: 3
+        )
 
       append_to_stream(stream_uuid, 12)
 
