@@ -47,7 +47,7 @@ defmodule EventStore.Mixfile do
       {:gen_stage, "~> 0.13"},
       {:poolboy, "~> 1.5"},
       {:postgrex, "~> 0.13"},
-      {:uuid, "~> 1.1"},
+      {:elixir_uuid, "~> 1.2"},
 
       # Test & release tooling
       {:benchfella, "~> 0.3", only: :bench},
