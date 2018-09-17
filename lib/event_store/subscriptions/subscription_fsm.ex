@@ -279,23 +279,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     )
   end
 
-  defp unsubscribe_from_stream(%SubscriptionState{} = data) do
-    %SubscriptionState{
-      conn: conn,
-      stream_uuid: stream_uuid,
-      subscription_name: subscription_name
-    } = data
-
-    Storage.Subscription.unsubscribe_from_stream(
-      conn,
-      stream_uuid,
-      subscription_name,
-      pool: DBConnection.Poolboy
-    )
-
-    data
-  end
-
   defp monitor_subscriber(%SubscriptionState{subscribers: subscribers} = data, pid, opts)
        when is_pid(pid) do
     subscriber = %Subscriber{

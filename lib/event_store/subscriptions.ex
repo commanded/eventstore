@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions do
   @moduledoc false
 
-  alias EventStore.Subscriptions
+  alias EventStore.{Storage, Subscriptions}
   alias EventStore.Subscriptions.Subscription
 
   @all_stream "$all"
@@ -24,6 +24,12 @@ defmodule EventStore.Subscriptions do
 
   def unsubscribe_from_all_streams(subscription_name) do
     do_unsubscribe_from_stream(@all_stream, subscription_name)
+  end
+
+  def delete_subscription(conn, stream_uuid, subscription_name, opts) do
+    :ok = Subscriptions.Supervisor.shutdown_subscription(stream_uuid, subscription_name)
+
+    Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
   end
 
   defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do

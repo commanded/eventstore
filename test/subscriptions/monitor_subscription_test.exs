@@ -22,8 +22,8 @@ defmodule EventStore.Subscriptions.MonitorSubscriptionTest do
       assert_shutdown(subscription1)
 
       # Other subscription should be unaffected
-      assert Process.alive?(subscription2) == true
-      assert Process.alive?(subscriber2) == true
+      assert Process.alive?(subscription2)
+      assert Process.alive?(subscriber2)
 
       # Appending events to stream should notify subscription 2
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
@@ -59,8 +59,8 @@ defmodule EventStore.Subscriptions.MonitorSubscriptionTest do
       assert_shutdown(subscription1)
 
       # Other subscription should be unaffected
-      assert Process.alive?(subscription2) == true
-      assert Process.alive?(subscriber2) == true
+      assert Process.alive?(subscription2)
+      assert Process.alive?(subscriber2)
 
       # Should still notify subscription 2
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
@@ -85,7 +85,7 @@ defmodule EventStore.Subscriptions.MonitorSubscriptionTest do
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       refute_receive {:events, _received_events}
-      assert Process.alive?(subscription) == false
+      refute Process.alive?(subscription)
     end
   end
 

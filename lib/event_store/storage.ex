@@ -3,13 +3,14 @@ defmodule EventStore.Storage do
 
   alias EventStore.Snapshots.SnapshotData
   alias EventStore.Storage
+
   alias EventStore.Storage.{
     Appender,
     CreateStream,
     QueryStreamInfo,
     Reader,
     Snapshot,
-    Subscription,
+    Subscription
   }
 
   @doc """
@@ -80,10 +81,10 @@ defmodule EventStore.Storage do
   end
 
   @doc """
-  Unsubscribe from an existing named subscription to a stream.
+  Delete an existing named subscription to a stream.
   """
-  def unsubscribe_from_stream(conn, stream_uuid, subscription_name, opts \\ []) do
-    Subscription.unsubscribe_from_stream(conn, stream_uuid, subscription_name, opts)
+  def delete_subscription(conn, stream_uuid, subscription_name, opts \\ []) do
+    Subscription.delete_subscription(conn, stream_uuid, subscription_name, opts)
   end
 
   @doc """

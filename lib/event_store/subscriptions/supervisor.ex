@@ -31,8 +31,21 @@ defmodule EventStore.Subscriptions.Supervisor do
         :ok
 
       subscription ->
-        :ok = Subscription.unsubscribe(subscription)
-        :ok = Supervisor.terminate_child(__MODULE__, subscription)
+        Subscription.unsubscribe(subscription)
+    end
+  end
+
+  def shutdown_subscription(stream_uuid, subscription_name) do
+    name = registry_name(stream_uuid, subscription_name)
+
+    case Registry.whereis_name(name) do
+      :undefined ->
+        :ok
+
+      subscription ->
+        Process.exit(subscription, :shutdown)
+
+        :ok
     end
   end
 

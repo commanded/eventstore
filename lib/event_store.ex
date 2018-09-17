@@ -491,8 +491,10 @@ defmodule EventStore do
   Accepts a `RecordedEvent`, a list of `RecordedEvent`s, or the event number of
   the recorded event to acknowledge.
   """
-  @spec ack(pid, EventStore.RecordedEvent.t() | list(EventStore.RecordedEvent.t()) | non_neg_integer()) ::
-          :ok | {:error, reason :: term}
+  @spec ack(
+          pid,
+          EventStore.RecordedEvent.t() | list(EventStore.RecordedEvent.t()) | non_neg_integer()
+        ) :: :ok | {:error, reason :: term}
   def ack(subscription, ack) do
     Subscription.ack(subscription, ack)
   end
@@ -502,8 +504,8 @@ defmodule EventStore do
 
     - `stream_uuid` is the stream to unsubscribe from.
 
-    - `subscription_name` is used to identify the existing subscription to
-      remove.
+    - `subscription_name` is used to identify the existing subscription process
+      to stop.
 
   Returns `:ok` on success.
   """
@@ -515,14 +517,44 @@ defmodule EventStore do
   @doc """
   Unsubscribe an existing subscriber from all event notifications.
 
-    - `subscription_name` is used to identify the existing subscription to
-      remove.
+    - `subscription_name` is used to identify the existing subscription process
+      to stop.
 
   Returns `:ok` on success.
   """
   @spec unsubscribe_from_all_streams(String.t()) :: :ok
   def unsubscribe_from_all_streams(subscription_name) do
     Subscriptions.unsubscribe_from_stream(@all_stream, subscription_name)
+  end
+
+  @doc """
+  Delete an existing persistent subscription.
+
+    - `stream_uuid` is the stream the subscription is subscribed to.
+
+    - `subscription_name` is used to identify the existing subscription to
+      remove.
+
+  Returns `:ok` on success.
+  """
+  @spec delete_subscription(String.t(), String.t()) :: :ok
+  def delete_subscription(stream_uuid, subscription_name) do
+    Subscriptions.delete_subscription(@conn, stream_uuid, subscription_name, opts())
+  end
+
+  @doc """
+  Delete an existing persistent subscription to all streams.
+
+    - `stream_uuid` is the stream the subscription is subscribed to.
+
+    - `subscription_name` is used to identify the existing subscription to
+      remove.
+
+  Returns `:ok` on success.
+  """
+  @spec delete_all_streams_subscription(String.t()) :: :ok
+  def delete_all_streams_subscription(subscription_name) do
+    EventStore.delete_subscription(@all_stream, subscription_name)
   end
 
   @doc """
@@ -563,13 +595,9 @@ defmodule EventStore do
 
   @default_opts [pool: DBConnection.Poolboy]
 
-  defp opts(timeout \\ nil) do
-    case timeout do
-      timeout when is_integer(timeout) ->
-        Keyword.put(@default_opts, :timeout, timeout)
+  defp opts, do: @default_opts
 
-      _ ->
-        @default_opts
-    end
+  defp opts(timeout) when is_integer(timeout) do
+    Keyword.put(@default_opts, :timeout, timeout)
   end
 end
