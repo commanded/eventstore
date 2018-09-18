@@ -55,7 +55,7 @@ defmodule EventStore.Mixfile do
       {:dialyxir, "~> 0.5", only: [:dev, :test]},
       {:ex_doc, "~> 0.19", only: :dev},
       {:markdown, github: "devinus/markdown", only: :dev},
-      {:mix_test_watch, "~> 0.8", only: :dev},
+      {:mix_test_watch, "~> 0.9", only: :dev},
       {:poison, "~> 2.2 or ~> 3.0 or ~> 4.0", optional: true}
     ]
   end
