@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, ProcessHelper}
   alias EventStore.Subscriptions.Subscription
 
   describe "concurrent subscription" do
@@ -186,6 +186,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       refute_receive {:events, _received_events, _subscriber}
     end
 
+    @tag :wip
     test "should resend in-flight events when subscriber process terminates" do
       subscription_name = UUID.uuid4()
       stream_uuid = UUID.uuid4()
@@ -205,10 +206,10 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       assert_receive_events([2], :subscriber2)
       assert_last_ack(subscription, 0)
 
-      Process.unlink(subscriber1)
-      Process.exit(subscriber1, :shutdown)
+      ProcessHelper.shutdown(subscriber1)
 
       Subscription.ack(subscription, 2, subscriber2)
+
       assert_receive_events([1], :subscriber2)
       assert_last_ack(subscription, 0)
 
@@ -243,11 +244,11 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       assert_receive_events([1, 3], :subscriber1)
       assert_receive_events([2], :subscriber2)
 
-      Process.unlink(subscriber1)
-      Process.exit(subscriber1, :shutdown)
-      assert_last_ack(subscription, 0)
+      ProcessHelper.shutdown(subscriber1)
 
+      assert_last_ack(subscription, 0)
       assert_receive_events([1], :subscriber2)
+
       Subscription.ack(subscription, 2, subscriber2)
       assert_last_ack(subscription, 0)
 
@@ -276,13 +277,11 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       assert_receive_events([1], :subscriber1)
       assert_receive_events([2], :subscriber2)
 
-      Process.unlink(subscriber1)
-      Process.unlink(subscriber2)
-
-      Process.exit(subscriber1, :shutdown)
-      Process.exit(subscriber2, :shutdown)
-
       ref = Process.monitor(subscription)
+
+      ProcessHelper.shutdown(subscriber1)
+      ProcessHelper.shutdown(subscriber2)
+
       assert_receive {:DOWN, ^ref, _, _, _}
     end
 
