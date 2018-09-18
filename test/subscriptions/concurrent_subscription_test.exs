@@ -203,10 +203,10 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
 
       assert_receive_events([1], :subscriber1)
       assert_receive_events([2], :subscriber2)
+      assert_last_ack(subscription, 0)
 
       Process.unlink(subscriber1)
       Process.exit(subscriber1, :shutdown)
-      assert_last_ack(subscription, 0)
 
       Subscription.ack(subscription, 2, subscriber2)
       assert_receive_events([1], :subscriber2)

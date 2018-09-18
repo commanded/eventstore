@@ -1,6 +1,6 @@
 use Mix.Config
 
-config :logger, :console, level: :debug
+config :logger, backends: []
 
 config :ex_unit,
   capture_log: true,

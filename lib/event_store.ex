@@ -627,4 +627,8 @@ defmodule EventStore do
   defp opts(timeout) when is_integer(timeout) do
     Keyword.put(@default_opts, :timeout, timeout)
   end
+
+  defp opts(:infinity) do
+    Keyword.put(@default_opts, :timeout, :infinity)
+  end
 end
