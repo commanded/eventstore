@@ -25,7 +25,8 @@ defmodule EventStoreTest do
     test "should fail attempting to append to `$all` stream" do
       events = EventFactory.create_events(1)
 
-      assert {:error, :cannot_append_to_all_stream} = EventStore.append_to_stream(@all_stream, 0, events)
+      assert {:error, :cannot_append_to_all_stream} =
+               EventStore.append_to_stream(@all_stream, 0, events)
     end
   end
 
@@ -38,13 +39,13 @@ defmodule EventStoreTest do
       :ok = EventStore.append_to_stream(source_stream_uuid, 0, events)
 
       {:ok, events} = EventStore.read_stream_forward(source_stream_uuid)
-      event_ids =  Enum.map(events, &(&1.event_id))
+      event_ids = Enum.map(events, & &1.event_id)
 
       [
         source_stream_uuid: source_stream_uuid,
         target_stream_uuid: target_stream_uuid,
         events: events,
-        event_ids: event_ids,
+        event_ids: event_ids
       ]
     end
 
@@ -72,7 +73,8 @@ defmodule EventStoreTest do
     end
 
     test "should fail attempting to link to `$all` stream", %{event_ids: event_ids} do
-      assert {:error, :cannot_append_to_all_stream} = EventStore.link_to_stream(@all_stream, 0, event_ids)
+      assert {:error, :cannot_append_to_all_stream} =
+               EventStore.link_to_stream(@all_stream, 0, event_ids)
     end
   end
 
@@ -118,15 +120,17 @@ defmodule EventStoreTest do
   test "unicode character support" do
     unicode_text = "Unicode characters are supported ✅"
     stream_uuid = UUID.uuid4()
+
     event = %EventStore.EventData{
       event_type: "Elixir.EventStore.EventFactory.Event",
       data: %EventStore.EventFactory.Event{
-        event: unicode_text,
-      },
+        event: unicode_text
+      }
     }
-    :ok = EventStore.append_to_stream(stream_uuid, 0, [ event ])
 
-    [ recorded_event ] = EventStore.stream_all_forward() |> Enum.to_list
+    :ok = EventStore.append_to_stream(stream_uuid, 0, [event])
+
+    [recorded_event] = EventStore.stream_all_forward() |> Enum.to_list()
 
     assert recorded_event.data.event == unicode_text
   end
@@ -193,22 +197,28 @@ defmodule EventStoreTest do
       stream_uuid = UUID.uuid4()
       events = EventFactory.create_events(1)
 
-      assert :ok = EventStore.subscribe(stream_uuid, mapper: fn
-        %RecordedEvent{event_number: event_number} -> event_number
-      end)
+      assert :ok =
+               EventStore.subscribe(stream_uuid,
+                 mapper: fn
+                   %RecordedEvent{event_number: event_number} -> event_number
+                 end
+               )
 
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
       assert_receive {:events, [1]}
     end
 
-    test "should map events using optional `selector` function" do
+    test "should filter events using optional `selector` function" do
       stream_uuid = UUID.uuid4()
       events = EventFactory.create_events(4)
 
-      assert :ok = EventStore.subscribe(stream_uuid, selector: fn
-        %RecordedEvent{event_number: event_number} -> rem(event_number, 2) == 0
-      end)
+      assert :ok =
+               EventStore.subscribe(stream_uuid,
+                 selector: fn
+                   %RecordedEvent{event_number: event_number} -> rem(event_number, 2) == 0
+                 end
+               )
 
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
@@ -216,7 +226,7 @@ defmodule EventStoreTest do
       assert length(filtered_events) == div(length(events), 2)
     end
 
-    test "should map events using optional `mapper` and `selector` function together" do
+    test "should map & filter events using optional `mapper` and `selector` functions" do
       stream_uuid = UUID.uuid4()
       events = EventFactory.create_events(4)
 
@@ -260,7 +270,8 @@ defmodule EventStoreTest do
 
       :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
 
-      {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self(), start_from: :current)
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(@subscription_name, self(), start_from: :current)
 
       :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
 
@@ -278,7 +289,8 @@ defmodule EventStoreTest do
       events = EventFactory.create_events(3)
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-      {:ok, subscription} = EventStore.subscribe_to_all_streams(@subscription_name, self())
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(@subscription_name, self(), buffer_size: 10)
 
       # should receive events appended before subscription created
       assert_receive {:subscribed, ^subscription}
@@ -318,7 +330,7 @@ defmodule EventStoreTest do
     end
   end
 
-  defmodule ExampleData, do: defstruct [:data]
+  defmodule(ExampleData, do: defstruct([:data]))
 
   test "record snapshot" do
     assert record_snapshot() != nil
@@ -345,7 +357,7 @@ defmodule EventStoreTest do
 
   defp record_snapshot do
     snapshot = %SnapshotData{
-      source_uuid: UUID.uuid4,
+      source_uuid: UUID.uuid4(),
       source_version: 1,
       source_type: Atom.to_string(ExampleData),
       data: %ExampleData{data: "some data"}
@@ -356,7 +368,11 @@ defmodule EventStoreTest do
     snapshot
   end
 
-  defp assert_recorded_event(expected_stream_uuid, expected_event, %RecordedEvent{} = recorded_event) do
+  defp assert_recorded_event(
+         expected_stream_uuid,
+         expected_event,
+         %RecordedEvent{} = recorded_event
+       ) do
     assert_is_uuid(recorded_event.event_id)
     assert_is_uuid(recorded_event.causation_id)
     assert_is_uuid(recorded_event.correlation_id)

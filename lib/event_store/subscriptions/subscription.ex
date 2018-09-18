@@ -11,21 +11,21 @@ defmodule EventStore.Subscriptions.Subscription do
   require Logger
 
   alias EventStore.{RecordedEvent, Registration}
-  alias EventStore.Subscriptions.{SubscriptionFsm, Subscription}
+  alias EventStore.Subscriptions.{SubscriptionFsm, Subscription, SubscriptionState}
 
   defstruct [
-    conn: nil,
-    retry_ref: nil,
-    stream_uuid: nil,
-    subscription_name: nil,
-    subscriber: nil,
-    subscription: nil,
-    subscription_opts: [],
-    retry_interval: nil
+    :conn,
+    :retry_ref,
+    :stream_uuid,
+    :subscription_name,
+    :subscriber,
+    :subscription,
+    :retry_interval,
+    subscription_opts: []
   ]
 
   def start_link(conn, stream_uuid, subscription_name, subscriber, subscription_opts, opts \\ []) do
-    GenServer.start_link(__MODULE__, %Subscription{
+    state = %Subscription{
       conn: conn,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
@@ -33,14 +33,30 @@ defmodule EventStore.Subscriptions.Subscription do
       subscription: SubscriptionFsm.new(),
       subscription_opts: subscription_opts,
       retry_interval: subscription_retry_interval()
-    }, opts)
+    }
+
+    GenServer.start_link(__MODULE__, state, opts)
+  end
+
+  @doc """
+  Connect a new subscriber to an already started subscription.
+  """
+  def connect(subscription, subscriber, subscription_opts) do
+    GenServer.call(subscription, {:connect, subscriber, subscription_opts})
+  end
+
+  @doc """
+  Confirm receipt of an event by its event number for a given subscriber.
+  """
+  def ack(subscription, ack, subscriber) when is_integer(ack) and is_pid(subscriber) do
+    GenServer.cast(subscription, {:ack, ack, subscriber})
   end
 
   @doc """
   Confirm receipt of an event by its event number.
   """
   def ack(subscription, ack) when is_integer(ack) do
-    GenServer.cast(subscription, {:ack, ack})
+    GenServer.cast(subscription, {:ack, ack, self()})
   end
 
   @doc """
@@ -54,7 +70,7 @@ defmodule EventStore.Subscriptions.Subscription do
   Confirm receipt of the given event.
   """
   def ack(subscription, %RecordedEvent{event_number: event_number}) do
-    GenServer.cast(subscription, {:ack, event_number})
+    Subscription.ack(subscription, event_number)
   end
 
   @doc """
@@ -80,13 +96,16 @@ defmodule EventStore.Subscriptions.Subscription do
 
   @doc false
   def unsubscribe(subscription) do
-    GenServer.call(subscription, :unsubscribe)
+    GenServer.call(subscription, {:unsubscribe, self()})
   end
 
   @doc false
-  def init(%Subscription{subscriber: subscriber} = state) do
-    Process.link(subscriber)
+  def last_seen(subscription) do
+    GenServer.call(subscription, :last_seen)
+  end
 
+  @doc false
+  def init(%Subscription{} = state) do
     send(self(), :subscribe_to_stream)
 
     {:ok, state}
@@ -99,7 +118,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def handle_info({:events, events}, %Subscription{subscription: subscription} = state) do
-    _ = Logger.debug(fn -> describe(state) <> " received #{length(events)} events(s)" end)
+    _ = Logger.debug(fn -> describe(state) <> " received #{length(events)} event(s)" end)
 
     subscription = SubscriptionFsm.notify_events(subscription, events)
 
@@ -113,6 +132,27 @@ defmodule EventStore.Subscriptions.Subscription do
     subscription = SubscriptionFsm.reconnect(subscription)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
+  end
+
+  def handle_info({:DOWN, _ref, :process, pid, reason}, %Subscription{} = state) do
+    %Subscription{subscription: subscription} = state
+
+    _ =
+      Logger.debug(fn ->
+        describe(state) <> " subscriber #{inspect(pid)} down due to: #{inspect(reason)}"
+      end)
+
+    subscription = SubscriptionFsm.unsubscribe(subscription, pid)
+
+    state = apply_subscription_to_state(subscription, state)
+
+    case subscription do
+      %SubscriptionFsm{state: :unsubscribed} ->
+        {:stop, reason, state}
+
+      %SubscriptionFsm{} ->
+        {:noreply, state}
+    end
   end
 
   def handle_cast(:subscribe_to_events, %Subscription{subscription: subscription} = state) do
@@ -138,18 +178,46 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
-  def handle_cast({:ack, ack}, %Subscription{subscription: subscription} = state) do
-    subscription = SubscriptionFsm.ack(subscription, ack)
+  def handle_cast({:ack, ack, subscriber}, %Subscription{subscription: subscription} = state) do
+    subscription = SubscriptionFsm.ack(subscription, ack, subscriber)
 
     {:noreply, apply_subscription_to_state(subscription, state)}
   end
 
-  def handle_call(:unsubscribe, _from, %Subscription{subscriber: subscriber, subscription: subscription} = state) do
-    Process.unlink(subscriber)
+  def handle_call({:connect, subscriber, opts}, _from, %Subscription{} = state) do
+    %Subscription{subscription: subscription} = state
 
-    subscription = SubscriptionFsm.unsubscribe(subscription)
+    with :ok <- ensure_not_already_subscribed(subscription, subscriber),
+         :ok <- ensure_within_concurrency_limit(subscription, opts) do
+      subscription = SubscriptionFsm.connect_subscriber(subscription, subscriber, opts)
 
-    {:reply, :ok, apply_subscription_to_state(subscription, state)}
+      state = %Subscription{state | subscription: subscription}
+
+      {:reply, {:ok, self()}, state}
+    else
+      {:error, _error} = reply ->
+        {:reply, reply, state}
+    end
+  end
+
+  def handle_call({:unsubscribe, pid}, _from, %Subscription{subscription: subscription} = state) do
+    subscription = SubscriptionFsm.unsubscribe(subscription, pid)
+
+    state = apply_subscription_to_state(subscription, state)
+
+    case subscription do
+      %SubscriptionFsm{state: :unsubscribed} ->
+        {:stop, :shutdown, :ok, state}
+
+      %SubscriptionFsm{} ->
+        {:reply, :ok, state}
+    end
+  end
+
+  def handle_call(:last_seen, _from, %Subscription{subscription: subscription} = state) do
+    %SubscriptionFsm{data: %SubscriptionState{last_ack: last_seen}} = subscription
+
+    {:reply, last_seen, state}
   end
 
   defp apply_subscription_to_state(%SubscriptionFsm{} = subscription, %Subscription{} = state) do
@@ -158,17 +226,19 @@ defmodule EventStore.Subscriptions.Subscription do
     handle_subscription_state(state)
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :initial}} = state) do
+  defp handle_subscription_state(
+         %Subscription{subscription: %SubscriptionFsm{state: :initial}} = state
+       ) do
     %Subscription{retry_interval: retry_interval} = state
-
-    _ = Logger.debug(fn -> describe(state) <> " failed to subscribe, will retry in #{retry_interval}ms" end)
 
     retry_ref = Process.send_after(self(), :subscribe_to_stream, retry_interval)
 
     %Subscription{state | retry_ref: retry_ref}
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :subscribe_to_events}} = state) do
+  defp handle_subscription_state(
+         %Subscription{subscription: %SubscriptionFsm{state: :subscribe_to_events}} = state
+       ) do
     _ = Logger.debug(fn -> describe(state) <> " subscribing to events" end)
 
     :ok = GenServer.cast(self(), :subscribe_to_events)
@@ -176,7 +246,9 @@ defmodule EventStore.Subscriptions.Subscription do
     state
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :request_catch_up}} = state) do
+  defp handle_subscription_state(
+         %Subscription{subscription: %SubscriptionFsm{state: :request_catch_up}} = state
+       ) do
     _ = Logger.debug(fn -> describe(state) <> " catching-up" end)
 
     :ok = GenServer.cast(self(), :catch_up)
@@ -184,19 +256,27 @@ defmodule EventStore.Subscriptions.Subscription do
     state
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :max_capacity}} = state) do
-    _ = Logger.warn(fn -> describe(state) <> " has reached max capacity, events will be ignored until it has caught up" end)
+  defp handle_subscription_state(
+         %Subscription{subscription: %SubscriptionFsm{state: :max_capacity}} = state
+       ) do
+    _ =
+      Logger.warn(fn ->
+        describe(state) <>
+          " has reached max capacity, events will be ignored until it has caught up"
+      end)
 
     state
   end
 
-  defp handle_subscription_state(%Subscription{subscription: %SubscriptionFsm{state: :unsubscribed}} = state) do
-    _ = Logger.debug(fn -> describe(state) <> " has unsubscribed" end)
+  defp handle_subscription_state(
+         %Subscription{subscription: %SubscriptionFsm{state: :unsubscribed}} = state
+       ) do
+    _ = Logger.debug(fn -> describe(state) <> " has no subscribers, shutting down" end)
 
     state
   end
 
-  # no-op for all other subscription states
+  # No-op for all other subscription states.
   defp handle_subscription_state(state), do: state
 
   defp subscribe_to_stream(%Subscription{} = state) do
@@ -248,6 +328,32 @@ defmodule EventStore.Subscriptions.Subscription do
     end
   end
 
+  # Prevent duplicate subscriptions from same process.
+  defp ensure_not_already_subscribed(%SubscriptionFsm{} = subscription, pid) do
+    unless subscribed?(subscription, pid) do
+      :ok
+    else
+      {:error, :already_subscribed}
+    end
+  end
+
+  defp subscribed?(%SubscriptionFsm{data: %SubscriptionState{subscribers: subscribers}}, pid),
+    do: Map.has_key?(subscribers, pid)
+
+  # Prevent more subscribers than requested concurrency limit.
+  defp ensure_within_concurrency_limit(%SubscriptionFsm{} = subscription, opts) do
+    concurrency_limit = Keyword.get(opts, :concurrency_limit, 1)
+
+    if subscriber_count(subscription) < concurrency_limit do
+      :ok
+    else
+      {:error, :too_many_subscribers}
+    end
+  end
+
+  defp subscriber_count(%SubscriptionFsm{data: %SubscriptionState{subscribers: subscribers}}),
+    do: map_size(subscribers)
+
   defp describe(%Subscription{stream_uuid: stream_uuid, subscription_name: name}),
-    do: "Subscription #{inspect name}@#{inspect stream_uuid}"
+    do: "Subscription #{inspect(name)}@#{inspect(stream_uuid)}"
 end

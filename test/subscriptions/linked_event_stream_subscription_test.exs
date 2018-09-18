@@ -7,7 +7,7 @@ defmodule EventStore.Subscriptions.LinkedEventSubscriptionFsmTest do
     test "should receive linked events" do
       linked_stream_uuid = UUID.uuid4()
 
-      {:ok, subscription} = subscribe_to_stream(linked_stream_uuid, self())
+      {:ok, subscription} = subscribe_to_stream(linked_stream_uuid, self(), buffer_size: 3)
 
       {:ok, source_stream1_uuid, events1} = link_events_in_stream(linked_stream_uuid, 0)
       {:ok, source_stream2_uuid, events2} = link_events_in_stream(linked_stream_uuid, 3)
@@ -61,7 +61,7 @@ defmodule EventStore.Subscriptions.LinkedEventSubscriptionFsmTest do
     end
   end
 
-  defp subscribe_to_stream(stream_uuid, subscriber, opts \\ []) do
+  defp subscribe_to_stream(stream_uuid, subscriber, opts) do
     name = UUID.uuid4()
 
     {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, name, subscriber, opts)

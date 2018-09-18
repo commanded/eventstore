@@ -346,15 +346,48 @@ defmodule EventStore do
       notification messages.
 
     - `opts` is an optional map providing additional subscription configuration:
-      - `start_from` is a pointer to the first event to receive. It must be one of:
+
+      - `start_from` is a pointer to the first event to receive.
+        It must be one of:
           - `:origin` for all events from the start of the stream (default).
           - `:current` for any new events appended to the stream after the
             subscription has been created.
           - any positive integer for a stream version to receive events after.
+
       - `selector` to define a function to filter each event, i.e. returns
-        only those elements for which fun returns a truthy value
+        only those elements for which fun returns a truthy value.
+
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
+
+      - `concurrency_limit` defines the maximum number of concurrent subscribers
+        allowed to connect to the subscription. By default only one subscriber
+        may connect. If too many subscribers attempt to connect to the
+        subscription an `{:error, :too_many_subscribers}` is returned.
+
+      - `buffer_size` limits how many in-flight events will be sent to the
+        subscriber process before acknowledgement of successful processing. This
+        limits the number of messages sent to the subscriber and stops their
+        message queue from getting filled with events. Defaults to one in-flight
+        event.
+
+      - `partition_by` is an optional function used to partition events to
+        subscribers. It can be used to guarantee processing order when multiple
+        subscribers have subscribed to a single subscription. The function is
+        passed a single argument (an `EventStore.RecordedEvent` struct) and must
+        return the partition key. As an example to guarantee events for a single
+        stream are processed serially, but different streams are processed
+        concurrently, you could use the `stream_uuid` as the partition key.
+
+            alias EventStore.RecordedEvent
+
+            by_stream = fn %RecordedEvent{stream_uuid: stream_uuid} -> stream_uuid end
+
+            {:ok, _subscription} =
+              EventStore.subscribe_to_stream(stream_uuid, "example", self(),
+                concurrency_limit: 10,
+                partition_by: by_stream
+              )
 
 
   The subscription will resume from the last acknowledged event if it already
@@ -392,7 +425,9 @@ defmodule EventStore do
   """
   @spec subscribe_to_stream(String.t(), String.t(), pid, keyword) ::
           {:ok, subscription :: pid}
+          | {:error, :already_subscribed}
           | {:error, :subscription_already_exists}
+          | {:error, :too_many_subscribers}
           | {:error, reason :: term}
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
@@ -419,16 +454,25 @@ defmodule EventStore do
       notification messages.
 
     - `opts` is an optional map providing additional subscription configuration:
-      - `start_from` is a pointer to the first event to receive. It must be one of:
+
+      - `start_from` is a pointer to the first event to receive.
+        It must be one of:
           - `:origin` for all events from the start of the stream (default).
           - `:current` for any new events appended to the stream after the
             subscription has been created.
           - any positive integer for an event id to receive events after that
             exact event.
+
       - `selector` to define a function to filter each event, i.e. returns
         only those elements for which fun returns a truthy value
+
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
+
+      - `concurrency_limit` defines the maximum number of concurrent subscribers
+        allowed to connect to the subscription. By default only one subscriber
+        may connect. If too many subscribers attempt to connect to the
+        subscription an `{:error, :too_many_subscribers}` is returned.
 
   The subscription will resume from the last acknowledged event if it already
   exists. It will ignore the `start_from` argument in this case.
@@ -456,7 +500,9 @@ defmodule EventStore do
   """
   @spec subscribe_to_all_streams(String.t(), pid, keyword) ::
           {:ok, subscription :: pid}
+          | {:error, :already_subscribed}
           | {:error, :subscription_already_exists}
+          | {:error, :too_many_subscribers}
           | {:error, reason :: term}
 
   def subscribe_to_all_streams(subscription_name, subscriber, opts \\ [])
@@ -472,8 +518,10 @@ defmodule EventStore do
   Accepts a `RecordedEvent`, a list of `RecordedEvent`s, or the event number of
   the recorded event to acknowledge.
   """
-  @spec ack(pid, EventStore.RecordedEvent.t() | list(EventStore.RecordedEvent.t()) | non_neg_integer()) ::
-          :ok | {:error, reason :: term}
+  @spec ack(
+          pid,
+          EventStore.RecordedEvent.t() | list(EventStore.RecordedEvent.t()) | non_neg_integer()
+        ) :: :ok | {:error, reason :: term}
   def ack(subscription, ack) do
     Subscription.ack(subscription, ack)
   end
@@ -483,8 +531,8 @@ defmodule EventStore do
 
     - `stream_uuid` is the stream to unsubscribe from.
 
-    - `subscription_name` is used to identify the existing subscription to
-      remove.
+    - `subscription_name` is used to identify the existing subscription process
+      to stop.
 
   Returns `:ok` on success.
   """
@@ -496,14 +544,44 @@ defmodule EventStore do
   @doc """
   Unsubscribe an existing subscriber from all event notifications.
 
-    - `subscription_name` is used to identify the existing subscription to
-      remove.
+    - `subscription_name` is used to identify the existing subscription process
+      to stop.
 
   Returns `:ok` on success.
   """
   @spec unsubscribe_from_all_streams(String.t()) :: :ok
   def unsubscribe_from_all_streams(subscription_name) do
     Subscriptions.unsubscribe_from_stream(@all_stream, subscription_name)
+  end
+
+  @doc """
+  Delete an existing persistent subscription.
+
+    - `stream_uuid` is the stream the subscription is subscribed to.
+
+    - `subscription_name` is used to identify the existing subscription to
+      remove.
+
+  Returns `:ok` on success.
+  """
+  @spec delete_subscription(String.t(), String.t()) :: :ok
+  def delete_subscription(stream_uuid, subscription_name) do
+    Subscriptions.delete_subscription(@conn, stream_uuid, subscription_name, opts())
+  end
+
+  @doc """
+  Delete an existing persistent subscription to all streams.
+
+    - `stream_uuid` is the stream the subscription is subscribed to.
+
+    - `subscription_name` is used to identify the existing subscription to
+      remove.
+
+  Returns `:ok` on success.
+  """
+  @spec delete_all_streams_subscription(String.t()) :: :ok
+  def delete_all_streams_subscription(subscription_name) do
+    EventStore.delete_subscription(@all_stream, subscription_name)
   end
 
   @doc """
@@ -544,13 +622,13 @@ defmodule EventStore do
 
   @default_opts [pool: DBConnection.Poolboy]
 
-  defp opts(timeout \\ nil) do
-    case timeout do
-      timeout when is_integer(timeout) ->
-        Keyword.put(@default_opts, :timeout, timeout)
+  defp opts, do: @default_opts
 
-      _ ->
-        @default_opts
-    end
+  defp opts(timeout) when is_integer(timeout) do
+    Keyword.put(@default_opts, :timeout, timeout)
+  end
+
+  defp opts(:infinity) do
+    Keyword.put(@default_opts, :timeout, :infinity)
   end
 end

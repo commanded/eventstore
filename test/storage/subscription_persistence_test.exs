@@ -35,14 +35,14 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
     initial_length = length(subscriptions)
 
     {:ok, _subscription} = Storage.subscribe_to_stream(conn, @all_stream, @subscription_name)
-    :ok = Storage.unsubscribe_from_stream(conn, @all_stream, @subscription_name)
+    :ok = Storage.delete_subscription(conn, @all_stream, @subscription_name)
 
     {:ok, subscriptions} = Storage.subscriptions(conn)
     assert length(subscriptions) == initial_length
   end
 
   test "remove subscription when not found should not fail", %{conn: conn} do
-    :ok = Storage.unsubscribe_from_stream(conn, @all_stream, @subscription_name)
+    :ok = Storage.delete_subscription(conn, @all_stream, @subscription_name)
   end
 
   test "ack last seen event by id", %{conn: conn} do
@@ -52,7 +52,7 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
 
     {:ok, subscriptions} = Storage.subscriptions(conn)
 
-    subscription = subscriptions |> Enum.reverse |> hd
+    subscription = subscriptions |> Enum.reverse() |> hd
 
     verify_subscription(subscription, 1)
   end
@@ -64,7 +64,7 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
 
     {:ok, subscriptions} = Storage.subscriptions(conn)
 
-    subscription = subscriptions |> Enum.reverse |> hd
+    subscription = subscriptions |> Enum.reverse() |> hd
 
     verify_subscription(subscription, 1)
   end

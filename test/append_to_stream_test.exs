@@ -46,7 +46,8 @@ defmodule EventStore.AppendToStreamTest do
     test "should return `{:error, :stream_exists}`", %{stream_uuid: stream_uuid} do
       events = EventFactory.create_events(1)
 
-      assert {:error, :stream_exists} = EventStore.append_to_stream(stream_uuid, :no_stream, events)
+      assert {:error, :stream_exists} =
+               EventStore.append_to_stream(stream_uuid, :no_stream, events)
     end
   end
 
@@ -55,7 +56,8 @@ defmodule EventStore.AppendToStreamTest do
       stream_uuid = UUID.uuid4()
       events = EventFactory.create_events(3)
 
-      assert {:error, :stream_does_not_exist} = EventStore.append_to_stream(stream_uuid, :stream_exists, events)
+      assert {:error, :stream_does_not_exist} =
+               EventStore.append_to_stream(stream_uuid, :stream_exists, events)
     end
   end
 
@@ -75,16 +77,17 @@ defmodule EventStore.AppendToStreamTest do
   @tag :slow
   @tag timeout: 180_000
   test "should append many events to a stream" do
-    stream_uuid = UUID.uuid4
+    stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(8_001)
 
     assert :ok = EventStore.append_to_stream(stream_uuid, 0, events, :infinity)
 
-    assert 1..8_001 |> Enum.to_list() == EventStore.stream_all_forward() |> Stream.map(&(&1.event_number)) |> Enum.to_list()
+    assert 1..8_001 |> Enum.to_list() ==
+             EventStore.stream_all_forward() |> Stream.map(& &1.event_number) |> Enum.to_list()
   end
 
   defp append_events_to_stream(_context) do
-    stream_uuid = UUID.uuid4
+    stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)

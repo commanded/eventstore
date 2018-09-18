@@ -34,17 +34,17 @@ defmodule EventStore.Mixfile do
     ]
   end
 
-  defp elixirc_paths(:bench), do: ["lib", "test/support"]
-  defp elixirc_paths(:jsonb), do: ["lib", "test/support"]
-  defp elixirc_paths(:distributed), do: ["lib", "test/support"]
-  defp elixirc_paths(:local), do: ["lib", "test/support"]
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:bench), do: ["lib", "test/support", "test/subscriptions/support"]
+  defp elixirc_paths(:jsonb), do: ["lib", "test/support", "test/subscriptions/support"]
+  defp elixirc_paths(:distributed), do: ["lib", "test/support", "test/subscriptions/support"]
+  defp elixirc_paths(:local), do: ["lib", "test/support", "test/subscriptions/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/subscriptions/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
     [
       {:fsm, "~> 0.3"},
-      {:gen_stage, "~> 0.13"},
+      {:gen_stage, "~> 0.14"},
       {:poolboy, "~> 1.5"},
       {:postgrex, "~> 0.13"},
       {:elixir_uuid, "~> 1.2"},
@@ -55,8 +55,8 @@ defmodule EventStore.Mixfile do
       {:dialyxir, "~> 0.5", only: [:dev, :test]},
       {:ex_doc, "~> 0.19", only: :dev},
       {:markdown, github: "devinus/markdown", only: :dev},
-      {:mix_test_watch, "~> 0.8", only: :dev},
-      {:poison, "~> 2.2 or ~> 3.0", optional: true}
+      {:mix_test_watch, "~> 0.9", only: :dev},
+      {:poison, "~> 2.2 or ~> 3.0 or ~> 4.0", optional: true}
     ]
   end
 

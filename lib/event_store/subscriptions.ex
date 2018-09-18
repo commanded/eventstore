@@ -1,7 +1,8 @@
 defmodule EventStore.Subscriptions do
   @moduledoc false
 
-  alias EventStore.Subscriptions
+  alias EventStore.{Storage, Subscriptions}
+  alias EventStore.Subscriptions.Subscription
 
   @all_stream "$all"
 
@@ -25,6 +26,12 @@ defmodule EventStore.Subscriptions do
     do_unsubscribe_from_stream(@all_stream, subscription_name)
   end
 
+  def delete_subscription(conn, stream_uuid, subscription_name, opts) do
+    :ok = Subscriptions.Supervisor.shutdown_subscription(stream_uuid, subscription_name)
+
+    Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
+  end
+
   defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
     case Subscriptions.Supervisor.subscribe_to_stream(
            stream_uuid,
@@ -35,8 +42,14 @@ defmodule EventStore.Subscriptions do
       {:ok, subscription} ->
         {:ok, subscription}
 
-      {:error, {:already_started, _subscription}} ->
-        {:error, :subscription_already_exists}
+      {:error, {:already_started, subscription}} ->
+        case Keyword.get(opts, :concurrency_limit) do
+          nil ->
+            {:error, :subscription_already_exists}
+
+          concurrency_limit when is_number(concurrency_limit) ->
+            Subscription.connect(subscription, subscriber, opts)
+        end
     end
   end
 
