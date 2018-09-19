@@ -1,6 +1,8 @@
 defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
   use EventStore.Subscriptions.StreamSubscriptionTestCase, stream_uuid: UUID.uuid4()
 
+  alias EventStore.EventFactory
+
   setup [:append_events_to_another_stream]
 
   defp create_recorded_events(%{stream_uuid: stream_uuid}, count, initial_event_number \\ 1) do

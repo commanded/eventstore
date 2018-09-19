@@ -10,28 +10,22 @@ defmodule EventStore.Subscriptions.Subscription do
   use GenServer
   require Logger
 
-  alias EventStore.{RecordedEvent, Registration}
+  alias EventStore.RecordedEvent
   alias EventStore.Subscriptions.{SubscriptionFsm, Subscription, SubscriptionState}
 
   defstruct [
-    :conn,
     :retry_ref,
     :stream_uuid,
     :subscription_name,
-    :subscriber,
     :subscription,
-    :retry_interval,
-    subscription_opts: []
+    :retry_interval
   ]
 
-  def start_link(conn, stream_uuid, subscription_name, subscriber, subscription_opts, opts \\ []) do
+  def start_link(conn, stream_uuid, subscription_name, subscription_opts, opts \\ []) do
     state = %Subscription{
-      conn: conn,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
-      subscriber: subscriber,
-      subscription: SubscriptionFsm.new(),
-      subscription_opts: subscription_opts,
+      subscription: SubscriptionFsm.new(conn, stream_uuid, subscription_name, subscription_opts),
       retry_interval: subscription_retry_interval()
     }
 
@@ -106,32 +100,41 @@ defmodule EventStore.Subscriptions.Subscription do
 
   @doc false
   def init(%Subscription{} = state) do
-    send(self(), :subscribe_to_stream)
-
     {:ok, state}
   end
 
-  def handle_info(:subscribe_to_stream, %Subscription{} = state) do
+  def handle_info(:subscribe_to_stream, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " subscribe to stream" end)
 
-    {:noreply, subscribe_to_stream(state)}
+    state =
+      subscription
+      |> SubscriptionFsm.subscribe()
+      |> apply_subscription_to_state(state)
+
+    {:noreply, state}
   end
 
   def handle_info({:events, events}, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " received #{length(events)} event(s)" end)
 
-    subscription = SubscriptionFsm.notify_events(subscription, events)
+    state =
+      subscription
+      |> SubscriptionFsm.notify_events(events)
+      |> apply_subscription_to_state(state)
 
-    {:noreply, apply_subscription_to_state(subscription, state)}
+    {:noreply, state}
   end
 
   def handle_info(:reconnect, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " reconnected" end)
 
-    state = cancel_retry_timer(state)
-    subscription = SubscriptionFsm.reconnect(subscription)
+    state =
+      subscription
+      |> SubscriptionFsm.reconnect()
+      |> apply_subscription_to_state(state)
+      |> cancel_retry_timer()
 
-    {:noreply, apply_subscription_to_state(subscription, state)}
+    {:noreply, state}
   end
 
   def handle_info({:DOWN, _ref, :process, pid, reason}, %Subscription{} = state) do
@@ -142,56 +145,65 @@ defmodule EventStore.Subscriptions.Subscription do
         describe(state) <> " subscriber #{inspect(pid)} down due to: #{inspect(reason)}"
       end)
 
-    subscription = SubscriptionFsm.unsubscribe(subscription, pid)
+    state =
+      subscription
+      |> SubscriptionFsm.unsubscribe(pid)
+      |> apply_subscription_to_state(state)
 
-    state = apply_subscription_to_state(subscription, state)
-
-    case subscription do
-      %SubscriptionFsm{state: :unsubscribed} ->
-        {:stop, reason, state}
-
-      %SubscriptionFsm{} ->
-        {:noreply, state}
+    if unsubscribed?(state) do
+      {:stop, reason, state}
+    else
+      {:noreply, state}
     end
   end
 
-  def handle_cast(:subscribe_to_events, %Subscription{subscription: subscription} = state) do
-    :ok = subscribe_to_events(state)
-    :ok = notify_subscribed(state)
-
-    subscription = SubscriptionFsm.subscribed(subscription)
-
-    {:noreply, apply_subscription_to_state(subscription, state)}
-  end
-
   def handle_cast(:catch_up, %Subscription{subscription: subscription} = state) do
-    subscription = SubscriptionFsm.catch_up(subscription)
+    state =
+      subscription
+      |> SubscriptionFsm.catch_up()
+      |> apply_subscription_to_state(state)
 
-    {:noreply, apply_subscription_to_state(subscription, state)}
+    {:noreply, state}
   end
 
   def handle_cast(:disconnect, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " disconnected" end)
 
-    subscription = SubscriptionFsm.disconnect(subscription)
+    state =
+      subscription
+      |> SubscriptionFsm.disconnect()
+      |> apply_subscription_to_state(state)
 
-    {:noreply, apply_subscription_to_state(subscription, state)}
+    {:noreply, state}
   end
 
   def handle_cast({:ack, ack, subscriber}, %Subscription{subscription: subscription} = state) do
-    subscription = SubscriptionFsm.ack(subscription, ack, subscriber)
+    state =
+      subscription
+      |> SubscriptionFsm.ack(ack, subscriber)
+      |> apply_subscription_to_state(state)
 
-    {:noreply, apply_subscription_to_state(subscription, state)}
+    {:noreply, state}
   end
 
   def handle_call({:connect, subscriber, opts}, _from, %Subscription{} = state) do
-    %Subscription{subscription: subscription} = state
+    %Subscription{
+      subscription:
+        %SubscriptionFsm{data: %SubscriptionState{subscribers: subscribers}} = subscription
+    } = state
 
-    with :ok <- ensure_not_already_subscribed(subscription, subscriber),
-         :ok <- ensure_within_concurrency_limit(subscription, opts) do
-      subscription = SubscriptionFsm.connect_subscriber(subscription, subscriber, opts)
+    _ =
+      Logger.debug(fn ->
+        describe(state) <> " attempting to connect subscriber " <> inspect(subscriber)
+      end)
 
-      state = %Subscription{state | subscription: subscription}
+    with :ok <- ensure_not_already_subscribed(subscribers, subscriber),
+         :ok <- ensure_within_concurrency_limit(subscribers, opts) do
+      state =
+        subscription
+        |> SubscriptionFsm.connect_subscriber(subscriber, opts)
+        |> SubscriptionFsm.subscribe()
+        |> apply_subscription_to_state(state)
 
       {:reply, {:ok, self()}, state}
     else
@@ -200,17 +212,18 @@ defmodule EventStore.Subscriptions.Subscription do
     end
   end
 
-  def handle_call({:unsubscribe, pid}, _from, %Subscription{subscription: subscription} = state) do
-    subscription = SubscriptionFsm.unsubscribe(subscription, pid)
+  def handle_call({:unsubscribe, pid}, _from, %Subscription{} = state) do
+    %Subscription{subscription: subscription} = state
 
-    state = apply_subscription_to_state(subscription, state)
+    state =
+      subscription
+      |> SubscriptionFsm.unsubscribe(pid)
+      |> apply_subscription_to_state(state)
 
-    case subscription do
-      %SubscriptionFsm{state: :unsubscribed} ->
-        {:stop, :shutdown, :ok, state}
-
-      %SubscriptionFsm{} ->
-        {:reply, :ok, state}
+    if unsubscribed?(state) do
+      {:stop, :shutdown, :ok, state}
+    else
+      {:reply, :ok, state}
     end
   end
 
@@ -234,16 +247,6 @@ defmodule EventStore.Subscriptions.Subscription do
     retry_ref = Process.send_after(self(), :subscribe_to_stream, retry_interval)
 
     %Subscription{state | retry_ref: retry_ref}
-  end
-
-  defp handle_subscription_state(
-         %Subscription{subscription: %SubscriptionFsm{state: :subscribe_to_events}} = state
-       ) do
-    _ = Logger.debug(fn -> describe(state) <> " subscribing to events" end)
-
-    :ok = GenServer.cast(self(), :subscribe_to_events)
-
-    state
   end
 
   defp handle_subscription_state(
@@ -277,22 +280,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   # No-op for all other subscription states.
-  defp handle_subscription_state(state), do: state
-
-  defp subscribe_to_stream(%Subscription{} = state) do
-    %Subscription{
-      conn: conn,
-      stream_uuid: stream_uuid,
-      subscription_name: subscription_name,
-      subscriber: subscriber,
-      subscription: subscription,
-      subscription_opts: opts
-    } = state
-
-    subscription
-    |> SubscriptionFsm.subscribe(conn, stream_uuid, subscription_name, subscriber, opts)
-    |> apply_subscription_to_state(state)
-  end
+  defp handle_subscription_state(%Subscription{} = state), do: state
 
   defp cancel_retry_timer(%Subscription{retry_ref: ref} = state) when is_reference(ref) do
     Process.cancel_timer(ref)
@@ -301,17 +289,6 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   defp cancel_retry_timer(%Subscription{} = state), do: state
-
-  defp subscribe_to_events(%Subscription{stream_uuid: stream_uuid}) do
-    Registration.subscribe(stream_uuid)
-  end
-
-  # notify the subscriber that this subscription has successfully subscribed to events
-  defp notify_subscribed(%Subscription{subscriber: subscriber}) do
-    send(subscriber, {:subscribed, self()})
-
-    :ok
-  end
 
   # Get the delay between subscription attempts, in milliseconds, from app
   # config. The default value is one minute and minimum allowed value is one
@@ -329,30 +306,27 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   # Prevent duplicate subscriptions from same process.
-  defp ensure_not_already_subscribed(%SubscriptionFsm{} = subscription, pid) do
-    unless subscribed?(subscription, pid) do
+  defp ensure_not_already_subscribed(subscribers, pid) do
+    unless Map.has_key?(subscribers, pid) do
       :ok
     else
       {:error, :already_subscribed}
     end
   end
 
-  defp subscribed?(%SubscriptionFsm{data: %SubscriptionState{subscribers: subscribers}}, pid),
-    do: Map.has_key?(subscribers, pid)
-
   # Prevent more subscribers than requested concurrency limit.
-  defp ensure_within_concurrency_limit(%SubscriptionFsm{} = subscription, opts) do
+  defp ensure_within_concurrency_limit(subscribers, opts) do
     concurrency_limit = Keyword.get(opts, :concurrency_limit, 1)
 
-    if subscriber_count(subscription) < concurrency_limit do
+    if Map.size(subscribers) < concurrency_limit do
       :ok
     else
       {:error, :too_many_subscribers}
     end
   end
 
-  defp subscriber_count(%SubscriptionFsm{data: %SubscriptionState{subscribers: subscribers}}),
-    do: map_size(subscribers)
+  def unsubscribed?(%Subscription{subscription: %SubscriptionFsm{state: :unsubscribed}}), do: true
+  def unsubscribed?(%Subscription{}), do: false
 
   defp describe(%Subscription{stream_uuid: stream_uuid, subscription_name: name}),
     do: "Subscription #{inspect(name)}@#{inspect(stream_uuid)}"

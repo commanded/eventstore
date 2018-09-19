@@ -33,14 +33,9 @@ defmodule EventStore.Subscriptions do
   end
 
   defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    case Subscriptions.Supervisor.subscribe_to_stream(
-           stream_uuid,
-           subscription_name,
-           subscriber,
-           opts
-         ) do
+    case Subscriptions.Supervisor.start_subscription(stream_uuid, subscription_name, opts) do
       {:ok, subscription} ->
-        {:ok, subscription}
+        Subscription.connect(subscription, subscriber, opts)
 
       {:error, {:already_started, subscription}} ->
         case Keyword.get(opts, :concurrency_limit) do

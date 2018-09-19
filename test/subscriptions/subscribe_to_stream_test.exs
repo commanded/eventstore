@@ -533,10 +533,12 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
           EventStore.Postgrex,
           "$all",
           subscription_name,
-          self(),
           buffer_size: 3,
           start_from: 0
         )
+
+      {:ok, ^subscription} =
+        EventStore.Subscriptions.Subscription.connect(subscription, self(), buffer_size: 3)
 
       refute_receive {:subscribed, ^subscription}
 

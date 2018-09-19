@@ -21,6 +21,26 @@ defmodule EventStore.SubscriptionHelpers do
     {:ok, subscription}
   end
 
+  def start_subscriber(name) do
+    reply_to = self()
+
+    spawn_link(fn ->
+      receive_events = fn loop ->
+        receive do
+          {:subscribed, subscription} ->
+            send(reply_to, {:subscribed, subscription, name})
+
+          {:events, events} ->
+            send(reply_to, {:events, events, name})
+        end
+
+        loop.(loop)
+      end
+
+      receive_events.(receive_events)
+    end)
+  end
+
   def receive_and_ack(subscription, expected_stream_uuid, expected_intial_event_number) do
     assert_receive {:events, received_events}
     assert length(received_events) == 10

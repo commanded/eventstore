@@ -15,6 +15,7 @@ defmodule EventStore.Subscriptions.SubscriptionState do
     last_sent: 0,
     last_ack: 0,
     queue_size: 0,
+    buffer_size: 1,
     subscribers: %{},
     partitions: %{},
     processed_event_ids: MapSet.new()
