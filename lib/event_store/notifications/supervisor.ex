@@ -50,8 +50,6 @@ defmodule EventStore.Notifications.Supervisor do
            [
              {PostgrexNotifications, :start_link, [postgrex_config]},
              [
-               after_restart: &Listener.reconnect/0,
-               after_exit: &Listener.disconnect/0,
                name: Listener.Postgrex
              ]
            ]},

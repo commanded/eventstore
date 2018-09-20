@@ -14,7 +14,6 @@ defmodule EventStore.Subscriptions.Subscription do
   alias EventStore.Subscriptions.{SubscriptionFsm, Subscription, SubscriptionState}
 
   defstruct [
-    :retry_ref,
     :stream_uuid,
     :subscription_name,
     :subscription,
@@ -33,7 +32,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc """
-  Connect a new subscriber to an already started subscription.
+  Connect a subscriber to a started subscription.
   """
   def connect(subscription, subscriber, subscription_opts) do
     GenServer.call(subscription, {:connect, subscriber, subscription_opts})
@@ -61,34 +60,15 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc """
-  Confirm receipt of the given event.
+  Confirm receipt of the given `EventStore.RecordedEvent` struct.
   """
   def ack(subscription, %RecordedEvent{event_number: event_number}) do
     Subscription.ack(subscription, event_number)
   end
 
   @doc """
-  Attempt to reconnect the subscription.
-
-  Typically used to resume a subscription after a database connection failure.
-  Allow a short delay for the connection to become available before attempting
-  to reconnect.
+  Unsubscribe a subscriber from the subscription.
   """
-  def reconnect(subscription, delay \\ 5_000) do
-    _ref = Process.send_after(subscription, :reconnect, delay)
-    :ok
-  end
-
-  @doc """
-  Disconnect the subscription.
-
-  Typically due to a database connection failure.
-  """
-  def disconnect(subscription) do
-    GenServer.cast(subscription, :disconnect)
-  end
-
-  @doc false
   def unsubscribe(subscription) do
     GenServer.call(subscription, {:unsubscribe, self()})
   end
@@ -125,14 +105,19 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, state}
   end
 
-  def handle_info(:reconnect, %Subscription{subscription: subscription} = state) do
-    _ = Logger.debug(fn -> describe(state) <> " reconnected" end)
+  def handle_info(
+        {EventStore.AdvisoryLocks, :lock_released, lock_ref, reason},
+        %Subscription{} = state
+      ) do
+    %Subscription{subscription: subscription} = state
+
+    _ =
+      Logger.debug(fn -> describe(state) <> " advisory lock lost due to: " <> inspect(reason) end)
 
     state =
       subscription
-      |> SubscriptionFsm.reconnect()
+      |> SubscriptionFsm.disconnect(lock_ref)
       |> apply_subscription_to_state(state)
-      |> cancel_retry_timer()
 
     {:noreply, state}
   end
@@ -161,17 +146,6 @@ defmodule EventStore.Subscriptions.Subscription do
     state =
       subscription
       |> SubscriptionFsm.catch_up()
-      |> apply_subscription_to_state(state)
-
-    {:noreply, state}
-  end
-
-  def handle_cast(:disconnect, %Subscription{subscription: subscription} = state) do
-    _ = Logger.debug(fn -> describe(state) <> " disconnected" end)
-
-    state =
-      subscription
-      |> SubscriptionFsm.disconnect()
       |> apply_subscription_to_state(state)
 
     {:noreply, state}
@@ -234,19 +208,20 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   defp apply_subscription_to_state(%SubscriptionFsm{} = subscription, %Subscription{} = state) do
-    state = %Subscription{state | subscription: subscription}
-
-    handle_subscription_state(state)
+    handle_subscription_state(%Subscription{state | subscription: subscription})
   end
 
+  # Attempt to subscribe to an initial or disconnected subscription after a
+  # retry interval.
   defp handle_subscription_state(
-         %Subscription{subscription: %SubscriptionFsm{state: :initial}} = state
-       ) do
+         %Subscription{subscription: %SubscriptionFsm{state: fsm}} = state
+       )
+       when fsm in [:initial, :disconnected] do
     %Subscription{retry_interval: retry_interval} = state
 
-    retry_ref = Process.send_after(self(), :subscribe_to_stream, retry_interval)
+    _ref = Process.send_after(self(), :subscribe_to_stream, retry_interval)
 
-    %Subscription{state | retry_ref: retry_ref}
+    state
   end
 
   defp handle_subscription_state(
@@ -281,14 +256,6 @@ defmodule EventStore.Subscriptions.Subscription do
 
   # No-op for all other subscription states.
   defp handle_subscription_state(%Subscription{} = state), do: state
-
-  defp cancel_retry_timer(%Subscription{retry_ref: ref} = state) when is_reference(ref) do
-    Process.cancel_timer(ref)
-
-    %Subscription{state | retry_ref: nil}
-  end
-
-  defp cancel_retry_timer(%Subscription{} = state), do: state
 
   # Get the delay between subscription attempts, in milliseconds, from app
   # config. The default value is one minute and minimum allowed value is one

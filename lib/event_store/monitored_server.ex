@@ -15,28 +15,49 @@ defmodule EventStore.MonitoredServer do
   defmodule State do
     @moduledoc false
 
-    defstruct [:mfa, :after_exit, :after_restart, :backoff, :pid, :shutdown, :queue]
+    defstruct [:mfa, :name, :backoff, :pid, :shutdown, :queue, monitors: MapSet.new()]
   end
 
   def start_link([{_module, _fun, _args} = mfa, opts]) do
     {start_opts, monitor_opts} = Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt])
 
-    GenServer.start_link(__MODULE__, [mfa, monitor_opts], start_opts)
-  end
-
-  def init([mfa, opts]) do
-    Process.flag(:trap_exit, true)
-
     state = %State{
-      after_exit: Keyword.get(opts, :after_exit),
-      after_restart: Keyword.get(opts, :after_restart),
       backoff: Backoff.new(backoff_type: :exp),
       mfa: mfa,
+      name: Keyword.get(start_opts, :name),
       queue: :queue.new(),
-      shutdown: Keyword.get(opts, :shutdown, 100)
+      shutdown: Keyword.get(monitor_opts, :shutdown, 100)
     }
 
-    {:ok, start_process(:start, state)}
+    GenServer.start_link(__MODULE__, state, start_opts)
+  end
+
+  def monitor(name) do
+    GenServer.call(name, {__MODULE__, :monitor, self()})
+  end
+
+  def init(%State{} = state) do
+    Process.flag(:trap_exit, true)
+
+    {:ok, start_process(state)}
+  end
+
+  def handle_call({__MODULE__, :monitor, monitor}, _from, %State{} = state) do
+    %State{monitors: monitors, name: name, pid: pid} = state
+
+    _ref = Process.monitor(monitor)
+
+    case pid do
+      pid when is_pid(pid) ->
+        Process.send(monitor, {:UP, name, pid}, [])
+
+      _ ->
+        :ok
+    end
+
+    state = %State{state | monitors: MapSet.put(monitors, monitor)}
+
+    {:reply, :ok, state}
   end
 
   def handle_call(msg, from, %State{pid: nil} = state) do
@@ -60,24 +81,28 @@ defmodule EventStore.MonitoredServer do
   end
 
   def handle_info(:start_process, %State{} = state) do
-    {:noreply, start_process(:restart, state)}
+    {:noreply, start_process(state)}
   end
 
   @doc """
   Handle process terminate by attempting to restart, after a delay.
   """
   def handle_info({:EXIT, pid, reason}, %State{pid: pid} = state) do
+    %State{name: name} = state
+
     Logger.debug(fn -> "Monitored process EXIT due to: #{inspect(reason)}" end)
 
-    after_callback(:exit, state)
+    notify_monitors({:EXIT, name, pid, reason}, state)
 
     state = %State{state | pid: nil}
 
     {:noreply, delayed_start(state)}
   end
 
-  def handle_info({:EXIT, _pid, reason}, %State{} = state) do
-    Logger.debug(fn -> "Monitored process EXIT due to: #{inspect(reason)}" end)
+  def handle_info({:EXIT, pid, _reason}, %State{} = state) do
+    %State{monitors: monitors} = state
+
+    state = %State{state | monitors: MapSet.delete(monitors, pid)}
 
     {:noreply, state}
   end
@@ -120,8 +145,8 @@ defmodule EventStore.MonitoredServer do
   end
 
   # Attempt to start the process, retry after a delay on failure
-  defp start_process(start_type, %State{} = state) do
-    %State{mfa: {module, fun, args}, queue: queue} = state
+  defp start_process(%State{} = state) do
+    %State{mfa: {module, fun, args}, name: name, queue: queue} = state
 
     Logger.debug(fn -> "Attempting to start #{inspect(module)}" end)
 
@@ -130,8 +155,7 @@ defmodule EventStore.MonitoredServer do
         Logger.debug(fn -> "Successfully started #{inspect(module)} (#{inspect(pid)})" end)
 
         :ok = forward_queued_msgs(pid, queue)
-
-        after_callback(start_type, state)
+        :ok = notify_monitors({:UP, name, pid}, state)
 
         %State{state | pid: pid, queue: :queue.new()}
 
@@ -175,19 +199,15 @@ defmodule EventStore.MonitoredServer do
 
   defp forward_queued_msg(pid, {:info, msg}), do: forward_info(pid, msg)
 
-  # Invoke `after_restart/0` callback function
-  defp after_callback(:restart, %State{after_restart: after_restart})
-       when is_function(after_restart, 0) do
-    Task.start(after_restart)
-  end
+  defp notify_monitors(message, %State{} = state) do
+    %State{monitors: monitors} = state
 
-  # Invoke `after_exit/0` callback function
-  defp after_callback(:exit, %State{after_exit: after_exit})
-       when is_function(after_exit, 0) do
-    Task.start(after_exit)
-  end
+    for monitor <- monitors do
+      :ok = Process.send(monitor, message, [])
+    end
 
-  defp after_callback(_type, _state), do: :ok
+    :ok
+  end
 
   defp delayed_start(%State{backoff: backoff} = state) do
     {delay, backoff} = Backoff.backoff(backoff)

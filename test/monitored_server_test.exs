@@ -23,32 +23,28 @@ defmodule EventStore.MonitoredServerTest do
     end)
   end
 
-  test "should execute `after_exit` after process exit" do
-    reply_to = self()
+  test "should send `EXIT` message after process exit" do
+    {:ok, _pid} = start_monitored_process()
 
-    {:ok, _pid} = start_monitored_process(after_exit: fn -> send(reply_to, :after_exit) end)
-
-    refute_receive :after_exit
+    refute_receive {:EXIT, MonitoredServer, _pid, _reason}
 
     shutdown_observed_process()
 
-    assert_receive :after_exit
+    assert_receive {:EXIT, MonitoredServer, _pid, :shutdown}
   end
 
-  test "should execute `after_restart` after process restarted" do
-    reply_to = self()
+  test "should send `:UP` message after process restarted" do
+    {:ok, _pid} = start_monitored_process()
 
-    {:ok, _pid} = start_monitored_process(after_restart: fn -> send(reply_to, :after_restart) end)
-
-    refute_receive :after_restart
+    assert_receive {:UP, MonitoredServer, _pid}
 
     shutdown_observed_process()
 
-    assert_receive :after_restart
+    assert_receive {:UP, MonitoredServer, _pid}
   end
 
   test "should forward calls to observed process using registered name" do
-    {:ok, _pid} = start_monitored_process(name: MonitoredServer)
+    {:ok, _pid} = start_monitored_process()
 
     assert {:ok, :pong} = GenServer.call(MonitoredServer, :ping)
   end
@@ -75,13 +71,18 @@ defmodule EventStore.MonitoredServerTest do
     assert_receive :pong
   end
 
-  defp start_monitored_process(opts \\ []) do
+  defp start_monitored_process do
     reply_to = self()
 
-    MonitoredServer.start_link([
-      {ObservedServer, :start_link, [[reply_to: reply_to, name: ObservedServer]]},
-      opts
-    ])
+    {:ok, pid} =
+      MonitoredServer.start_link([
+        {ObservedServer, :start_link, [[reply_to: reply_to, name: ObservedServer]]},
+        [name: MonitoredServer]
+      ])
+
+    :ok = MonitoredServer.monitor(MonitoredServer)
+
+    {:ok, pid}
   end
 
   defp shutdown_observed_process do

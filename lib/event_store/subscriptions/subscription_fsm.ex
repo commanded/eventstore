@@ -2,7 +2,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   @moduledoc false
 
   alias EventStore.{AdvisoryLocks, RecordedEvent, Registration, Storage}
-  alias EventStore.Subscriptions.{SubscriptionState, Subscription, Subscriber}
+  alias EventStore.Subscriptions.{SubscriptionState, Subscriber}
 
   use Fsm, initial_state: :initial, initial_data: %SubscriptionState{}
 
@@ -40,7 +40,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       }
 
       with {:ok, subscription} <- create_subscription(data),
-           :ok <- try_acquire_exclusive_lock(subscription),
+           {:ok, lock_ref} <- try_acquire_exclusive_lock(subscription),
            :ok <- subscribe_to_events(data) do
         %Storage.Subscription{subscription_id: subscription_id, last_seen: last_seen} =
           subscription
@@ -50,6 +50,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         data = %SubscriptionState{
           data
           | subscription_id: subscription_id,
+            lock_ref: lock_ref,
             last_received: last_seen,
             last_sent: last_seen,
             last_ack: last_seen
@@ -158,26 +159,27 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defstate disconnected do
-    # reconnect to subscription after lock reacquired
-    defevent reconnect, data: %SubscriptionState{} = data do
-      case create_subscription(data) do
-        {:ok, subscription} ->
-          %Storage.Subscription{
-            subscription_id: subscription_id,
-            last_seen: last_seen
-          } = subscription
+    # Attempt to subscribe
+    defevent subscribe, data: %SubscriptionState{} = data do
+      with {:ok, subscription} <- create_subscription(data),
+           {:ok, lock_ref} <- try_acquire_exclusive_lock(subscription) do
+        %Storage.Subscription{
+          subscription_id: subscription_id,
+          last_seen: last_seen
+        } = subscription
 
-          last_ack = last_seen || 0
+        last_ack = last_seen || 0
 
-          data = %SubscriptionState{
-            data
-            | subscription_id: subscription_id,
-              last_sent: last_ack,
-              last_ack: last_ack
-          }
+        data = %SubscriptionState{
+          data
+          | subscription_id: subscription_id,
+            lock_ref: lock_ref,
+            last_sent: last_ack,
+            last_ack: last_ack
+        }
 
-          next_state(:request_catch_up, data)
-
+        next_state(:request_catch_up, data)
+      else
         _ ->
           next_state(:disconnected, data)
       end
@@ -223,8 +225,18 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     next_state(state, data)
   end
 
-  defevent disconnect, data: %SubscriptionState{} = data do
-    next_state(:disconnected, purge_in_flight_events(data))
+  defevent disconnect(lock_ref), data: %SubscriptionState{lock_ref: lock_ref} = data do
+    data =
+      %SubscriptionState{
+        data
+        | lock_ref: nil,
+          queue_size: 0,
+          partitions: %{},
+          processed_event_ids: MapSet.new()
+      }
+      |> purge_in_flight_events()
+
+    next_state(:disconnected, data)
   end
 
   defevent unsubscribe(pid), data: %SubscriptionState{} = data, state: state do
@@ -257,19 +269,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defp try_acquire_exclusive_lock(%Storage.Subscription{subscription_id: subscription_id}) do
-    subscription = self()
-
-    AdvisoryLocks.try_advisory_lock(
-      subscription_id,
-      lock_released: fn ->
-        # Disconnect subscription when lock is released (e.g. database connection down).
-        Subscription.disconnect(subscription)
-      end,
-      lock_reacquired: fn ->
-        # Reconnect subscription when lock reacquired.
-        Subscription.reconnect(subscription)
-      end
-    )
+    AdvisoryLocks.try_advisory_lock(subscription_id)
   end
 
   defp subscribe_to_events(%SubscriptionState{} = data) do
@@ -620,13 +620,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         Map.put(acc, pid, Subscriber.reset_in_flight(subscriber))
       end)
 
-    %SubscriptionState{
-      data
-      | queue_size: 0,
-        partitions: %{},
-        processed_event_ids: MapSet.new(),
-        subscribers: subscribers
-    }
+    %SubscriptionState{data | subscribers: subscribers}
   end
 
   defp empty_queue?(%SubscriptionState{queue_size: 0}), do: true

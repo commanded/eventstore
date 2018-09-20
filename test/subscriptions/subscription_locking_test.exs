@@ -22,14 +22,14 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
       assert_receive_events([1, 2, 3])
 
-      :ok = Subscription.disconnect(subscription)
+      :ok = disconnect(subscription)
 
       # Acknowledgements should be ignored while subscription is disconnected
       :ok = Subscription.ack(subscription, 1)
       :ok = Subscription.ack(subscription, 2)
       :ok = Subscription.ack(subscription, 3)
 
-      :ok = Subscription.reconnect(subscription, 0)
+      :ok = reconnect(subscription)
 
       # Should receive already sent, but not successfully ack'd events
       assert_receive_events([1, 2, 3])
@@ -47,13 +47,13 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
       refute_receive {:events, _received_events}
 
-      :ok = Subscription.disconnect(subscription)
+      :ok = disconnect(subscription)
 
       # Acknowledgements sent after subscription disconnect should be ignored
       :ok = Subscription.ack(subscription, 2)
       :ok = Subscription.ack(subscription, 3)
 
-      :ok = Subscription.reconnect(subscription, 0)
+      :ok = reconnect(subscription)
 
       # Should receive already sent, but not successfully ack'd events
       assert_receive_events([2, 3])
@@ -70,7 +70,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       assert_receive_events([1, 2, 3])
       refute_receive {:events, _received_events}
 
-      :ok = Subscription.disconnect(subscription)
+      :ok = disconnect(subscription)
 
       :ok =
         EventStore.Storage.Subscription.ack_last_seen_event(
@@ -81,10 +81,23 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
           pool: DBConnection.Poolboy
         )
 
-      :ok = Subscription.reconnect(subscription, 0)
+      :ok = reconnect(subscription)
 
       # Should only receive events not yet ack'd
       assert_receive_events([3])
+    end
+
+    test "should subscribe after waiting `retry_interval`", %{subscription: subscription} do
+      assert_receive {:subscribed, ^subscription}
+
+      append_events_to_stream(3)
+
+      assert_receive_events([1, 2, 3])
+
+      :ok = disconnect(subscription)
+
+      # Should receive already sent, but not successfully ack'd events
+      assert_receive_events([1, 2, 3])
     end
   end
 
@@ -163,6 +176,20 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       EventStore.Subscriptions.Subscription.connect(subscription, self(), buffer_size: 3)
 
     [subscription: subscription]
+  end
+
+  defp reconnect(subscription) do
+    Process.send(subscription, :subscribe_to_stream, [])
+  end
+
+  defp disconnect(subscription) do
+    %Subscription{subscription: %{data: %{lock_ref: lock_ref}}} = :sys.get_state(subscription)
+
+    Process.send(
+      subscription,
+      {EventStore.AdvisoryLocks, :lock_released, lock_ref, :shutdown},
+      []
+    )
   end
 
   defp append_events_to_stream(count) do
