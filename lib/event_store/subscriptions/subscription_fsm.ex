@@ -64,11 +64,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           next_state(:initial, data)
       end
     end
-
-    # ignore ack's before subscribed
-    defevent ack(_ack, _subscriber), data: %SubscriptionState{} = data do
-      next_state(:initial, data)
-    end
   end
 
   defstate request_catch_up do
@@ -178,10 +173,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
             data
             | subscription_id: subscription_id,
               last_sent: last_ack,
-              last_ack: last_ack,
-              queue_size: 0,
-              partitions: %{},
-              processed_event_ids: MapSet.new()
+              last_ack: last_ack
           }
 
           next_state(:request_catch_up, data)
@@ -193,16 +185,16 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defstate unsubscribed do
-    defevent ack(_ack, _subscriber), data: %SubscriptionState{} = data do
-      next_state(:unsubscribed, data)
-    end
-
     defevent unsubscribe(_subscriber), data: %SubscriptionState{} = data do
       next_state(:unsubscribed, data)
     end
   end
 
   # Catch-all event handlers
+
+  defevent ack(_ack, _subscriber), data: %SubscriptionState{} = data, state: state do
+    next_state(state, data)
+  end
 
   defevent connect_subscriber(subscriber, opts),
     data: %SubscriptionState{} = data,
@@ -232,7 +224,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defevent disconnect, data: %SubscriptionState{} = data do
-    next_state(:disconnected, data)
+    next_state(:disconnected, purge_in_flight_events(data))
   end
 
   defevent unsubscribe(pid), data: %SubscriptionState{} = data, state: state do
@@ -617,6 +609,24 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       true ->
         data
     end
+  end
+
+  # Purge all subscriber in-flight events and subscription event queue.
+  defp purge_in_flight_events(%SubscriptionState{} = data) do
+    %SubscriptionState{subscribers: subscribers} = data
+
+    subscribers =
+      Enum.reduce(subscribers, %{}, fn {pid, subscriber}, acc ->
+        Map.put(acc, pid, Subscriber.reset_in_flight(subscriber))
+      end)
+
+    %SubscriptionState{
+      data
+      | queue_size: 0,
+        partitions: %{},
+        processed_event_ids: MapSet.new(),
+        subscribers: subscribers
+    }
   end
 
   defp empty_queue?(%SubscriptionState{queue_size: 0}), do: true

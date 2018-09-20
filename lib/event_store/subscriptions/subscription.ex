@@ -74,8 +74,8 @@ defmodule EventStore.Subscriptions.Subscription do
   Allow a short delay for the connection to become available before attempting
   to reconnect.
   """
-  def reconnect(subscription) do
-    _ref = Process.send_after(subscription, :reconnect, 5_000)
+  def reconnect(subscription, delay \\ 5_000) do
+    _ref = Process.send_after(subscription, :reconnect, delay)
     :ok
   end
 

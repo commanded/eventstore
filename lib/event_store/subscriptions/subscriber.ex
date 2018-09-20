@@ -41,6 +41,10 @@ defmodule EventStore.Subscriptions.Subscriber do
     }
   end
 
+  def reset_in_flight(%Subscriber{} = subscriber) do
+    %Subscriber{subscriber | in_flight: [], partition_key: nil}
+  end
+
   @doc """
   Acknowledge the in-flight event by number and all events sent to the
   subscriber before the ack'd event.
