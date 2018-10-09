@@ -13,6 +13,10 @@ defmodule EventStore.Subscriber do
     GenServer.call(server, :received_events)
   end
 
+  def stop(server) do
+    GenServer.stop(server)
+  end
+
   def init(receiver) do
     {:ok, %{receiver: receiver, events: []}}
   end

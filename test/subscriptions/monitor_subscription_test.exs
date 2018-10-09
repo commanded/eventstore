@@ -87,6 +87,36 @@ defmodule EventStore.Subscriptions.MonitorSubscriptionTest do
       refute_receive {:events, _received_events}
       refute Process.alive?(subscription)
     end
+
+    test "should shutdown subscription on subscriber `:normal` exit" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      {:ok, subscriber} = Subscriber.start(self())
+
+      {:ok, subscription} = subscribe_to_stream(stream_uuid, subscription_name, subscriber)
+
+      :ok = Subscriber.stop(subscriber)
+
+      # Both subscription and subscriber should be shutdown
+      assert_shutdown(subscriber)
+      assert_shutdown(subscription)
+    end
+
+    test "should shutdown subscription on subscriber `:kill` exit" do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      {:ok, subscriber} = Subscriber.start(self())
+
+      {:ok, subscription} = subscribe_to_stream(stream_uuid, subscription_name, subscriber)
+
+      Process.exit(subscriber, :kill)
+
+      # Both subscription and subscriber should be shutdown
+      assert_shutdown(subscriber)
+      assert_shutdown(subscription)
+    end
   end
 
   # Subscribe to a single stream and wait for the subscription to be subscribed.
