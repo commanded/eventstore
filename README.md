@@ -10,6 +10,7 @@ EventStore supports [running on a cluster of nodes](guides/Cluster.md).
 - [Wiki](https://github.com/commanded/eventstore/wiki)
 - [Frequently asked questions](https://github.com/commanded/eventstore/wiki/FAQ)
 - [Getting help](https://github.com/commanded/eventstore/wiki/Getting-help)
+- [Latest published Hex package](https://hex.pm/packages/eventstore) & [documentation](https://hexdocs.pm/eventstore/)
 
 MIT License
 
@@ -18,6 +19,9 @@ MIT License
 ---
 
 ### Overview
+
+> This README and the following guides follow the `master` branch which may not be the currently published version.
+> [Read docs for the latest published version of EventStore on Hex](https://hexdocs.pm/eventstore/).
 
 - [Getting started](guides/Getting%20Started.md)
   - [Initialize an existing database](guides/Getting%20Started.md#initialize-an-existing-database)
