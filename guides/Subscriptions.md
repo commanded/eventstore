@@ -321,3 +321,16 @@ Start your subscriber process, which subscribes to all streams in the event stor
 ```elixir
 {:ok, subscriber} = Subscriber.start_link()
 ```
+
+### Deleting a persistent subscription
+
+You can delete a single stream or all stream subscription without requiring an active subscriber:
+
+```elixir
+:ok = EventStore.delete_subscription(stream_uuid, subscription_name)
+:ok = EventStore.delete_all_streams_subscription(subscription_name)
+```
+
+Deleting the subscription will remove the subscription checkpoint allowing you to later create a subscription with the same name, using any start point.
+
+If there is an active subscriber when deleting the subscription it will be stopped.
