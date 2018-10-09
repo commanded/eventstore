@@ -7,6 +7,7 @@
 - Add `:socket` and `:socket_dir` config options ([#132](https://github.com/commanded/eventstore/pull/132)).
 - Rename `uuid` dependency to `elixir_uuid` ([#135](https://github.com/commanded/eventstore/pull/135)).
 - Subscription concurrency ([#134](https://github.com/commanded/eventstore/pull/134)).
+- Send `:subscribed` message to all subscribers connected to a subscription ([#136](https://github.com/commanded/eventstore/pull/136)).
 
 ## 0.15.1
 
