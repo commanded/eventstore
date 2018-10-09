@@ -1,7 +1,7 @@
 defmodule EventStore.AdvisoryLocksTest do
   use EventStore.StorageCase
 
-  alias EventStore.{AdvisoryLocks, Config, ProcessHelper}
+  alias EventStore.{AdvisoryLocks, Config, ProcessHelper, Wait}
   alias EventStore.Storage
 
   setup do
@@ -9,9 +9,9 @@ defmodule EventStore.AdvisoryLocksTest do
 
     {:ok, conn} = Postgrex.start_link(postgrex_config)
 
-    on_exit fn ->
+    on_exit(fn ->
       ProcessHelper.shutdown(conn)
-    end
+    end)
 
     [
       conn: conn
@@ -20,13 +20,18 @@ defmodule EventStore.AdvisoryLocksTest do
 
   describe "acquire lock" do
     test "should acquire lock when available" do
-      assert :ok = AdvisoryLocks.try_advisory_lock(1)
+      assert {:ok, lock} = AdvisoryLocks.try_advisory_lock(1)
+      assert is_reference(lock)
     end
 
     test "should acquire lock when same process already has lock" do
-      assert :ok = AdvisoryLocks.try_advisory_lock(1)
-      assert :ok = AdvisoryLocks.try_advisory_lock(1)
-      assert :ok = AdvisoryLocks.try_advisory_lock(1)
+      assert {:ok, lock1} = AdvisoryLocks.try_advisory_lock(1)
+      assert {:ok, lock2} = AdvisoryLocks.try_advisory_lock(1)
+      assert {:ok, lock3} = AdvisoryLocks.try_advisory_lock(1)
+
+      assert is_reference(lock1)
+      assert is_reference(lock2)
+      assert is_reference(lock3)
     end
 
     test "should fail to acquire lock when already taken", %{conn: conn} do
@@ -40,69 +45,39 @@ defmodule EventStore.AdvisoryLocksTest do
     test "should release lock when process terminates", %{conn: conn} do
       reply_to = self()
 
-      pid = spawn_link(fn ->
-        assert :ok = AdvisoryLocks.try_advisory_lock(1)
+      pid =
+        spawn_link(fn ->
+          assert {:ok, _lock} = AdvisoryLocks.try_advisory_lock(1)
 
-        send(reply_to, :lock_acquired)
+          send(reply_to, :lock_acquired)
 
-        # wait until terminated
-        :timer.sleep(:infinity)
-      end)
+          # Wait until terminated
+          :timer.sleep(:infinity)
+        end)
 
       assert_receive :lock_acquired
       assert {:error, :lock_already_taken} = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
 
       ProcessHelper.shutdown(pid)
 
-      # wait for lock to be released after process terminates
-      :timer.sleep 100
-
-      assert :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
+      # Wait for lock to be released after process terminates
+      Wait.until(fn ->
+        assert :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
+      end)
     end
   end
 
   describe "disconnect" do
-    test "should execute `lock_released` callback function" do
-      reply_to = self()
+    test "should send `lock_released` message" do
+      assert {:ok, lock} = AdvisoryLocks.try_advisory_lock(1)
 
-      assert :ok = AdvisoryLocks.try_advisory_lock(1, lock_released: fn ->
-        send(reply_to, :lock_released)
-      end)
+      connection_down()
 
-      AdvisoryLocks.disconnect()
-
-      assert_receive(:lock_released)
+      assert_receive({AdvisoryLocks, :lock_released, ^lock, :shutdown})
     end
   end
 
-  describe "reconnect" do
-    test "should execute `lock_reacquired` callback function when reacquired" do
-      reply_to = self()
-
-      assert :ok = AdvisoryLocks.try_advisory_lock(1, lock_reacquired: fn ->
-        send(reply_to, :lock_reacquired)
-      end)
-
-      :ok = AdvisoryLocks.disconnect()
-
-      assert :ok = AdvisoryLocks.reconnect()
-      assert_receive(:lock_reacquired)
-    end
-
-    test "should not execute `lock_reacquired` callback function when cannot reacquire", %{conn: conn} do
-      reply_to = self()
-
-      assert :ok = AdvisoryLocks.try_advisory_lock(1, lock_reacquired: fn ->
-        send(reply_to, :lock_reacquired)
-      end)
-
-      :ok = AdvisoryLocks.disconnect()
-
-      :ok = Storage.Lock.unlock(AdvisoryLocks.Postgrex, 1)
-      :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
-
-      assert :ok = AdvisoryLocks.reconnect()
-      refute_receive(:lock_reacquired)
-    end
+  defp connection_down do
+    send(AdvisoryLocks, {:DOWN, AdvisoryLocks.Postgrex, nil, :shutdown})
   end
 end

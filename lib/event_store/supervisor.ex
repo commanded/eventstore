@@ -23,8 +23,6 @@ defmodule EventStore.Supervisor do
         MonitoredServer.child_spec([
           {Postgrex, :start_link, [Config.sync_connect_postgrex_opts(config)]},
           [
-            after_exit: &AdvisoryLocks.disconnect/0,
-            after_restart: &AdvisoryLocks.reconnect/0,
             name: AdvisoryLocks.Postgrex
           ]
         ]),

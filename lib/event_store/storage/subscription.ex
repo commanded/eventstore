@@ -98,9 +98,9 @@ defmodule EventStore.Storage.Subscription do
     def execute(conn, stream_uuid, subscription_name, start_from, opts) do
       _ =
         Logger.debug(fn ->
-          "Attempting to create subscription on stream \"#{stream_uuid}\" named \"#{
-            subscription_name
-          }\""
+          "Attempting to create subscription on stream " <>
+            inspect(stream_uuid) <>
+            " named " <> inspect(subscription_name) <> " starting from #" <> inspect(start_from)
         end)
 
       conn

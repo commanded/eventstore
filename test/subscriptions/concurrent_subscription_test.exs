@@ -1,7 +1,9 @@
 defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, ProcessHelper}
+  import EventStore.SubscriptionHelpers
+
+  alias EventStore.ProcessHelper
   alias EventStore.Subscriptions.Subscription
 
   describe "concurrent subscription" do
@@ -15,9 +17,47 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
 
       {:ok, ^subscription} =
         EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 2)
+    end
+
+    test "should send `:subscribed` message to all subscribers" do
+      subscription_name = UUID.uuid4()
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+      subscriber3 = start_subscriber(:subscriber3)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency_limit: 3)
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 3)
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber3, concurrency_limit: 3)
 
       assert_receive {:subscribed, ^subscription, :subscriber1}
-      refute_receive {:subscribed, ^subscription, _subscriber}
+      assert_receive {:subscribed, ^subscription, :subscriber2}
+      assert_receive {:subscribed, ^subscription, :subscriber3}
+    end
+
+    test "should send `:subscribed` message to subscribers connected after subscribed" do
+      subscription_name = UUID.uuid4()
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+      subscriber3 = start_subscriber(:subscriber3)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency_limit: 3)
+
+      assert_receive {:subscribed, ^subscription, :subscriber1}
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 3)
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(subscription_name, subscriber3, concurrency_limit: 3)
+
+      assert_receive {:subscribed, ^subscription, :subscriber2}
+      assert_receive {:subscribed, ^subscription, :subscriber3}
     end
 
     test "should refuse multiple subscribers by default" do
@@ -186,7 +226,6 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       refute_receive {:events, _received_events, _subscriber}
     end
 
-    @tag :wip
     test "should resend in-flight events when subscriber process terminates" do
       subscription_name = UUID.uuid4()
       stream_uuid = UUID.uuid4()
@@ -273,6 +312,9 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
         EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 2)
 
       append_to_stream(stream_uuid, 6)
+
+      assert_receive {:subscribed, ^subscription, :subscriber1}
+      assert_receive {:subscribed, ^subscription, :subscriber2}
 
       assert_receive_events([1], :subscriber1)
       assert_receive_events([2], :subscriber2)
@@ -536,36 +578,10 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
     assert last_seen == expected_ack
   end
 
-  defp start_subscriber(name) do
-    reply_to = self()
-
-    spawn_link(fn ->
-      receive_events = fn loop ->
-        receive do
-          {:subscribed, subscription} ->
-            send(reply_to, {:subscribed, subscription, name})
-
-          {:events, events} ->
-            send(reply_to, {:events, events, name})
-        end
-
-        loop.(loop)
-      end
-
-      receive_events.(receive_events)
-    end)
-  end
-
   def receive_and_ack(subscription, expected_stream_uuid) do
     assert_receive {:events, received_events}
     assert Enum.all?(received_events, fn event -> event.stream_uuid == expected_stream_uuid end)
 
     Subscription.ack(subscription, received_events)
-  end
-
-  defp append_to_stream(stream_uuid, event_count, expected_version \\ 0) do
-    events = EventFactory.create_events(event_count)
-
-    :ok = EventStore.append_to_stream(stream_uuid, expected_version, events)
   end
 end

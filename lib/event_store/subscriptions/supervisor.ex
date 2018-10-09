@@ -11,13 +11,12 @@ defmodule EventStore.Subscriptions.Supervisor do
     Supervisor.start_link(__MODULE__, args, name: __MODULE__)
   end
 
-  def subscribe_to_stream(stream_uuid, subscription_name, subscriber, subscription_opts) do
+  def start_subscription(stream_uuid, subscription_name, subscription_opts) do
     name = {:via, Registry, registry_name(stream_uuid, subscription_name)}
 
     Supervisor.start_child(__MODULE__, [
       stream_uuid,
       subscription_name,
-      subscriber,
       subscription_opts,
       [name: name]
     ])

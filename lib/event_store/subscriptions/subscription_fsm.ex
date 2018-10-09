@@ -1,37 +1,47 @@
 defmodule EventStore.Subscriptions.SubscriptionFsm do
   @moduledoc false
 
-  alias EventStore.{AdvisoryLocks, RecordedEvent, Storage}
-  alias EventStore.Subscriptions.{SubscriptionState, Subscription, Subscriber}
+  alias EventStore.{AdvisoryLocks, RecordedEvent, Registration, Storage}
+  alias EventStore.Subscriptions.{SubscriptionState, Subscriber}
 
   use Fsm, initial_state: :initial, initial_data: %SubscriptionState{}
 
   require Logger
 
-  @max_buffer_size 1_000
+  def new(conn, stream_uuid, subscription_name, subscription_opts) do
+    new(
+      data: %SubscriptionState{
+        conn: conn,
+        stream_uuid: stream_uuid,
+        subscription_name: subscription_name,
+        start_from: subscription_opts[:start_from] || 0,
+        mapper: subscription_opts[:mapper],
+        selector: subscription_opts[:selector],
+        partition_by: subscription_opts[:partition_by],
+        buffer_size: subscription_opts[:buffer_size] || 1,
+        max_size: subscription_opts[:max_size] || 1_000
+      }
+    )
+  end
 
   # The main flow between states in this finite state machine is:
   #
-  #   initial -> subscribe_to_events -> request_catch_up -> catching_up -> subscribed
+  #   initial -> request_catch_up -> catching_up -> subscribed
   #
 
   defstate initial do
-    defevent subscribe(conn, stream_uuid, subscription_name, subscriber, opts) do
-      data =
-        %SubscriptionState{
-          conn: conn,
-          stream_uuid: stream_uuid,
-          subscription_name: subscription_name,
-          start_from: opts[:start_from],
-          mapper: opts[:mapper],
-          selector: opts[:selector],
-          partition_by: opts[:partition_by],
-          max_size: opts[:max_size] || @max_buffer_size
-        }
-        |> monitor_subscriber(subscriber, opts)
+    defevent subscribe,
+      data: %SubscriptionState{} = data do
+      data = %SubscriptionState{
+        data
+        | queue_size: 0,
+          partitions: %{},
+          processed_event_ids: MapSet.new()
+      }
 
       with {:ok, subscription} <- create_subscription(data),
-           :ok <- try_acquire_exclusive_lock(subscription) do
+           {:ok, lock_ref} <- try_acquire_exclusive_lock(subscription),
+           :ok <- subscribe_to_events(data) do
         %Storage.Subscription{subscription_id: subscription_id, last_seen: last_seen} =
           subscription
 
@@ -40,37 +50,20 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         data = %SubscriptionState{
           data
           | subscription_id: subscription_id,
+            lock_ref: lock_ref,
             last_received: last_seen,
             last_sent: last_seen,
             last_ack: last_seen
         }
 
-        next_state(:subscribe_to_events, data)
+        notify_subscribed(data)
+
+        next_state(:request_catch_up, data)
       else
         _ ->
           # Failed to subscribe to stream, retry after delay
           next_state(:initial, data)
       end
-    end
-
-    # ignore ack's before subscribed
-    defevent ack(_ack, _subscriber), data: %SubscriptionState{} = data do
-      next_state(:initial, data)
-    end
-  end
-
-  defstate subscribe_to_events do
-    defevent subscribed, data: %SubscriptionState{} = data do
-      next_state(:request_catch_up, data)
-    end
-
-    defevent ack(ack, subscriber), data: %SubscriptionState{} = data do
-      data =
-        data
-        |> ack_events(ack, subscriber)
-        |> notify_subscribers()
-
-      next_state(:subscribe_to_events, data)
     end
   end
 
@@ -166,9 +159,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defstate disconnected do
-    # reconnect to subscription after lock reacquired
-    defevent reconnect, data: %SubscriptionState{} = data do
-      with {:ok, subscription} <- create_subscription(data) do
+    # Attempt to subscribe
+    defevent subscribe, data: %SubscriptionState{} = data do
+      with {:ok, subscription} <- create_subscription(data),
+           {:ok, lock_ref} <- try_acquire_exclusive_lock(subscription) do
         %Storage.Subscription{
           subscription_id: subscription_id,
           last_seen: last_seen
@@ -179,6 +173,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         data = %SubscriptionState{
           data
           | subscription_id: subscription_id,
+            lock_ref: lock_ref,
             last_sent: last_ack,
             last_ack: last_ack
         }
@@ -192,10 +187,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defstate unsubscribed do
-    defevent ack(_ack, _subscriber), data: %SubscriptionState{} = data do
-      next_state(:unsubscribed, data)
-    end
-
     defevent unsubscribe(_subscriber), data: %SubscriptionState{} = data do
       next_state(:unsubscribed, data)
     end
@@ -203,34 +194,48 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   # Catch-all event handlers
 
+  defevent ack(_ack, _subscriber), data: %SubscriptionState{} = data, state: state do
+    next_state(state, data)
+  end
+
   defevent connect_subscriber(subscriber, opts),
     data: %SubscriptionState{} = data,
     state: state do
     data = data |> monitor_subscriber(subscriber, opts) |> notify_subscribers()
 
+    unless state == :initial do
+      notify_subscribed(subscriber)
+    end
+
     next_state(state, data)
   end
 
-  defevent subscribe(_conn, _stream_uuid, _subscription_name, _subscriber, _opts),
+  defevent subscribe,
     data: %SubscriptionState{} = data,
     state: state do
     next_state(state, data)
   end
 
-  defevent subscribed, data: %SubscriptionState{} = data, state: state do
-    next_state(state, data)
-  end
-
   # Ignore notify events unless subscribed
   defevent notify_events(events), data: %SubscriptionState{} = data, state: state do
-    next_state(state, track_last_received(events, data))
+    next_state(state, track_last_received(data, events))
   end
 
   defevent catch_up, data: %SubscriptionState{} = data, state: state do
     next_state(state, data)
   end
 
-  defevent disconnect, data: %SubscriptionState{} = data do
+  defevent disconnect(lock_ref), data: %SubscriptionState{lock_ref: lock_ref} = data do
+    data =
+      %SubscriptionState{
+        data
+        | lock_ref: nil,
+          queue_size: 0,
+          partitions: %{},
+          processed_event_ids: MapSet.new()
+      }
+      |> purge_in_flight_events()
+
     next_state(:disconnected, data)
   end
 
@@ -264,27 +269,23 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defp try_acquire_exclusive_lock(%Storage.Subscription{subscription_id: subscription_id}) do
-    subscription = self()
-
-    AdvisoryLocks.try_advisory_lock(
-      subscription_id,
-      lock_released: fn ->
-        # Disconnect subscription when lock is released (e.g. database connection down).
-        Subscription.disconnect(subscription)
-      end,
-      lock_reacquired: fn ->
-        # Reconnect subscription when lock reacquired.
-        Subscription.reconnect(subscription)
-      end
-    )
+    AdvisoryLocks.try_advisory_lock(subscription_id)
   end
 
-  defp monitor_subscriber(%SubscriptionState{subscribers: subscribers} = data, pid, opts)
+  defp subscribe_to_events(%SubscriptionState{} = data) do
+    %SubscriptionState{stream_uuid: stream_uuid} = data
+
+    Registration.subscribe(stream_uuid)
+  end
+
+  defp monitor_subscriber(%SubscriptionState{} = data, pid, opts)
        when is_pid(pid) do
+    %SubscriptionState{subscribers: subscribers, buffer_size: buffer_size} = data
+
     subscriber = %Subscriber{
       pid: pid,
       ref: Process.monitor(pid),
-      buffer_size: Keyword.get(opts, :buffer_size, 1)
+      buffer_size: Keyword.get(opts, :buffer_size, buffer_size)
     }
 
     %SubscriptionState{data | subscribers: Map.put(subscribers, pid, subscriber)}
@@ -312,8 +313,27 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   defp has_subscribers?(%SubscriptionState{subscribers: subscribers}), do: subscribers != %{}
 
-  defp track_last_received(events, %SubscriptionState{} = data) do
+  # Notify all connected subscribers that this subscription has successfully subscribed.
+  defp notify_subscribed(%SubscriptionState{subscribers: subscribers}) do
+    for {pid, _subscriber} <- subscribers do
+      notify_subscribed(pid)
+    end
+
+    :ok
+  end
+
+  defp notify_subscribed(subscriber) when is_pid(subscriber) do
+    send(subscriber, {:subscribed, self()})
+  end
+
+  defp track_last_received(%SubscriptionState{} = data, events) do
     %SubscriptionState{data | last_received: last_event_number(events)}
+  end
+
+  defp track_last_sent(%SubscriptionState{} = data, event_number) do
+    %SubscriptionState{last_sent: last_sent} = data
+
+    %SubscriptionState{data | last_sent: max(last_sent, event_number)}
   end
 
   defp first_event_number([%RecordedEvent{event_number: event_number} | _]), do: event_number
@@ -358,14 +378,15 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     %SubscriptionState{
       conn: conn,
       stream_uuid: stream_uuid,
-      last_sent: last_sent
+      last_sent: last_sent,
+      max_size: max_size
     } = data
 
     EventStore.Streams.Stream.read_stream_forward(
       conn,
       stream_uuid,
       last_sent + 1,
-      @max_buffer_size,
+      max_size,
       pool: DBConnection.Poolboy
     )
   end
@@ -375,7 +396,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp enqueue_events(%SubscriptionState{} = data, [event | events]) do
     %SubscriptionState{
       processed_event_ids: processed_event_ids,
-      last_sent: last_sent,
       last_received: last_received
     } = data
 
@@ -391,9 +411,9 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           # Filtered event, don't send to subscriber, but track it as processed.
           %SubscriptionState{
             data
-            | processed_event_ids: MapSet.put(processed_event_ids, event_number),
-              last_sent: max(last_sent, event_number)
+            | processed_event_ids: MapSet.put(processed_event_ids, event_number)
           }
+          |> track_last_sent(event_number)
       end
 
     %SubscriptionState{data | last_received: max(last_received, event_number)}
@@ -442,7 +462,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     %SubscriptionState{
       partitions: partitions,
       subscribers: subscribers,
-      last_sent: last_sent,
       queue_size: queue_size
     } = data
 
@@ -463,10 +482,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       %SubscriptionState{
         data
         | partitions: partitions,
-          last_sent: max(last_sent, event_number),
           subscribers: Map.put(subscribers, subscriber_pid, subscriber),
           queue_size: max(queue_size - 1, 0)
       }
+      |> track_last_sent(event_number)
       |> notify_partition_subscriber(partition_key, [{subscriber_pid, event} | events_to_send])
     else
       _ ->
@@ -590,6 +609,18 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       true ->
         data
     end
+  end
+
+  # Purge all subscriber in-flight events and subscription event queue.
+  defp purge_in_flight_events(%SubscriptionState{} = data) do
+    %SubscriptionState{subscribers: subscribers} = data
+
+    subscribers =
+      Enum.reduce(subscribers, %{}, fn {pid, subscriber}, acc ->
+        Map.put(acc, pid, Subscriber.reset_in_flight(subscriber))
+      end)
+
+    %SubscriptionState{data | subscribers: subscribers}
   end
 
   defp empty_queue?(%SubscriptionState{queue_size: 0}), do: true

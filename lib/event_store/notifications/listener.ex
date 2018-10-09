@@ -11,6 +11,7 @@ defmodule EventStore.Notifications.Listener do
 
   require Logger
 
+  alias EventStore.MonitoredServer
   alias EventStore.Notifications.Listener
 
   defstruct demand: 0,
@@ -22,26 +23,16 @@ defmodule EventStore.Notifications.Listener do
   end
 
   def init(%Listener{} = state) do
-    {:producer, listen_for_events(state)}
+    :ok = MonitoredServer.monitor(Listener.Postgrex)
+
+    {:producer, state}
   end
 
-  def reconnect do
-    GenServer.cast(__MODULE__, :listen_for_events)
-  end
-
-  def disconnect do
-    GenServer.cast(__MODULE__, :disconnect)
-  end
-
-  def handle_cast(:listen_for_events, %Listener{ref: nil} = state) do
+  def handle_info({:UP, Listener.Postgrex, _pid}, %Listener{} = state) do
     {:noreply, [], listen_for_events(state)}
   end
 
-  def handle_cast(:listen_for_events, %Listener{} = state) do
-    {:noreply, [], state}
-  end
-
-  def handle_cast(:disconnect, %Listener{} = state) do
+  def handle_info({:DOWN, Listener.Postgrex, _pid, _reason}, %Listener{} = state) do
     {:noreply, [], %Listener{state | ref: nil}}
   end
 

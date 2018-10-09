@@ -8,6 +8,8 @@ defmodule EventStore.Notifications.Reader do
   alias EventStore.Notifications.Listener
   alias EventStore.{RecordedEvent, Storage}
 
+  @conn EventStore.Notifications.Reader.Postgrex
+
   def start_link(serializer) do
     GenStage.start_link(__MODULE__, serializer, name: __MODULE__)
   end
@@ -37,12 +39,7 @@ defmodule EventStore.Notifications.Reader do
     count = to_stream_version - from_stream_version + 1
 
     with {:ok, events} <-
-           Storage.read_stream_forward(
-             EventStore.Notifications.Reader.Postgrex,
-             stream_id,
-             from_stream_version,
-             count
-           ),
+           Storage.read_stream_forward(@conn, stream_id, from_stream_version, count),
          deserialized_events <- deserialize_recorded_events(events, serializer) do
       {stream_uuid, deserialized_events}
     end
