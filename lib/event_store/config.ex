@@ -14,6 +14,7 @@ defmodule EventStore.Config do
   end
 
   @doc """
+  Get the connection pool module for postgrex.
   """
   def get_pool do
     case Code.ensure_loaded?(DBConnection.ConnectionPool) do
