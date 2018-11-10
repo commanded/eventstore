@@ -14,6 +14,15 @@ defmodule EventStore.Config do
   end
 
   @doc """
+  """
+  def get_pool do
+    case Code.ensure_loaded?(DBConnection.ConnectionPool) do
+      true -> DBConnection.ConnectionPool
+      false -> DBConnection.Poolboy
+    end
+  end
+
+  @doc """
   Get the event store configuration for the environment.
   """
   def parsed do
@@ -32,8 +41,9 @@ defmodule EventStore.Config do
       {:socket_dir, value}, config -> Keyword.put(config, :socket_dir, get_config_value(value))
       {key, value}, config -> Keyword.put(config, key, get_config_value(value))
     end)
-    |> Keyword.merge(pool: DBConnection.Poolboy)
+    |> Keyword.merge(pool: EventStore.Config.get_pool())
   end
+
 
   @doc """
   Converts a database url into a Keyword list

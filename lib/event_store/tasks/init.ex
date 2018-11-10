@@ -31,7 +31,7 @@ defmodule EventStore.Tasks.Init do
 
     {:ok, conn} = Postgrex.start_link(config)
 
-    conn_opts = [pool: DBConnection.Poolboy]
+    conn_opts = [pool: EventStore.Config.get_pool()]
 
     Postgrex.query!(conn, @is_events_table_exists, [], conn_opts)
     |> case do

@@ -9,7 +9,7 @@ defmodule EventStore.ConfigTest do
       hostname: "localhost",
       database: "eventstore_test",
       password: "postgres",
-      pool: DBConnection.Poolboy
+      pool: EventStore.Config.get_pool()
     ]
 
     assert Config.parse(original) == [
@@ -17,7 +17,7 @@ defmodule EventStore.ConfigTest do
              database: "eventstore_test",
              hostname: "localhost",
              username: "postgres",
-             pool: DBConnection.Poolboy
+             pool: EventStore.Config.get_pool()
            ]
   end
 
@@ -27,7 +27,7 @@ defmodule EventStore.ConfigTest do
       socket: "/path/to/socket",
       database: "eventstore_test",
       password: "postgres",
-      pool: DBConnection.Poolboy
+      pool: EventStore.Config.get_pool()
     ]
 
     assert Config.parse(original) == [
@@ -35,7 +35,7 @@ defmodule EventStore.ConfigTest do
              database: "eventstore_test",
              socket: "/path/to/socket",
              username: "postgres",
-             pool: DBConnection.Poolboy
+             pool: EventStore.Config.get_pool()
            ]
   end
 
@@ -45,7 +45,7 @@ defmodule EventStore.ConfigTest do
       socket_dir: "/path/to/socket_dir",
       database: "eventstore_test",
       password: "postgres",
-      pool: DBConnection.Poolboy
+      pool: EventStore.Config.get_pool()
     ]
 
     assert Config.parse(original) == [
@@ -53,7 +53,7 @@ defmodule EventStore.ConfigTest do
              database: "eventstore_test",
              socket_dir: "/path/to/socket_dir",
              username: "postgres",
-             pool: DBConnection.Poolboy
+             pool: EventStore.Config.get_pool()
            ]
   end
 
@@ -67,7 +67,7 @@ defmodule EventStore.ConfigTest do
              password: "password",
              database: "database",
              hostname: "localhost",
-             pool: DBConnection.Poolboy
+             pool: EventStore.Config.get_pool()
            ]
   end
 
@@ -83,7 +83,7 @@ defmodule EventStore.ConfigTest do
              hostname: "localhost",
              pool_size: 5,
              ssl: true,
-             pool: DBConnection.Poolboy
+             pool: EventStore.Config.get_pool()
            ]
   end
 
@@ -97,7 +97,7 @@ defmodule EventStore.ConfigTest do
              password: "password",
              database: "database",
              hostname: "localhost",
-             pool: DBConnection.Poolboy
+             pool: EventStore.Config.get_pool()
            ]
   end
 
@@ -125,7 +125,7 @@ defmodule EventStore.ConfigTest do
              database: "database",
              password: "password",
              username: "username",
-             pool: DBConnection.Poolboy
+             pool: EventStore.Config.get_pool()
            ]
   end
 
@@ -134,7 +134,7 @@ defmodule EventStore.ConfigTest do
 
     assert config == [
              username: "default_username",
-             pool: DBConnection.Poolboy
+             pool: EventStore.Config.get_pool()
            ]
   end
 

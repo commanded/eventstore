@@ -45,7 +45,7 @@ defmodule EventStore.Mixfile do
     [
       {:fsm, "~> 0.3"},
       {:gen_stage, "~> 0.14"},
-      {:poolboy, "~> 1.5"},
+      {:poolboy, "~> 1.5", optional: true},
       {:postgrex, "~> 0.14 or ~> 0.13"},
       {:elixir_uuid, "~> 1.2"},
 
