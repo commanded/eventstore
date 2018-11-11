@@ -264,7 +264,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       stream_uuid,
       subscription_name,
       start_from,
-      pool: DBConnection.Poolboy
+      pool: EventStore.Config.get_pool()
     )
   end
 
@@ -387,7 +387,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       stream_uuid,
       last_sent + 1,
       max_size,
-      pool: DBConnection.Poolboy
+      pool: EventStore.Config.get_pool()
     )
   end
 
@@ -601,7 +601,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           stream_uuid,
           subscription_name,
           last_ack,
-          pool: DBConnection.Poolboy
+          pool: EventStore.Config.get_pool()
         )
 
         data

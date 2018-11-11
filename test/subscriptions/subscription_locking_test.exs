@@ -78,7 +78,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
           "$all",
           subscription_name,
           2,
-          pool: DBConnection.Poolboy
+          pool: EventStore.Config.get_pool()
         )
 
       :ok = reconnect(subscription)

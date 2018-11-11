@@ -8,6 +8,7 @@
 - Rename `uuid` dependency to `elixir_uuid` ([#135](https://github.com/commanded/eventstore/pull/135)).
 - Subscription concurrency ([#134](https://github.com/commanded/eventstore/pull/134)).
 - Send `:subscribed` message to all subscribers connected to a subscription ([#136](https://github.com/commanded/eventstore/pull/136)).
+- Update to `postgrex 0.14` ([#143](https://github.com/commanded/eventstore/pull/143)).
 
 ## 0.15.1
 

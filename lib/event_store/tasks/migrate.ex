@@ -87,7 +87,7 @@ defmodule EventStore.Tasks.Migrate do
       |> Postgrex.query!(
         "SELECT major_version, minor_version, patch_version FROM schema_migrations",
         [],
-        pool: DBConnection.Poolboy
+        pool: EventStore.Config.get_pool()
       )
       |> handle_response()
     end

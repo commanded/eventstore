@@ -620,7 +620,7 @@ defmodule EventStore do
   """
   def configuration, do: EventStore.Config.get()
 
-  @default_opts [pool: DBConnection.Poolboy]
+  @default_opts [pool: EventStore.Config.get_pool()]
 
   defp opts, do: @default_opts
 
