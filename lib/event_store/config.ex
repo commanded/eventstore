@@ -45,7 +45,6 @@ defmodule EventStore.Config do
     |> Keyword.merge(pool: EventStore.Config.get_pool())
   end
 
-
   @doc """
   Converts a database url into a Keyword list
   """
@@ -67,13 +66,17 @@ defmodule EventStore.Config do
     destructure [username, password], info.userinfo && String.split(info.userinfo, ":")
     "/" <> database = info.path
 
-    opts = Enum.reject([
-      username: username,
-      password: password,
-      database: database,
-      hostname: info.host,
-      port: info.port
-    ], fn {_k, v} -> is_nil(v) end)
+    opts =
+      Enum.reject(
+        [
+          username: username,
+          password: password,
+          database: database,
+          hostname: info.host,
+          port: info.port
+        ],
+        fn {_k, v} -> is_nil(v) end
+      )
 
     query_opts = parse_uri_query(info)
 
@@ -84,6 +87,7 @@ defmodule EventStore.Config do
 
   defp parse_uri_query(%URI{query: nil}),
     do: []
+
   defp parse_uri_query(%URI{query: query}) do
     query
     |> URI.query_decoder()
@@ -108,7 +112,8 @@ defmodule EventStore.Config do
         int
 
       _ ->
-        raise ArgumentError, message: "can not parse value `#{value}` for parameter `#{key}` as an integer"
+        raise ArgumentError,
+          message: "can not parse value `#{value}` for parameter `#{key}` as an integer"
     end
   end
 

@@ -2,8 +2,8 @@ defmodule EventStore.Storage.ReadEventsTest do
   use EventStore.StorageCase
 
   alias EventStore.EventFactory
-  alias EventStore.{RecordedEvent,Storage}
-  alias EventStore.Storage.{Appender,CreateStream}
+  alias EventStore.{RecordedEvent, Storage}
+  alias EventStore.Storage.{Appender, CreateStream}
 
   @all_stream_id 0
 
@@ -90,25 +90,46 @@ defmodule EventStore.Storage.ReadEventsTest do
       {:ok, stream1_uuid, stream1_id} = create_stream(conn)
       {:ok, stream2_uuid, stream2_id} = create_stream(conn)
 
-      :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(1, stream1_uuid))
-      :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(1, stream2_uuid, 2))
-      :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(1, stream1_uuid, 3, 2))
-      :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(1, stream2_uuid, 4, 2))
+      :ok =
+        Appender.append(conn, stream1_id, EventFactory.create_recorded_events(1, stream1_uuid))
+
+      :ok =
+        Appender.append(conn, stream2_id, EventFactory.create_recorded_events(1, stream2_uuid, 2))
+
+      :ok =
+        Appender.append(
+          conn,
+          stream1_id,
+          EventFactory.create_recorded_events(1, stream1_uuid, 3, 2)
+        )
+
+      :ok =
+        Appender.append(
+          conn,
+          stream2_id,
+          EventFactory.create_recorded_events(1, stream2_uuid, 4, 2)
+        )
 
       {:ok, events} = Storage.read_stream_forward(conn, @all_stream_id, 0, 1_000)
 
       assert length(events) == 4
-      assert [1, 2, 3, 4] == Enum.map(events, &(&1.event_number))
-      assert [stream1_uuid, stream2_uuid, stream1_uuid, stream2_uuid] == Enum.map(events, &(&1.stream_uuid))
-      assert [1, 1, 2, 2] == Enum.map(events, &(&1.stream_version))
+      assert [1, 2, 3, 4] == Enum.map(events, & &1.event_number)
+
+      assert [stream1_uuid, stream2_uuid, stream1_uuid, stream2_uuid] ==
+               Enum.map(events, & &1.stream_uuid)
+
+      assert [1, 1, 2, 2] == Enum.map(events, & &1.stream_version)
     end
 
     test "with multiple events from after last event", %{conn: conn} do
       {:ok, stream1_uuid, stream1_id} = create_stream(conn)
       {:ok, stream2_uuid, stream2_id} = create_stream(conn)
 
-      :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(1, stream1_uuid))
-      :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(1, stream2_uuid, 2))
+      :ok =
+        Appender.append(conn, stream1_id, EventFactory.create_recorded_events(1, stream1_uuid))
+
+      :ok =
+        Appender.append(conn, stream2_id, EventFactory.create_recorded_events(1, stream2_uuid, 2))
 
       {:ok, events} = Storage.read_stream_forward(conn, @all_stream_id, 3, 1_000)
 
@@ -119,10 +140,25 @@ defmodule EventStore.Storage.ReadEventsTest do
       {:ok, stream1_uuid, stream1_id} = create_stream(conn)
       {:ok, stream2_uuid, stream2_id} = create_stream(conn)
 
-      :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(5, stream1_uuid))
-      :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(5, stream2_uuid, 6))
-      :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(5, stream1_uuid, 11, 6))
-      :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(5, stream2_uuid, 16, 6))
+      :ok =
+        Appender.append(conn, stream1_id, EventFactory.create_recorded_events(5, stream1_uuid))
+
+      :ok =
+        Appender.append(conn, stream2_id, EventFactory.create_recorded_events(5, stream2_uuid, 6))
+
+      :ok =
+        Appender.append(
+          conn,
+          stream1_id,
+          EventFactory.create_recorded_events(5, stream1_uuid, 11, 6)
+        )
+
+      :ok =
+        Appender.append(
+          conn,
+          stream2_id,
+          EventFactory.create_recorded_events(5, stream2_uuid, 16, 6)
+        )
 
       {:ok, events} = Storage.read_stream_forward(conn, @all_stream_id, 0, 10)
 

@@ -556,7 +556,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert :ok = EventStore.delete_subscription(stream_uuid, subscription_name)
       refute Process.alive?(subscription)
 
-      assert {:ok, []} = EventStore.Storage.subscriptions(@conn, pool: EventStore.Config.get_pool())
+      assert {:ok, []} =
+               EventStore.Storage.subscriptions(@conn, pool: EventStore.Config.get_pool())
     end
   end
 

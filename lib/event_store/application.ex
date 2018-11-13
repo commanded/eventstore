@@ -1,6 +1,6 @@
 defmodule EventStore.Application do
   @moduledoc false
-  
+
   use Application
 
   alias EventStore.Config

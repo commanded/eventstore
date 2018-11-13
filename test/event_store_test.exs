@@ -330,7 +330,6 @@ defmodule EventStoreTest do
     end
   end
 
-
   defmodule ExampleData do
     @derive Jason.Encoder
     defstruct([:data])

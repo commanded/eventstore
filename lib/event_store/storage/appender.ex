@@ -43,7 +43,8 @@ defmodule EventStore.Storage.Appender do
             |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
           with :ok <- insert_stream_events(transaction, parameters, stream_id, event_count, opts),
-               :ok <- insert_link_events(transaction, parameters, @all_stream_id, event_count, opts) do
+               :ok <-
+                 insert_link_events(transaction, parameters, @all_stream_id, event_count, opts) do
             :ok
           else
             {:error, reason} -> Postgrex.rollback(transaction, reason)

@@ -8,18 +8,18 @@ defmodule EventStore.EventData do
     :causation_id,
     :event_type,
     :data,
-    :metadata,
+    :metadata
   ]
 
-  @type uuid :: String.t
+  @type uuid :: String.t()
 
   @type t :: %EventStore.EventData{
-    correlation_id: uuid() | nil,
-    causation_id: uuid() | nil,
-    event_type: String.t,
-    data: term,
-    metadata: term | nil
-  }
+          correlation_id: uuid() | nil,
+          causation_id: uuid() | nil,
+          event_type: String.t(),
+          data: term,
+          metadata: term | nil
+        }
 
   def fetch(map, key) when is_map(map) do
     Map.fetch(map, key)

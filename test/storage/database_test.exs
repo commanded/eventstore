@@ -2,12 +2,12 @@ defmodule EventStore.Storage.DatabaseTest do
   use ExUnit.Case
   doctest EventStore.Storage.Database
 
-  alias EventStore.{ Storage, Config }
+  alias EventStore.{Storage, Config}
   alias EventStore.Storage.Database
 
   def temp_database_config do
-    config = Config.parse Application.get_env(:eventstore, Storage)
-    Keyword.merge(config, [database: config[:database] <> "_temp"])
+    config = Config.parse(Application.get_env(:eventstore, Storage))
+    Keyword.merge(config, database: config[:database] <> "_temp")
   end
 
   def create_database do
@@ -19,7 +19,7 @@ defmodule EventStore.Storage.DatabaseTest do
   end
 
   setup do
-    on_exit fn -> drop_database() end
+    on_exit(fn -> drop_database() end)
     :ok
   end
 

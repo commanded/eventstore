@@ -6,7 +6,7 @@ defmodule EventStore.Serializer do
 
   @type t :: module
 
-  @type config :: Keyword.t
+  @type config :: Keyword.t()
 
   @doc """
   Serialize the given term to a representation that can be stored by the database.

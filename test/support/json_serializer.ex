@@ -1,4 +1,4 @@
-if (Code.ensure_loaded?(Jason)) do
+if Code.ensure_loaded?(Jason) do
   defmodule EventStore.JsonSerializer do
     @moduledoc """
     A serializer that uses the JSON format.
