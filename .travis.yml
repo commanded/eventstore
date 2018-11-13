@@ -5,8 +5,7 @@ cache:
   - priv/plts
 
 elixir:
-  - 1.6.6
-  - 1.7.3
+  - 1.7.4
 
 otp_release:
   - 21.0
@@ -21,7 +20,7 @@ before_script:
 
 script:
   - mix test.all
-  - mix dialyzer --halt-exit-status
+  - travis_wait 30 mix dialyzer --halt-exit-status
 
 sudo: required
 dist: trusty
