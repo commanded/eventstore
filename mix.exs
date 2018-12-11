@@ -56,7 +56,8 @@ defmodule EventStore.Mixfile do
       {:ex_doc, "~> 0.19", only: :dev},
       {:markdown, github: "devinus/markdown", only: :dev},
       {:mix_test_watch, "~> 0.9", only: :dev},
-      {:poison, "~> 2.2 or ~> 3.0 or ~> 4.0", optional: true}
+      {:poison, "~> 2.2 or ~> 3.0 or ~> 4.0", optional: true},
+      {:jason, "~> 1.1"}
     ]
   end
 
