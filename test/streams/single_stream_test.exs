@@ -20,17 +20,21 @@ defmodule EventStore.Streams.SingleStreamTest do
     test "should set created at datetime", context do
       %{conn: conn, stream_uuid: stream_uuid} = context
 
-      now = NaiveDateTime.utc_now()
+      utc_now = DateTime.utc_now()
 
       {:ok, [event]} = Stream.read_stream_forward(conn, stream_uuid, 0, 1)
 
       created_at = event.created_at
       assert created_at != nil
-      assert created_at.year == now.year
-      assert created_at.month == now.month
-      assert created_at.day == now.day
-      assert created_at.hour == now.hour
-      assert created_at.minute == now.minute
+
+      assert created_at.time_zone == utc_now.time_zone
+      assert created_at.zone_abbr == utc_now.zone_abbr
+      assert created_at.utc_offset == utc_now.utc_offset
+      assert created_at.std_offset == utc_now.std_offset
+
+      diff = DateTime.diff(utc_now, created_at, :millisecond)
+      assert 0 <= diff
+      assert diff < 60_000
     end
 
     test "for wrong expected version should error", context do

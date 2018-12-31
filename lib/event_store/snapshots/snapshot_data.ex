@@ -18,7 +18,7 @@ defmodule EventStore.Snapshots.SnapshotData do
     source_type: String.t,
     data: binary,
     metadata: binary,
-    created_at: NaiveDateTime.t
+    created_at: DateTime.t
   }
 
   def serialize(%SnapshotData{data: data, metadata: metadata} = snapshot, serializer) do

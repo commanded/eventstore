@@ -44,7 +44,7 @@ defmodule EventStore.EventFactory do
         event_type: "Elixir.EventStore.EventFactory.Event",
         data: serialize(%EventStore.EventFactory.Event{event: event_number}),
         metadata: serialize(%{"user" => "user@example.com"}),
-        created_at: now(),
+        created_at: utc_now(),
       }
     end)
   end
@@ -67,5 +67,5 @@ defmodule EventStore.EventFactory do
     apply(@serializer, :deserialize, [term, type])
   end
 
-  defp now, do: DateTime.utc_now |> DateTime.to_naive
+  defp utc_now, do: DateTime.utc_now
 end

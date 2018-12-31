@@ -11,7 +11,7 @@ defmodule EventStore.Storage.Subscription do
           stream_uuid: String.t(),
           subscription_name: String.t(),
           last_seen: non_neg_integer(),
-          created_at: NaiveDateTime.t()
+          created_at: DateTime.t()
         }
 
   defstruct subscription_id: nil,
