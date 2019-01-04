@@ -1,6 +1,6 @@
 defmodule EventStore do
   @moduledoc """
-  EventStore is CQRS event store implemented in Elixir.
+  EventStore is an event store implemented in Elixir.
 
   It uses PostgreSQL (v9.5 or later) as the underlying storage engine.
 
