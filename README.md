@@ -1,6 +1,6 @@
 # EventStore
 
-CQRS event store implemented in Elixir. Uses [PostgreSQL](http://www.postgresql.org/) as the underlying storage engine.
+Event store implemented in Elixir. Uses [PostgreSQL](http://www.postgresql.org/) as the underlying storage engine.
 
 Requires Elixir v1.5 and PostgreSQL v9.5 or newer.
 
