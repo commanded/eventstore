@@ -20,6 +20,8 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
 
       kill_socket()
 
+      Process.sleep(10)
+
       append_to_stream(stream1_uuid, 10, 10)
 
       refute_receive {:events, _events}
