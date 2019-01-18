@@ -15,7 +15,6 @@ defmodule EventStore.Notifications.Supervisor do
 
   alias EventStore.Notifications.{
     Listener,
-    PostgrexNotifications,
     Reader,
     StreamBroadcaster
   }
@@ -48,7 +47,7 @@ defmodule EventStore.Notifications.Supervisor do
         Supervisor.child_spec(
           {MonitoredServer,
            [
-             {PostgrexNotifications, :start_link, [postgrex_config]},
+             {Postgrex.Notifications, :start_link, [postgrex_config]},
              [
                name: Listener.Postgrex
              ]
