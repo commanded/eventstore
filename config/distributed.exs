@@ -1,6 +1,10 @@
 use Mix.Config
 
-config :logger, backends: []
+config :logger,
+  backends: [],
+  compile_time_purge_matching: [
+    [application: :eventstore]
+  ]
 
 config :ex_unit,
   capture_log: true,
