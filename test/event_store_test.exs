@@ -330,7 +330,10 @@ defmodule EventStoreTest do
     end
   end
 
-  defmodule(ExampleData, do: defstruct([:data]))
+  defmodule ExampleData do
+    @derive Jason.Encoder
+    defstruct([:data])
+  end
 
   test "record snapshot" do
     assert record_snapshot() != nil

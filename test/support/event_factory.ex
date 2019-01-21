@@ -4,6 +4,7 @@ defmodule EventStore.EventFactory do
   @serializer Application.get_env(:eventstore, EventStore.Storage)[:serializer] || EventStore.JsonSerializer
 
   defmodule Event do
+    @derive Jason.Encoder
     defstruct event: nil
   end
 

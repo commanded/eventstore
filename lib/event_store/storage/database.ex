@@ -179,7 +179,7 @@ defmodule EventStore.Storage.Database do
     opts = [function: :execute] ++ opts
 
     case DBConnection.execute(conn, query, params, opts) do
-      {:ok, _} = ok ->
+      {:ok, _, _} = ok ->
         ok
 
       {:error, %ArgumentError{} = err} ->

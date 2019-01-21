@@ -4,6 +4,22 @@
 
 ### Enhancements
 
+- BREAKING CHANGE: Replace `:poison` with `:jason` ([#144](https://github.com/commanded/eventstore/pull/144)).
+To support this change the users will need to @derive the Jason.Encoder protocol to all their Events.
+This can be done by either using `@derive Jason.Encoder` before defining the struct. Or using `Protocol.derive/2` for each event.
+Examples below.
+```
+defmodule Event1 do
+  @derive Jason.Encoder
+  defstruct [:id, :data]
+end
+```
+```
+require Protocol
+for event <- [Event1, Event2, Event3] do
+  Protocol.derive(Jason.Encoder, event)
+end
+```
 - Add `:socket` and `:socket_dir` config options ([#132](https://github.com/commanded/eventstore/pull/132)).
 - Rename `uuid` dependency to `elixir_uuid` ([#135](https://github.com/commanded/eventstore/pull/135)).
 - Subscription concurrency ([#134](https://github.com/commanded/eventstore/pull/134)).
