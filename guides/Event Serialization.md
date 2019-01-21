@@ -4,16 +4,15 @@ The default serialization of event data and metadata uses Erlang's [external ter
 
 You must implement the `EventStore.Serializer` behaviour to provide your preferred serialization format.
 
-## Jason Serializer
-EventStore includes a JSON serializer using Jason under the `EventStore.JsonSerializer` module. To include it add `{:jason, "~> 1.1"}` to your dependencies. Then configure EventStore to use it.
+## JSON serialization using Jason
+
+EventStore includes a JSON serializer using Jason in the `EventStore.JsonSerializer` module. To include it add `{:jason, "~> 1.1"}` to your application's mix dependencies and configure EventStore as below.
 
 ```elixir
-config :eventstore, EventStore.Storage,
-  serializer: EventStore.JsonSerializer,
-  # ...
+config :eventstore, EventStore.Storage, serializer: EventStore.JsonSerializer
 ```
 
-## Example JSON (Poison) serializer
+## Example JSON serializer using Poison
 
 The example serializer below serializes event data and metadata to JSON using the [Poison](https://github.com/devinus/poison) library.
 
@@ -48,9 +47,7 @@ end
 Configure your serializer by setting the `serializer` option in the mix environment configuration file (e.g. `config/dev.exs`).
 
 ```elixir
-config :eventstore, EventStore.Storage,
-  serializer: JsonSerializer,
-  # ...
+config :eventstore, EventStore.Storage, serializer: JsonSerializer
 ```
 
 You must set the `event_type` field to a string representing the type of event being persisted when using this serializer:

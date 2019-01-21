@@ -26,10 +26,7 @@ defmodule EventStore.Mixfile do
 
   def application do
     [
-      extra_applications: [
-        :logger,
-        :poolboy
-      ],
+      extra_applications: [:logger],
       mod: {EventStore.Application, []}
     ]
   end
@@ -43,20 +40,22 @@ defmodule EventStore.Mixfile do
 
   defp deps do
     [
+      {:elixir_uuid, "~> 1.2"},
       {:fsm, "~> 0.3"},
       {:gen_stage, "~> 0.14"},
-      {:poolboy, "~> 1.5", optional: true},
       {:postgrex, "~> 0.14"},
-      {:elixir_uuid, "~> 1.2"},
+
+      # Optional dependencies
+      {:jason, "~> 1.1", optional: true},
+      {:poolboy, "~> 1.5", optional: true},
 
       # Test & release tooling
       {:benchfella, "~> 0.3", only: :bench},
-      {:credo, "~> 0.10", only: [:dev, :test]},
+      {:credo, "~> 1.0", only: [:dev, :test]},
       {:dialyxir, "~> 0.5", only: [:dev, :test]},
       {:ex_doc, "~> 0.19", only: :dev},
       {:markdown, github: "devinus/markdown", only: :dev},
-      {:mix_test_watch, "~> 0.9", only: :dev},
-      {:jason, "~> 1.1", optional: true}
+      {:mix_test_watch, "~> 0.9", only: :dev}
     ]
   end
 
@@ -123,7 +122,7 @@ defmodule EventStore.Mixfile do
 
   defp dialyzer do
     [
-      plt_add_apps: [:poison, :ex_unit],
+      plt_add_apps: [:jason, :ex_unit],
       plt_add_deps: :app_tree,
       plt_file: {:no_warn, "priv/plts/eventstore.plt"}
     ]
