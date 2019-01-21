@@ -5,10 +5,10 @@ cache:
   - priv/plts
 
 elixir:
-  - 1.7.4
+  - 1.8.0
 
 otp_release:
-  - 21.0
+  - 21.2
 
 services:
   - postgresql
