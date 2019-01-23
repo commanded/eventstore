@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## v0.16.0
 
 ### Enhancements
 
