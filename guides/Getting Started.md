@@ -4,7 +4,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
   1. Add eventstore to your list of dependencies in `mix.exs`:
 
-      ```elixir    
+      ```elixir
       def deps do
         [{:eventstore, "~> 0.16"}]
       end
@@ -73,6 +73,15 @@ config :eventstore, column_data_type: "jsonb"
 config :eventstore, EventStore.Storage,
   serializer: EventStore.JsonbSerializer,
   types: EventStore.PostgresTypes
+```
+
+Finally, you need to include the Jason library in `mix.exs` to enable Postgrex type with JSON support.
+
+```elixir
+# mix.exs
+defp deps do
+  [{:jason, "~> 1.1"}]
+end
 ```
 
 These settings must be configured *before* creating the EventStore database. It's not possible to migrate between `bytea` and `jsonb` data types once you've created the database. This must be decided in advance.
