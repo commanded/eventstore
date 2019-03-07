@@ -28,13 +28,11 @@ defmodule EventStore.Tasks.Init do
   """
   def exec(config, opts) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
+    conn_opts = [pool: EventStore.Config.get_pool()]
 
     {:ok, conn} = Postgrex.start_link(config)
 
-    conn_opts = [pool: EventStore.Config.get_pool()]
-
-    Postgrex.query!(conn, @is_events_table_exists, [], conn_opts)
-    |> case do
+    case run_query(conn, @is_events_table_exists, conn_opts) do
       %{rows: [[true]]} ->
         write_info("The EventStore database has already been initialized.", opts)
 
@@ -42,5 +40,14 @@ defmodule EventStore.Tasks.Init do
         Initializer.run!(conn, conn_opts)
         write_info("The EventStore database has been initialized.", opts)
     end
+
+    true = Process.unlink(conn)
+    true = Process.exit(conn, :shutdown)
+
+    :ok
+  end
+
+  defp run_query(conn, query, opts) do
+    Postgrex.query!(conn, query, [], opts)
   end
 end

@@ -82,15 +82,20 @@ defmodule EventStore.Tasks.Migrate do
   end
 
   defp query_schema_migrations(config) do
-    with {:ok, conn} <- Postgrex.start_link(config) do
-      conn
-      |> Postgrex.query!(
-        "SELECT major_version, minor_version, patch_version FROM schema_migrations",
-        [],
-        pool: EventStore.Config.get_pool()
-      )
-      |> handle_response()
-    end
+    config
+    |> run_query("SELECT major_version, minor_version, patch_version FROM schema_migrations")
+    |> handle_response()
+  end
+
+  defp run_query(config, query) do
+    {:ok, conn} = Postgrex.start_link(config)
+
+    reply = Postgrex.query!(conn, query, [], pool: EventStore.Config.get_pool())
+
+    true = Process.unlink(conn)
+    true = Process.exit(conn, :shutdown)
+
+    reply
   end
 
   defp handle_response(%Postgrex.Result{num_rows: 0}), do: []
