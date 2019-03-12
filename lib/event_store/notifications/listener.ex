@@ -70,6 +70,14 @@ defmodule EventStore.Notifications.Listener do
     dispatch_events([], state)
   end
 
+  # Ignore notifications when database connection down.
+  def handle_info(
+        {:notification, _connection_pid, _ref, _channel, _payload},
+        %Listener{ref: nil} = state
+      ) do
+    {:noreply, [], state}
+  end
+
   def handle_demand(incoming_demand, %Listener{demand: pending_demand} = state) do
     dispatch_events([], %Listener{state | demand: incoming_demand + pending_demand})
   end
