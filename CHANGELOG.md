@@ -1,10 +1,11 @@
 # Changelog
 
-## Next release
+## v0.16.1
 
 ### Bug fixes
 
 - Stop Postgrex database connection process in mix `event_store.init` and `event_store.migrate` tasks after use to prevent IEx shutdown when tasks are run together (as `mix do event_store.init, event_store.migrate`).
+- Ensure the event store application doesn't crash when the database connection is lost ([#159](https://github.com/commanded/eventstore/pull/159)).
 
 ## v0.16.0
 
