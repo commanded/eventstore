@@ -23,14 +23,14 @@ defmodule EventStore.MonitoredServerTest do
     end)
   end
 
-  test "should send `EXIT` message after process exit" do
+  test "should send `DOWN` message after process shutdown" do
     {:ok, _pid} = start_monitored_process()
 
-    refute_receive {:EXIT, MonitoredServer, _pid, _reason}
+    refute_receive {:DOWN, MonitoredServer, _pid, _reason}
 
-    shutdown_observed_process()
+    _pid = shutdown_observed_process()
 
-    assert_receive {:EXIT, MonitoredServer, _pid, :shutdown}
+    assert_receive {:DOWN, MonitoredServer, _pid, :shutdown}
   end
 
   test "should send `:UP` message after process restarted" do
@@ -38,7 +38,7 @@ defmodule EventStore.MonitoredServerTest do
 
     assert_receive {:UP, MonitoredServer, _pid}
 
-    shutdown_observed_process()
+    _pid = shutdown_observed_process()
 
     assert_receive {:UP, MonitoredServer, _pid}
   end

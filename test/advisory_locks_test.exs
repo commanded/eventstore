@@ -9,10 +9,6 @@ defmodule EventStore.AdvisoryLocksTest do
 
     {:ok, conn} = Postgrex.start_link(postgrex_config)
 
-    on_exit(fn ->
-      ProcessHelper.shutdown(conn)
-    end)
-
     [
       conn: conn
     ]

@@ -85,14 +85,14 @@ defmodule EventStore.MonitoredServer do
   end
 
   @doc """
-  Handle process terminate by attempting to restart, after a delay.
+  Handle process exit by attempting to restart, after a delay.
   """
   def handle_info({:EXIT, pid, reason}, %State{pid: pid} = state) do
     %State{name: name} = state
 
     Logger.debug(fn -> "Monitored process EXIT due to: #{inspect(reason)}" end)
 
-    notify_monitors({:EXIT, name, pid, reason}, state)
+    notify_monitors({:DOWN, name, pid, reason}, state)
 
     state = %State{state | pid: nil}
 
