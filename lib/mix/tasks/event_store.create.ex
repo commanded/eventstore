@@ -22,6 +22,7 @@ defmodule Mix.Tasks.EventStore.Create do
   @doc false
   def run(args) do
     {:ok, _} = Application.ensure_all_started(:postgrex)
+    {:ok, _} = Application.ensure_all_started(:ssl)
 
     config = Config.parsed()
     {opts, _, _} = OptionParser.parse(args, switches: [quiet: :boolean])
