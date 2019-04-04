@@ -91,8 +91,11 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   defstate subscribed do
     # Notify events when subscribed
-    defevent notify_events(events), data: %SubscriptionState{last_sent: last_sent} = data do
-      expected_event = last_sent + 1
+    defevent notify_events(events), data: %SubscriptionState{} = data do
+      %SubscriptionState{last_received: last_received, last_sent: last_sent} = data
+      IO.inspect(last_received, label: "last_received")
+      IO.inspect(last_sent, label: "last_sent")
+      expected_event = last_received + 1
 
       case first_event_number(events) do
         past when past < expected_event ->
@@ -116,6 +119,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
           # Subscriber is up-to-date, so enqueue events to send
           data = data |> enqueue_events(events) |> notify_subscribers()
+          IO.inspect(data)
 
           if over_capacity?(data) do
             # Too many pending events, must wait for these to be processed.
@@ -326,8 +330,15 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     send(subscriber, {:subscribed, self()})
   end
 
-  defp track_last_received(%SubscriptionState{} = data, events) do
-    %SubscriptionState{data | last_received: last_event_number(events)}
+  defp track_last_received(%SubscriptionState{} = data, events) when is_list(events) do
+    track_last_received(data, last_event_number(events))
+  end
+
+  defp track_last_received(%SubscriptionState{} = data, event_number)
+       when is_number(event_number) do
+    %SubscriptionState{last_received: last_received} = data
+
+    %SubscriptionState{data | last_received: max(last_received, event_number)}
   end
 
   defp track_last_sent(%SubscriptionState{} = data, event_number) do
@@ -394,11 +405,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp enqueue_events(%SubscriptionState{} = data, []), do: data
 
   defp enqueue_events(%SubscriptionState{} = data, [event | events]) do
-    %SubscriptionState{
-      processed_event_ids: processed_event_ids,
-      last_received: last_received
-    } = data
-
+    %SubscriptionState{processed_event_ids: processed_event_ids} = data
     %RecordedEvent{event_number: event_number} = event
 
     data =
@@ -416,7 +423,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           |> track_last_sent(event_number)
       end
 
-    %SubscriptionState{data | last_received: max(last_received, event_number)}
+    data
+    |> track_last_received(event_number)
     |> enqueue_events(events)
   end
 
@@ -517,8 +525,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   #
   # Events will be distributed to subscribers based upon their partition key
   # when a `partition_by/1` function is provided. This is used to guarantee
-  # ordering of events for each partition (e.g. stream/aggregate identity).
-  #
+  # ordering of events for each partition.
   defp next_available_subscriber(%SubscriptionState{} = data, partition_key) do
     %SubscriptionState{subscribers: subscribers} = data
 

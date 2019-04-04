@@ -4,6 +4,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
   import EventStore.SubscriptionHelpers
 
   alias EventStore.ProcessHelper
+  alias EventStore.RecordedEvent
   alias EventStore.Subscriptions.Subscription
 
   describe "concurrent subscription" do
@@ -37,9 +38,10 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       assert_receive {:subscribed, ^subscription, :subscriber1}
       assert_receive {:subscribed, ^subscription, :subscriber2}
       assert_receive {:subscribed, ^subscription, :subscriber3}
+      refute_receive {:subscribed, ^subscription, _subscriber}
     end
 
-    test "should send `:subscribed` message to subscribers connected after subscribed" do
+    test "should send `:subscribed` message to subscribers connected after already subscribed" do
       subscription_name = UUID.uuid4()
       subscriber1 = start_subscriber(:subscriber1)
       subscriber2 = start_subscriber(:subscriber2)
@@ -49,6 +51,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
         EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency_limit: 3)
 
       assert_receive {:subscribed, ^subscription, :subscriber1}
+      refute_receive {:subscribed, ^subscription, _subscriber}
 
       {:ok, ^subscription} =
         EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 3)
@@ -58,6 +61,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
 
       assert_receive {:subscribed, ^subscription, :subscriber2}
       assert_receive {:subscribed, ^subscription, :subscriber3}
+      refute_receive {:subscribed, ^subscription, _subscriber}
     end
 
     test "should refuse multiple subscribers by default" do
@@ -100,7 +104,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
                )
     end
 
-    test "should refuse same subscriber process twice" do
+    test "should refuse duplicate subscriber process" do
       subscription_name = UUID.uuid4()
 
       assert {:ok, _subscription} =
@@ -127,7 +131,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       {:ok, ^subscription} =
         EventStore.subscribe_to_all_streams(subscription_name, subscriber3, concurrency_limit: 3)
 
-      append_to_stream(stream_uuid, 3)
+      :ok = append_to_stream(stream_uuid, 3)
 
       assert_receive_events([1], :subscriber1)
       assert_receive_events([2], :subscriber2)
@@ -149,7 +153,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       {:ok, ^subscription} =
         EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 2)
 
-      append_to_stream(stream_uuid, 6)
+      :ok = append_to_stream(stream_uuid, 6)
 
       assert_receive_events([1], :subscriber1)
       assert_receive_events([2], :subscriber2)
@@ -186,7 +190,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       {:ok, ^subscription} =
         EventStore.subscribe_to_all_streams(subscription_name, subscriber3, concurrency_limit: 3)
 
-      append_to_stream(stream_uuid, 8)
+      :ok = append_to_stream(stream_uuid, 8)
 
       assert_receive_events([1], :subscriber1)
       assert_receive_events([2], :subscriber2)
@@ -239,7 +243,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       {:ok, ^subscription} =
         EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 2)
 
-      append_to_stream(stream_uuid, 6)
+      :ok = append_to_stream(stream_uuid, 6)
 
       assert_receive_events([1], :subscriber1)
       assert_receive_events([2], :subscriber2)
@@ -278,7 +282,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
           buffer_size: 2
         )
 
-      append_to_stream(stream_uuid, 3)
+      :ok = append_to_stream(stream_uuid, 3)
 
       assert_receive_events([1, 3], :subscriber1)
       assert_receive_events([2], :subscriber2)
@@ -311,7 +315,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       {:ok, ^subscription} =
         EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 2)
 
-      append_to_stream(stream_uuid, 6)
+      :ok = append_to_stream(stream_uuid, 6)
 
       assert_receive {:subscribed, ^subscription, :subscriber1}
       assert_receive {:subscribed, ^subscription, :subscriber2}
@@ -324,7 +328,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       ProcessHelper.shutdown(subscriber1)
       ProcessHelper.shutdown(subscriber2)
 
-      assert_receive {:DOWN, ^ref, _, _, _}
+      assert_receive {:DOWN, ^ref, _, ^subscription, _}
     end
 
     test "should send pending events to newly connected subscribers" do
@@ -336,7 +340,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       {:ok, subscription} =
         EventStore.subscribe_to_all_streams(subscription_name, subscriber1, concurrency_limit: 3)
 
-      append_to_stream(stream_uuid, 6)
+      :ok = append_to_stream(stream_uuid, 6)
 
       assert_receive_events([1], :subscriber1)
 
@@ -392,7 +396,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
           selector: selector
         )
 
-      append_to_stream(stream_uuid, 12)
+      :ok = append_to_stream(stream_uuid, 12)
 
       assert_receive_events([3], :subscriber1)
       assert_receive_events([6], :subscriber2)
@@ -440,17 +444,17 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
           selector: selector
         )
 
-      append_to_stream(stream_uuid, 1)
+      :ok = append_to_stream(stream_uuid, 1)
 
       refute_receive {:events, _received_events, _subscriber}
       assert_last_ack(subscription, 1)
 
-      append_to_stream(stream_uuid, 2, 1)
+      :ok = append_to_stream(stream_uuid, 2, 1)
 
       refute_receive {:events, _received_events, _subscriber}
       assert_last_ack(subscription, 3)
 
-      append_to_stream(stream_uuid, 3, 3)
+      :ok = append_to_stream(stream_uuid, 3, 3)
 
       refute_receive {:events, _received_events, _subscriber}
       assert_last_ack(subscription, 6)
@@ -472,7 +476,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
           buffer_size: 2
         )
 
-      append_to_stream(stream_uuid, 6)
+      :ok = append_to_stream(stream_uuid, 6)
 
       assert_receive_events([1, 2], :subscriber1)
       Subscription.ack(subscription, 2, subscriber1)
@@ -505,7 +509,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
           buffer_size: 3
         )
 
-      append_to_stream(stream_uuid, 12)
+      :ok = append_to_stream(stream_uuid, 12)
 
       assert_receive_events([1, 3], :subscriber1)
       assert_receive_events([2, 4, 5], :subscriber2)
@@ -533,7 +537,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       subscription_name = UUID.uuid4()
       stream_uuid = UUID.uuid4()
 
-      append_to_stream(stream_uuid, 3)
+      :ok = append_to_stream(stream_uuid, 3)
 
       subscriber1 = start_subscriber(:subscriber1)
       subscriber2 = start_subscriber(:subscriber2)
@@ -544,7 +548,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
       {:ok, ^subscription} =
         EventStore.subscribe_to_all_streams(subscription_name, subscriber2, concurrency_limit: 2)
 
-      append_to_stream(stream_uuid, 3, 3)
+      :ok = append_to_stream(stream_uuid, 3, 3)
 
       assert_receive_events([1], :subscriber1)
       assert_receive_events([2], :subscriber2)
@@ -563,6 +567,120 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
 
       refute_receive {:events, _received_events, _subscriber}
     end
+
+    test "should send events to available subscribers once caught up after over capacity" do
+    end
+  end
+
+  describe "concurrency max queue size" do
+    test "when queue is limited to one event" do
+      buffer_test(1)
+    end
+
+    test "when max queue equals buffer size" do
+      buffer_test(2)
+    end
+
+    test "when max queue is slightly larger than buffer size" do
+      buffer_test(10)
+    end
+
+    test "when max queue is large enough" do
+      buffer_test(100)
+    end
+  end
+
+  defp buffer_test(max_size) do
+    subscription_name = UUID.uuid4()
+    partition_by = fn %RecordedEvent{stream_uuid: stream_uuid} -> stream_uuid end
+
+    subscriber1 = start_subscriber(:subscriber1)
+    subscriber2 = start_subscriber(:subscriber2)
+
+    {:ok, subscription} =
+      EventStore.subscribe_to_all_streams(subscription_name, subscriber1,
+        concurrency_limit: 2,
+        buffer_size: 2,
+        max_size: max_size,
+        partition_by: partition_by
+      )
+
+    {:ok, ^subscription} =
+      EventStore.subscribe_to_all_streams(subscription_name, subscriber2,
+        concurrency_limit: 2,
+        buffer_size: 2,
+        max_size: max_size,
+        partition_by: partition_by
+      )
+
+    assert_receive {:subscribed, ^subscription, :subscriber1}
+    assert_receive {:subscribed, ^subscription, :subscriber2}
+
+    :ok = append_to_stream("stream1", 5, 0)
+    :ok = append_to_stream("stream2", 5, 0)
+    :ok = append_to_stream("stream1", 5, 5)
+    :ok = append_to_stream("stream2", 5, 5)
+
+    assert_receive_events([1, 2], :subscriber1)
+    assert_receive_events([6, 7], :subscriber2)
+
+    :ok = Subscription.ack(subscription, 2, subscriber1)
+    :ok = Subscription.ack(subscription, 7, subscriber2)
+
+    assert_receive_events([3, 4], :subscriber1)
+    assert_receive_events([8, 9], :subscriber2)
+
+    :ok = Subscription.ack(subscription, 4, subscriber1)
+    :ok = Subscription.ack(subscription, 8, subscriber2)
+
+    assert_receive_events([5], :subscriber1)
+    assert_receive_events([10], :subscriber2)
+
+    :ok = Subscription.ack(subscription, 5, subscriber1)
+    :ok = Subscription.ack(subscription, 10, subscriber2)
+
+    assert_receive_events([11, 12], :subscriber1)
+    assert_receive_events([16, 17], :subscriber2)
+
+    :ok = Subscription.ack(subscription, 12, subscriber1)
+    :ok = Subscription.ack(subscription, 17, subscriber2)
+
+    assert_receive_events([13, 14], :subscriber1)
+    assert_receive_events([18, 19], :subscriber2)
+
+    :ok = Subscription.ack(subscription, 14, subscriber1)
+    :ok = Subscription.ack(subscription, 19, subscriber2)
+
+    assert_receive_events([15], :subscriber1)
+    assert_receive_events([20], :subscriber1)
+
+    :ok = Subscription.ack(subscription, 20, subscriber1)
+
+    # Now caught up
+    refute_receive {:events, _received_events, _subscriber}
+
+    :ok = append_to_stream("stream1", 5, 10)
+    :ok = append_to_stream("stream2", 5, 10)
+
+    assert_receive_events([26, 27], :subscriber1)
+    assert_receive_events([21, 22], :subscriber2)
+
+    :ok = Subscription.ack(subscription, 27, subscriber1)
+    :ok = Subscription.ack(subscription, 22, subscriber2)
+
+    assert_receive_events([28, 29], :subscriber1)
+    assert_receive_events([23, 24], :subscriber2)
+
+    :ok = Subscription.ack(subscription, 29, subscriber1)
+    :ok = Subscription.ack(subscription, 24, subscriber2)
+
+    assert_receive_events([30], :subscriber1)
+    assert_receive_events([25], :subscriber2)
+
+    :ok = Subscription.ack(subscription, 30, subscriber1)
+    :ok = Subscription.ack(subscription, 25, subscriber2)
+
+    refute_receive {:events, _received_events, _subscriber}
   end
 
   defp assert_receive_events(expected_event_numbers, expected_subscriber) do

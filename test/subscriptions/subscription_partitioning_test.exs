@@ -265,13 +265,6 @@ defmodule EventStore.Subscriptions.SubscriptionPartitioningTest do
     end)
   end
 
-  def receive_and_ack(subscription, expected_stream_uuid) do
-    assert_receive {:events, received_events}
-    assert Enum.all?(received_events, fn event -> event.stream_uuid == expected_stream_uuid end)
-
-    Subscription.ack(subscription, received_events)
-  end
-
   defp append_to_stream(stream_uuid, event_count, expected_version \\ 0) do
     events = EventFactory.create_events(event_count)
 

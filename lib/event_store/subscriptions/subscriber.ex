@@ -58,13 +58,10 @@ defmodule EventStore.Subscriptions.Subscriber do
 
       index ->
         # All in-flight events up to the ack'd event number are also ack'd
-        acknowledged_events =
-          in_flight
-          |> Enum.reverse()
-          |> Enum.take(length(in_flight) - index)
+        {in_flight, acknowledged_events} = Enum.split(in_flight, index)
 
         subscriber =
-          case in_flight -- acknowledged_events do
+          case in_flight do
             [] ->
               %Subscriber{subscriber | in_flight: [], partition_key: nil}
 
@@ -79,7 +76,7 @@ defmodule EventStore.Subscriptions.Subscriber do
   defp ack_event_index(in_flight, ack) do
     Enum.find_index(in_flight, fn
       %RecordedEvent{event_number: ^ack} -> true
-      _event -> false
+      %RecordedEvent{} -> false
     end)
   end
 end
