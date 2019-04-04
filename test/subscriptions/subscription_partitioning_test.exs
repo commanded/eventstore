@@ -44,10 +44,74 @@ defmodule EventStore.Subscriptions.SubscriptionPartitioningTest do
           partition_by: partition_by
         )
 
+      assert_receive {:subscribed, susbcription, :subscriber1}
+      assert_receive {:subscribed, susbcription, :subscriber2}
+      assert_receive {:subscribed, susbcription, :subscriber3}
+
       append_to_stream(stream_uuid, 9)
 
       assert_receive_events([1, 3, 5], :subscriber1)
       assert_receive_events([2, 4, 6], :subscriber2)
+
+      refute_receive {:events, _received_events, _subscriber}
+    end
+
+    test "should partition events by stream identity" do
+      subscription_name = UUID.uuid4()
+
+      subscriber1 = start_subscriber(:subscriber1)
+      subscriber2 = start_subscriber(:subscriber2)
+      subscriber3 = start_subscriber(:subscriber3)
+
+      partition_by = fn %RecordedEvent{stream_uuid: stream_uuid} -> stream_uuid end
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_all_streams(
+          subscription_name,
+          subscriber1,
+          concurrency_limit: 3,
+          buffer_size: 1,
+          partition_by: partition_by
+        )
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(
+          subscription_name,
+          subscriber2,
+          concurrency_limit: 3,
+          buffer_size: 1,
+          partition_by: partition_by
+        )
+
+      {:ok, ^subscription} =
+        EventStore.subscribe_to_all_streams(
+          subscription_name,
+          subscriber3,
+          concurrency_limit: 3,
+          buffer_size: 1,
+          partition_by: partition_by
+        )
+
+      assert_receive {:subscribed, susbcription, :subscriber1}
+      assert_receive {:subscribed, susbcription, :subscriber2}
+      assert_receive {:subscribed, susbcription, :subscriber3}
+
+      append_to_stream("stream1", 2)
+      append_to_stream("stream2", 2)
+      append_to_stream("stream3", 2)
+
+      assert_receive_events([1], :subscriber1)
+      assert_receive_events([3], :subscriber2)
+      assert_receive_events([5], :subscriber3)
+
+      Subscription.ack(subscription, 1, subscriber1)
+      Subscription.ack(subscription, 3, subscriber2)
+      Subscription.ack(subscription, 5, subscriber3)
+
+      assert_receive_events([2], :subscriber1)
+      assert_receive_events([4], :subscriber2)
+      assert_receive_events([6], :subscriber3)
+
       refute_receive {:events, _received_events, _subscriber}
     end
 
