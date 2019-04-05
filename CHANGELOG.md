@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Bug fixes
+
+- Fix issue with concurrent subscription partitioning ([#162](https://github.com/commanded/eventstore/pull/162)).
+
 ## v0.16.1
 
 ### Bug fixes
