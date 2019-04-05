@@ -73,19 +73,21 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
 
     defevent ack(ack, subscriber), data: %SubscriptionState{} = data do
-      data
-      |> ack_events(ack, subscriber)
-      |> notify_subscribers()
-      |> catch_up_from_stream()
+      with {:ok, data} <- ack_events(data, ack, subscriber) do
+        catch_up_from_stream(data)
+      else
+        reply -> respond(reply)
+      end
     end
   end
 
   defstate catching_up do
     defevent ack(ack, subscriber), data: %SubscriptionState{} = data do
-      data
-      |> ack_events(ack, subscriber)
-      |> notify_subscribers()
-      |> catch_up_from_stream()
+      with {:ok, data} <- ack_events(data, ack, subscriber) do
+        catch_up_from_stream(data)
+      else
+        reply -> respond(reply)
+      end
     end
   end
 
@@ -130,12 +132,11 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
 
     defevent ack(ack, subscriber), data: %SubscriptionState{} = data do
-      data =
-        data
-        |> ack_events(ack, subscriber)
-        |> notify_subscribers()
-
-      next_state(:subscribed, data)
+      with {:ok, data} <- ack_events(data, ack, subscriber) do
+        next_state(:subscribed, data)
+      else
+        reply -> respond(reply)
+      end
     end
 
     defevent catch_up, data: %SubscriptionState{} = data do
@@ -145,17 +146,16 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   defstate max_capacity do
     defevent ack(ack, subscriber), data: %SubscriptionState{} = data do
-      data =
-        data
-        |> ack_events(ack, subscriber)
-        |> notify_subscribers()
-
-      if empty_queue?(data) do
-        # No further pending events so catch up with any unseen.
-        next_state(:request_catch_up, data)
+      with {:ok, data} <- ack_events(data, ack, subscriber) do
+        if empty_queue?(data) do
+          # No further pending events so catch up with any unseen.
+          next_state(:request_catch_up, data)
+        else
+          # Pending events remain, wait until subscriber ack's.
+          next_state(:max_capacity, data)
+        end
       else
-        # Pending events remain, wait until subscriber ack's.
-        next_state(:max_capacity, data)
+        reply -> respond(reply)
       end
     end
   end
@@ -293,15 +293,15 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     %SubscriptionState{data | subscribers: Map.put(subscribers, pid, subscriber)}
   end
 
-  defp remove_subscriber(%SubscriptionState{subscribers: subscribers} = data, pid)
-       when is_pid(pid) do
-    case Map.get(subscribers, pid) do
-      nil ->
-        data
+  defp remove_subscriber(%SubscriptionState{subscribers: subscribers} = data, subscriber_pid)
+       when is_pid(subscriber_pid) do
+    case subscriber_by_pid(subscribers, subscriber_pid) do
+      {:ok, %Subscriber{} = subscriber} ->
+        %Subscriber{in_flight: in_flight} = subscriber
 
-      %Subscriber{in_flight: in_flight} ->
-        # Prepend in-flight events for the down subscriber to the pending
-        # event queue so they will be resent to another available subscriber.
+        # Prepend in-flight events for the removed subscriber to the pending
+        # event queue so they can be sent to another available subscriber.
+
         data =
           in_flight
           |> Enum.sort_by(fn %RecordedEvent{event_number: event_number} -> -event_number end)
@@ -309,7 +309,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
             enqueue_event(data, event, &:queue.in_r/2)
           end)
 
-        %SubscriptionState{data | subscribers: Map.delete(subscribers, pid)}
+        %SubscriptionState{data | subscribers: Map.delete(subscribers, subscriber_pid)}
+
+      {:error, :unknown_subscriber} ->
+        data
     end
   end
 
@@ -560,23 +563,29 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp ack_events(%SubscriptionState{} = data, ack, subscriber_pid) do
     %SubscriptionState{subscribers: subscribers, processed_event_ids: processed_event_ids} = data
 
-    case subscribers |> Map.get(subscriber_pid) |> Subscriber.acknowledge(ack) do
-      {_subscriber, []} ->
-        # Not an in-flight event, ignore ack.
-        data
+    with {:ok, subscriber} <- subscriber_by_pid(subscribers, subscriber_pid),
+         {:ok, subscriber, acknowledged_events} <- Subscriber.acknowledge(subscriber, ack) do
+      processed_event_ids =
+        acknowledged_events
+        |> Enum.map(& &1.event_number)
+        |> Enum.reduce(processed_event_ids, &MapSet.put(&2, &1))
 
-      {subscriber, acknowledged_events} ->
-        processed_event_ids =
-          acknowledged_events
-          |> Enum.map(& &1.event_number)
-          |> Enum.reduce(processed_event_ids, &MapSet.put(&2, &1))
-
+      data =
         %SubscriptionState{
           data
           | subscribers: Map.put(subscribers, subscriber_pid, subscriber),
             processed_event_ids: processed_event_ids
         }
-        |> checkpoint_last_seen()
+        |> notify_subscribers()
+
+      {:ok, data}
+    end
+  end
+
+  defp subscriber_by_pid(subscribers, subscriber_pid) do
+    case Map.get(subscribers, subscriber_pid) do
+      %Subscriber{} = subscriber -> {:ok, subscriber}
+      nil -> {:error, :unknown_subscriber}
     end
   end
 

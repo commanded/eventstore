@@ -54,7 +54,7 @@ defmodule EventStore.Subscriptions.Subscriber do
 
     case ack_event_index(in_flight, ack) do
       nil ->
-        {subscriber, []}
+        {:error, :unexpected_ack}
 
       index ->
         # All in-flight events up to the ack'd event number are also ack'd
@@ -69,7 +69,7 @@ defmodule EventStore.Subscriptions.Subscriber do
               %Subscriber{subscriber | in_flight: in_flight}
           end
 
-        {subscriber, acknowledged_events}
+        {:ok, subscriber, acknowledged_events}
     end
   end
 

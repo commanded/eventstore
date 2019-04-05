@@ -42,14 +42,14 @@ defmodule EventStore.Subscriptions.Subscription do
   Confirm receipt of an event by its event number for a given subscriber.
   """
   def ack(subscription, ack, subscriber) when is_integer(ack) and is_pid(subscriber) do
-    GenServer.cast(subscription, {:ack, ack, subscriber})
+    GenServer.call(subscription, {:ack, ack, subscriber})
   end
 
   @doc """
   Confirm receipt of an event by its event number.
   """
   def ack(subscription, ack) when is_integer(ack) do
-    GenServer.cast(subscription, {:ack, ack, self()})
+    GenServer.call(subscription, {:ack, ack, self()})
   end
 
   @doc """
@@ -62,8 +62,10 @@ defmodule EventStore.Subscriptions.Subscription do
   @doc """
   Confirm receipt of the given `EventStore.RecordedEvent` struct.
   """
-  def ack(subscription, %RecordedEvent{event_number: event_number}) do
-    Subscription.ack(subscription, event_number)
+  def ack(subscription, %RecordedEvent{} = event) do
+    %RecordedEvent{event_number: event_number} = event
+
+    GenServer.call(subscription, {:ack, event_number, self()})
   end
 
   @doc """
@@ -142,7 +144,9 @@ defmodule EventStore.Subscriptions.Subscription do
     end
   end
 
-  def handle_cast(:catch_up, %Subscription{subscription: subscription} = state) do
+  def handle_cast(:catch_up, %Subscription{} = state) do
+    %Subscription{subscription: subscription} = state
+
     state =
       subscription
       |> SubscriptionFsm.catch_up()
@@ -151,13 +155,18 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, state}
   end
 
-  def handle_cast({:ack, ack, subscriber}, %Subscription{subscription: subscription} = state) do
-    state =
-      subscription
-      |> SubscriptionFsm.ack(ack, subscriber)
-      |> apply_subscription_to_state(state)
+  def handle_call({:ack, ack, subscriber}, _from, %Subscription{} = state) do
+    %Subscription{subscription: subscription} = state
 
-    {:noreply, state}
+    {reply, subscription} =
+      case SubscriptionFsm.ack(subscription, ack, subscriber) do
+        {reply, subscription} -> {reply, subscription}
+        subscription -> {:ok, subscription}
+      end
+
+    state = apply_subscription_to_state(subscription, state)
+
+    {:reply, reply, state}
   end
 
   def handle_call({:connect, subscriber, opts}, _from, %Subscription{} = state) do
