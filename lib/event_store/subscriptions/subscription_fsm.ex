@@ -92,9 +92,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defstate subscribed do
     # Notify events when subscribed
     defevent notify_events(events), data: %SubscriptionState{} = data do
-      %SubscriptionState{last_received: last_received, last_sent: last_sent} = data
-      IO.inspect(last_received, label: "last_received")
-      IO.inspect(last_sent, label: "last_sent")
+      %SubscriptionState{last_received: last_received} = data
+
       expected_event = last_received + 1
 
       case first_event_number(events) do
@@ -119,7 +118,6 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
           # Subscriber is up-to-date, so enqueue events to send
           data = data |> enqueue_events(events) |> notify_subscribers()
-          IO.inspect(data)
 
           if over_capacity?(data) do
             # Too many pending events, must wait for these to be processed.

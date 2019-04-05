@@ -69,6 +69,6 @@ defmodule EventStore.Subscriptions.SubscriptionCatchUpTest do
       assert event.stream_uuid == expected_stream_uuid
     end)
 
-    Subscription.ack(subscription, received_events)
+    :ok = Subscription.ack(subscription, received_events)
   end
 end

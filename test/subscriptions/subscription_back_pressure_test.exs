@@ -82,7 +82,7 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
       assert event.event_number == expected_event_number
     end
 
-    Subscription.ack(subscription, received_events)
+    :ok = Subscription.ack(subscription, received_events)
   end
 
   defp append_to_stream(stream_uuid, event_count) do
