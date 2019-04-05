@@ -51,7 +51,7 @@ defmodule EventStore.Support.CollectingSubscriber do
   def handle_info({:events, received_events}, state) do
     %{events: events, subscription: subscription} = state
 
-    Subscription.ack(subscription, received_events)
+    :ok = Subscription.ack(subscription, received_events)
 
     {:noreply, %{state | events: events ++ received_events}}
   end

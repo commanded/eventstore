@@ -4,74 +4,87 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
   alias EventStore.EventFactory
   alias EventStore.Subscriptions.Subscription
 
-  describe "subscription over capacity" do
-    test "should receive events once caught up" do
-      subscription_name = UUID.uuid4()
-      stream1_uuid = UUID.uuid4()
-      stream2_uuid = UUID.uuid4()
-      stream3_uuid = UUID.uuid4()
-      stream4_uuid = UUID.uuid4()
+  describe "subscription back pressure" do
+    test "should receive pending events once caught up" do
+      {:ok, subscription} = subscribe_to_all_streams(buffer_size: 5, max_size: 5)
 
-      {:ok, subscription} =
-        subscribe_to_all_streams(subscription_name, self(), buffer_size: 5, max_size: 5)
+      append_to_stream("stream1", 5)
+      append_to_stream("stream2", 5)
+      append_to_stream("stream3", 5)
+      append_to_stream("stream4", 5)
 
-      append_to_stream(stream1_uuid, 5)
-      append_to_stream(stream2_uuid, 5)
-      append_to_stream(stream3_uuid, 5)
+      receive_and_ack(subscription, "stream1", [1, 2, 3, 4, 5])
+      receive_and_ack(subscription, "stream2", [6, 7, 8, 9, 10])
+      receive_and_ack(subscription, "stream3", [11, 12, 13, 14, 15])
+      receive_and_ack(subscription, "stream4", [16, 17, 18, 19, 20])
 
-      receive_and_ack(subscription, stream1_uuid, 5)
+      refute_receive {:events, _events}
+    end
 
-      append_to_stream(stream4_uuid, 5)
+    test "should receive appended events once caught up" do
+      {:ok, subscription} = subscribe_to_all_streams(buffer_size: 5, max_size: 5)
 
-      receive_and_ack(subscription, stream2_uuid, 5)
-      receive_and_ack(subscription, stream3_uuid, 5)
-      receive_and_ack(subscription, stream4_uuid, 5)
+      append_to_stream("stream1", 5)
+      append_to_stream("stream2", 5)
+      append_to_stream("stream3", 5)
+
+      receive_and_ack(subscription, "stream1", [1, 2, 3, 4, 5])
+      receive_and_ack(subscription, "stream2", [6, 7, 8, 9, 10])
+
+      append_to_stream("stream4", 5)
+
+      receive_and_ack(subscription, "stream3", [11, 12, 13, 14, 15])
+      receive_and_ack(subscription, "stream4", [16, 17, 18, 19, 20])
 
       refute_receive {:events, _events}
     end
 
     test "should handle unexpected event" do
-      subscription_name = UUID.uuid4()
-      stream1_uuid = "stream1"
-      stream2_uuid = "stream2"
-      stream3_uuid = "stream3"
-      stream4_uuid = "stream4"
-      stream5_uuid = "stream5"
+      {:ok, subscription} = subscribe_to_all_streams(buffer_size: 3)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), buffer_size: 3)
-
-      append_to_stream(stream1_uuid, 3)
-      append_to_stream(stream2_uuid, 3)
+      append_to_stream("stream1", 3)
+      append_to_stream("stream2", 3)
 
       # Notify the subscription with unexpected events
-      unexpected_events = EventFactory.create_recorded_events(5, stream1_uuid, 999)
+      unexpected_events = EventFactory.create_recorded_events(5, "stream1", 999)
 
       send(subscription, {:events, unexpected_events})
 
-      append_to_stream(stream3_uuid, 3)
-      append_to_stream(stream4_uuid, 3)
-      append_to_stream(stream5_uuid, 3)
+      append_to_stream("stream3", 3)
+      append_to_stream("stream4", 3)
+      append_to_stream("stream5", 3)
 
-      receive_and_ack(subscription, stream1_uuid, 3)
-      receive_and_ack(subscription, stream2_uuid, 3)
-      receive_and_ack(subscription, stream3_uuid, 3)
-      receive_and_ack(subscription, stream4_uuid, 3)
-      receive_and_ack(subscription, stream5_uuid, 3)
+      receive_and_ack(subscription, "stream1", [1, 2, 3])
+      receive_and_ack(subscription, "stream2", [4, 5, 6])
+      receive_and_ack(subscription, "stream3", [7, 8, 9])
+      receive_and_ack(subscription, "stream4", [10, 11, 12])
+      receive_and_ack(subscription, "stream5", [13, 14, 15])
 
       refute_receive {:events, _events}
     end
+
+    test "should return an error when incorrect ack sent" do
+      {:ok, subscription} = subscribe_to_all_streams(buffer_size: 5, max_size: 5)
+
+      append_to_stream("stream1", 5)
+
+      assert_receive {:events, received_events}
+
+      assert {:error, :unexpected_ack} = Subscription.ack(subscription, 999)
+    end
   end
 
-  def receive_and_ack(subscription, expected_stream_uuid, expected_event_count) do
+  def receive_and_ack(subscription, expected_stream_uuid, expected_event_numbers) do
     assert_receive {:events, received_events}
 
-    assert length(received_events) == expected_event_count
+    assert length(received_events) == length(expected_event_numbers)
 
-    for event <- received_events do
+    for {event, expected_event_number} <- Enum.zip(received_events, expected_event_numbers) do
       assert event.stream_uuid == expected_stream_uuid
+      assert event.event_number == expected_event_number
     end
 
-    Subscription.ack(subscription, received_events)
+    :ok = Subscription.ack(subscription, received_events)
   end
 
   defp append_to_stream(stream_uuid, event_count) do
@@ -80,9 +93,9 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
     :ok = EventStore.append_to_stream(stream_uuid, 0, events)
   end
 
-  # subscribe to all streams and wait for the subscription to be subscribed
-  defp subscribe_to_all_streams(subscription_name, subscriber, opts) do
-    {:ok, subscription} = EventStore.subscribe_to_all_streams(subscription_name, subscriber, opts)
+  # Subscribe to all streams and wait for the subscription to be subscribed.
+  defp subscribe_to_all_streams(opts) do
+    {:ok, subscription} = EventStore.subscribe_to_all_streams("subscription", self(), opts)
 
     assert_receive {:subscribed, ^subscription}
 

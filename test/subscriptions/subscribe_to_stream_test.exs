@@ -227,12 +227,12 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert_receive {:events, received_events}
       assert pluck(received_events, :data) == pluck(initial_events, :data)
 
-      Subscription.ack(subscription, received_events)
+      :ok = Subscription.ack(subscription, received_events)
 
       assert_receive {:events, received_events}
       assert pluck(received_events, :data) == pluck(new_events, :data)
 
-      Subscription.ack(subscription, received_events)
+      :ok = Subscription.ack(subscription, received_events)
 
       refute_receive {:events, _received_events}
     end
@@ -253,12 +253,12 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert_receive {:events, received_events}
       assert pluck(received_events, :data) == pluck(initial_events, :data)
 
-      Subscription.ack(subscription, 1)
+      :ok = Subscription.ack(subscription, 1)
 
       assert_receive {:events, received_events}
       assert pluck(received_events, :data) == pluck(new_events, :data)
 
-      Subscription.ack(subscription, 2)
+      :ok = Subscription.ack(subscription, 2)
 
       refute_receive {:events, _received_events}
     end
@@ -316,7 +316,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert pluck(stream1_received_events, :metadata) == pluck(stream1_events, :metadata)
       refute pluck(stream1_received_events, :created_at) |> Enum.any?(&is_nil/1)
 
-      Subscription.ack(subscription, stream1_received_events)
+      :ok = Subscription.ack(subscription, stream1_received_events)
 
       assert_receive {:events, stream2_received_events}
       assert pluck(stream2_received_events, :event_number) == [2]
@@ -352,7 +352,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = EventStore.append_to_stream(stream2_uuid, 1, stream2_new_events)
 
       assert_receive {:events, stream1_received_events}
-      Subscription.ack(subscription, stream1_received_events)
+      :ok = Subscription.ack(subscription, stream1_received_events)
 
       assert_receive {:events, stream2_received_events}
 
@@ -393,7 +393,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert pluck(initial_received_events, :data) == pluck(initial_events, :data)
 
       # Acknowledge receipt of first event only
-      Subscription.ack(subscription, hd(initial_received_events))
+      :ok = Subscription.ack(subscription, hd(initial_received_events))
       refute_receive {:events, _events}
 
       :ok = EventStore.append_to_stream(stream_uuid, 3, remaining_events)
@@ -422,7 +422,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
 
       assert_receive {:events, stream1_received_events}
-      Subscription.ack(subscription, 1)
+      :ok = Subscription.ack(subscription, 1)
 
       assert_receive {:events, stream2_received_events}
 
@@ -556,7 +556,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert :ok = EventStore.delete_subscription(stream_uuid, subscription_name)
       refute Process.alive?(subscription)
 
-      assert {:ok, []} = EventStore.Storage.subscriptions(@conn, pool: EventStore.Config.get_pool())
+      assert {:ok, []} =
+               EventStore.Storage.subscriptions(@conn, pool: EventStore.Config.get_pool())
     end
   end
 
@@ -590,7 +591,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     assert_receive {:events, received_events}
     assert pluck(received_events, :event_number) == expected_event_numbers
 
-    Subscription.ack(subscription, received_events)
+    :ok = Subscription.ack(subscription, received_events)
   end
 
   defp pluck(enumerable, field) do

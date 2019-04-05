@@ -21,28 +21,34 @@ defmodule EventStore.SubscriptionHelpers do
     {:ok, subscription}
   end
 
-  def start_subscriber(name) do
+  def start_subscriber do
     reply_to = self()
 
-    spawn_link(fn ->
-      receive_events = fn loop ->
-        receive do
-          {:subscribed, subscription} ->
-            send(reply_to, {:subscribed, subscription, name})
+    spawn_link(fn -> receive_events(reply_to) end)
+  end
 
-          {:events, events} ->
-            send(reply_to, {:events, events, name})
-        end
+  def receive_events(reply_to) do
+    receive do
+      {:subscribed, subscription} ->
+        send(reply_to, {:subscribed, subscription, self()})
 
-        loop.(loop)
-      end
+      {:events, events} ->
+        send(reply_to, {:events, events, self()})
+    end
 
-      receive_events.(receive_events)
-    end)
+    receive_events(reply_to)
+  end
+
+  def assert_receive_events(expected_event_numbers, expected_subscriber) do
+    assert_receive {:events, received_events, ^expected_subscriber}
+
+    actual_event_numbers = Enum.map(received_events, & &1.event_number)
+    assert expected_event_numbers == actual_event_numbers
   end
 
   def receive_and_ack(subscription, expected_stream_uuid, expected_intial_event_number) do
     assert_receive {:events, received_events}
+    refute_receive {:events, _received_events}
     assert length(received_events) == 10
 
     received_events
@@ -53,7 +59,7 @@ defmodule EventStore.SubscriptionHelpers do
       assert event_number == expected_event_number
       assert event.stream_uuid == expected_stream_uuid
 
-      Subscription.ack(subscription, event)
+      :ok = Subscription.ack(subscription, event)
     end)
   end
 end

@@ -3,7 +3,9 @@ use Mix.Config
 # no logging for benchmarking
 config :logger, backends: []
 
-config :ex_unit, assert_receive_timeout: 2_000
+config :ex_unit,
+  assert_receive_timeout: 2_000,
+  refute_receive_timeout: 1_000
 
 config :eventstore, EventStore.Storage,
   serializer: EventStore.TermSerializer,

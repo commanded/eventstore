@@ -54,10 +54,10 @@ defmodule EventStore.Streams.AllStreamTest do
         )
 
       assert_receive {:events, received_events1}
-      Subscription.ack(subscription, received_events1)
+      :ok = Subscription.ack(subscription, received_events1)
 
       assert_receive {:events, received_events2}
-      Subscription.ack(subscription, received_events2)
+      :ok = Subscription.ack(subscription, received_events2)
 
       assert length(received_events1 ++ received_events2) == 6
 
@@ -96,10 +96,10 @@ defmodule EventStore.Streams.AllStreamTest do
         )
 
       assert_receive {:events, received_events1}
-      Subscription.ack(subscription, received_events1)
+      :ok = Subscription.ack(subscription, received_events1)
 
       assert_receive {:events, received_events2}
-      Subscription.ack(subscription, received_events2)
+      :ok = Subscription.ack(subscription, received_events2)
 
       assert length(received_events1 ++ received_events2) == 4
 

@@ -104,7 +104,7 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
       assert event.stream_uuid == expected_stream_uuid
     end)
 
-    Subscription.ack(subscription, received_events)
+    :ok = Subscription.ack(subscription, received_events)
   end
 
   def wait_until(timeout \\ 1000, step \\ 50, fun)
