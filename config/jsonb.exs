@@ -4,7 +4,8 @@ config :logger, backends: []
 
 config :ex_unit,
   capture_log: true,
-  assert_receive_timeout: 2_000
+  assert_receive_timeout: 2_000,
+  refute_receive_timeout: 1_000
 
 config :eventstore, EventStore.Storage,
   serializer: EventStore.JsonbSerializer,
