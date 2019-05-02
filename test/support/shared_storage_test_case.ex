@@ -5,10 +5,10 @@ defmodule EventStore.SharedStorageTestCase do
         block = unquote(Macro.escape(block))
 
         quote do
-          # use ExUnit.Case
           use EventStore.StorageCase
 
           @moduletag unquote(options)
+
           unquote(block)
         end
       end

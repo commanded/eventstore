@@ -1,15 +1,19 @@
 defmodule EventStore.StorageCase do
   use ExUnit.CaseTemplate
 
-  alias EventStore.{Config, ProcessHelper}
+  alias EventStore.Config
 
-  setup do
+  setup_all do
     config = Config.parsed()
     postgrex_config = Config.default_postgrex_opts(config)
 
-    registry = Application.get_env(:eventstore, :registry, :local)
-
     {:ok, conn} = Postgrex.start_link(postgrex_config)
+
+    [conn: conn]
+  end
+
+  setup %{conn: conn} do
+    registry = Application.get_env(:eventstore, :registry, :local)
 
     EventStore.Storage.Initializer.reset!(conn)
 
@@ -17,11 +21,7 @@ defmodule EventStore.StorageCase do
 
     on_exit(fn ->
       after_exit(registry)
-
-      ProcessHelper.shutdown(conn)
     end)
-
-    {:ok, %{conn: conn}}
   end
 
   defp after_exit(:local) do
