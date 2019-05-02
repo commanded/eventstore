@@ -5,6 +5,7 @@
 ### Bug fixes
 
 - Fix issue with concurrent subscription partitioning ([#162](https://github.com/commanded/eventstore/pull/162)).
+- Reliably start `EventStore.Notifications.Supervisor` on `:global` name clash ([#165](https://github.com/commanded/eventstore/pull/165)).
 
 ## v0.16.1
 
