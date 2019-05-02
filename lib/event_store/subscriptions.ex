@@ -26,7 +26,7 @@ defmodule EventStore.Subscriptions do
     do_unsubscribe_from_stream(@all_stream, subscription_name)
   end
 
-  def delete_subscription(conn, stream_uuid, subscription_name, opts) do
+  def delete_subscription(conn, stream_uuid, subscription_name, opts \\ []) do
     :ok = Subscriptions.Supervisor.shutdown_subscription(stream_uuid, subscription_name)
 
     Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)

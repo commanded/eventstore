@@ -90,7 +90,7 @@ defmodule EventStore.Tasks.Migrate do
   defp run_query(config, query) do
     {:ok, conn} = Postgrex.start_link(config)
 
-    reply = Postgrex.query!(conn, query, [], pool: EventStore.Config.get_pool())
+    reply = Postgrex.query!(conn, query, [])
 
     true = Process.unlink(conn)
     true = Process.exit(conn, :shutdown)

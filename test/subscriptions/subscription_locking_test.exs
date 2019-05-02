@@ -73,13 +73,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       :ok = disconnect(subscription)
 
       :ok =
-        EventStore.Storage.Subscription.ack_last_seen_event(
-          @conn,
-          "$all",
-          subscription_name,
-          2,
-          pool: EventStore.Config.get_pool()
-        )
+        EventStore.Storage.Subscription.ack_last_seen_event(@conn, "$all", subscription_name, 2)
 
       :ok = reconnect(subscription)
 

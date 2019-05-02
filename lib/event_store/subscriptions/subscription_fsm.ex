@@ -265,8 +265,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       conn,
       stream_uuid,
       subscription_name,
-      start_from,
-      pool: EventStore.Config.get_pool()
+      start_from
     )
   end
 
@@ -398,8 +397,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       conn,
       stream_uuid,
       last_sent + 1,
-      max_size,
-      pool: EventStore.Config.get_pool()
+      max_size
     )
   end
 
@@ -610,13 +608,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         |> checkpoint_last_seen(true)
 
       persist ->
-        Storage.Subscription.ack_last_seen_event(
-          conn,
-          stream_uuid,
-          subscription_name,
-          last_ack,
-          pool: EventStore.Config.get_pool()
-        )
+        Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, last_ack)
 
         data
 
