@@ -3,7 +3,7 @@ defmodule EventStore.Notifications.SupervisorTest do
 
   alias EventStore.Config
 
-  setup_all do
+  setup do
     Application.stop(:eventstore)
 
     on_exit(fn ->

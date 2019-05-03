@@ -34,8 +34,8 @@ defmodule EventStore.Notifications.Supervisor do
         Process.link(pid)
         {:ok, pid}
 
-      :ignore ->
-        :ignore
+      reply ->
+        reply
     end
   end
 
