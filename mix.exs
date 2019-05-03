@@ -1,7 +1,7 @@
 defmodule EventStore.Mixfile do
   use Mix.Project
 
-  @version "0.16.1"
+  @version "0.16.2"
 
   def project do
     [
@@ -53,7 +53,7 @@ defmodule EventStore.Mixfile do
       {:benchfella, "~> 0.3", only: :bench},
       {:credo, "~> 1.0", only: [:dev, :test]},
       {:dialyxir, "~> 0.5", only: [:dev, :test]},
-      {:ex_doc, "~> 0.19", only: :dev},
+      {:ex_doc, "~> 0.20", only: :dev},
       {:markdown, github: "devinus/markdown", only: :dev},
       {:mix_test_watch, "~> 0.9", only: :dev}
     ]
@@ -102,10 +102,9 @@ defmodule EventStore.Mixfile do
       "es.setup": ["event_store.setup"],
       "es.reset": ["event_store.reset"],
       benchmark: ["es.reset", "app.start", "bench"],
-      "test.all": ["test.registries", "test.jsonb", "test --only slow"],
-      "test.jsonb": &test_jsonb/1,
-      "test.registries": &test_registries/1,
+      "test.all": ["test.local", "test.jsonb", "test --only slow"],
       "test.distributed": &test_distributed/1,
+      "test.jsonb": &test_jsonb/1,
       "test.local": &test_local/1
     ]
   end
@@ -128,9 +127,8 @@ defmodule EventStore.Mixfile do
     ]
   end
 
-  defp test_jsonb(args), do: test_env(:jsonb, args)
-  defp test_registries(args), do: Enum.map([:local, :distributed], &test_env(&1, args))
   defp test_distributed(args), do: test_env(:distributed, args)
+  defp test_jsonb(args), do: test_env(:jsonb, args)
   defp test_local(args), do: test_env(:local, args)
 
   defp test_env(env, args) do

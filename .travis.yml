@@ -3,6 +3,7 @@ language: elixir
 cache:
   directories:
   - priv/plts
+  - deps
 
 elixir:
   - 1.8.1
