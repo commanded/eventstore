@@ -434,7 +434,7 @@ defmodule EventStore do
 
   def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
     with {start_from, opts} <- Keyword.pop(opts, :start_from, :origin),
-         {:ok, start_from} <- Stream.start_from(@conn, stream_uuid, start_from, opts()),
+         {:ok, start_from} <- Stream.start_from(@conn, stream_uuid, start_from),
          opts <- Keyword.put(opts, :start_from, start_from) do
       Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
     else
@@ -564,9 +564,9 @@ defmodule EventStore do
 
   Returns `:ok` on success.
   """
-  @spec delete_subscription(String.t(), String.t()) :: :ok
+  @spec delete_subscription(String.t(), String.t()) :: :ok | {:error, term}
   def delete_subscription(stream_uuid, subscription_name) do
-    Subscriptions.delete_subscription(@conn, stream_uuid, subscription_name, opts())
+    Subscriptions.delete_subscription(@conn, stream_uuid, subscription_name)
   end
 
   @doc """
@@ -579,7 +579,7 @@ defmodule EventStore do
 
   Returns `:ok` on success.
   """
-  @spec delete_all_streams_subscription(String.t()) :: :ok
+  @spec delete_all_streams_subscription(String.t()) :: :ok | {:error, term}
   def delete_all_streams_subscription(subscription_name) do
     EventStore.delete_subscription(@all_stream, subscription_name)
   end
@@ -592,7 +592,7 @@ defmodule EventStore do
   """
   @spec read_snapshot(String.t()) :: {:ok, SnapshotData.t()} | {:error, :snapshot_not_found}
   def read_snapshot(source_uuid) do
-    Snapshotter.read_snapshot(@conn, source_uuid, Config.serializer(), opts())
+    Snapshotter.read_snapshot(@conn, source_uuid, Config.serializer())
   end
 
   @doc """
@@ -602,7 +602,7 @@ defmodule EventStore do
   """
   @spec record_snapshot(SnapshotData.t()) :: :ok | {:error, reason :: term}
   def record_snapshot(%SnapshotData{} = snapshot) do
-    Snapshotter.record_snapshot(@conn, snapshot, Config.serializer(), opts())
+    Snapshotter.record_snapshot(@conn, snapshot, Config.serializer())
   end
 
   @doc """
@@ -612,7 +612,7 @@ defmodule EventStore do
   """
   @spec delete_snapshot(String.t()) :: :ok | {:error, reason :: term}
   def delete_snapshot(source_uuid) do
-    Snapshotter.delete_snapshot(@conn, source_uuid, opts())
+    Snapshotter.delete_snapshot(@conn, source_uuid)
   end
 
   @doc """
@@ -620,15 +620,7 @@ defmodule EventStore do
   """
   def configuration, do: EventStore.Config.get()
 
-  @default_opts [pool: EventStore.Config.get_pool()]
-
-  defp opts, do: @default_opts
-
-  defp opts(timeout) when is_integer(timeout) do
-    Keyword.put(@default_opts, :timeout, timeout)
-  end
-
-  defp opts(:infinity) do
-    Keyword.put(@default_opts, :timeout, :infinity)
+  defp opts(timeout) when is_integer(timeout) or timeout == :infinity do
+    [timeout: timeout]
   end
 end

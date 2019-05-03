@@ -12,12 +12,7 @@ defmodule EventStore.Notifications.Supervisor do
   use Supervisor
 
   alias EventStore.{Config, MonitoredServer}
-
-  alias EventStore.Notifications.{
-    Listener,
-    Reader,
-    StreamBroadcaster
-  }
+  alias EventStore.Notifications.{Listener, Reader, StreamBroadcaster}
 
   @doc """
   Starts a globally named supervisor process.
@@ -30,12 +25,17 @@ defmodule EventStore.Notifications.Supervisor do
       {:ok, pid} ->
         {:ok, pid}
 
+      {:error, :killed} ->
+        # Process may be killed due to `:global` name registation when another node connects.
+        # Attempting to start again should link to the other named existing process.
+        start_link(config)
+
       {:error, {:already_started, pid}} ->
         Process.link(pid)
         {:ok, pid}
 
-      :ignore ->
-        :ignore
+      reply ->
+        reply
     end
   end
 

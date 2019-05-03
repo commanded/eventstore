@@ -2,6 +2,7 @@ defmodule EventStore.StorageCase do
   use ExUnit.CaseTemplate
 
   alias EventStore.Config
+  alias EventStore.Storage
 
   setup_all do
     config = Config.parsed()
@@ -15,7 +16,7 @@ defmodule EventStore.StorageCase do
   setup %{conn: conn} do
     registry = Application.get_env(:eventstore, :registry, :local)
 
-    EventStore.Storage.Initializer.reset!(conn)
+    Storage.Initializer.reset!(conn)
 
     after_reset(registry)
 
