@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Enhancements
+
+- SSL support including Mix tasks ([#161](https://github.com/commanded/eventstore/pull/161)).
+
 ## v0.16.2
 
 ### Bug fixes

@@ -197,6 +197,7 @@ You should include unit tests to cover any changes.
 - [Eamon Taaffe](https://github.com/eamontaaffe)
 - [Floris Huetink](https://github.com/florish)
 - [Jan Vereecken](https://github.com/javereec)
+- [Kaz Walker](https://github.com/KazW)
 - [Olafur Arason](https://github.com/olafura)
 - [Ole Michaelis](https://github.com/OleMchls)
 - [Paul Iannazzo](https://github.com/boxxxie)
