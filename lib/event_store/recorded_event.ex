@@ -39,7 +39,7 @@ defmodule EventStore.RecordedEvent do
           event_type: String.t(),
           data: term,
           metadata: binary() | nil,
-          created_at: NaiveDateTime.t()
+          created_at: DateTime.t()
         }
 
   defstruct [

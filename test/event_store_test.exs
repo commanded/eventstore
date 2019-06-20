@@ -384,7 +384,7 @@ defmodule EventStoreTest do
     assert recorded_event.event_type == expected_event.event_type
     assert recorded_event.data == expected_event.data
     assert recorded_event.metadata == expected_event.metadata
-    assert %NaiveDateTime{} = recorded_event.created_at
+    assert %DateTime{} = recorded_event.created_at
   end
 
   defp assert_is_uuid(uuid) do

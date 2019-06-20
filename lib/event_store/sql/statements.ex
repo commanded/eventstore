@@ -60,7 +60,7 @@ CREATE TABLE streams
     stream_id bigserial PRIMARY KEY NOT NULL,
     stream_uuid text NOT NULL,
     stream_version bigint default 0 NOT NULL,
-    created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
+    created_at timestamp with time zone default now() NOT NULL
 );
 """
   end
@@ -88,7 +88,7 @@ CREATE TABLE events
     correlation_id uuid NULL,
     data #{column_data_type()} NOT NULL,
     metadata #{column_data_type()} NULL,
-    created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
+    created_at timestamp with time zone default now() NOT NULL
 );
 """
   end
@@ -182,7 +182,7 @@ CREATE TABLE subscriptions
     stream_uuid text NOT NULL,
     subscription_name text NOT NULL,
     last_seen bigint NULL,
-    created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
+    created_at timestamp with time zone default now() NOT NULL
 );
 """
   end
@@ -202,7 +202,7 @@ CREATE TABLE snapshots
     source_type text NOT NULL,
     data #{column_data_type()} NOT NULL,
     metadata #{column_data_type()} NULL,
-    created_at timestamp without time zone default (now() at time zone 'utc') NOT NULL
+    created_at timestamp with time zone default now() NOT NULL
 );
 """
   end
@@ -215,7 +215,7 @@ CREATE TABLE schema_migrations
     major_version int NOT NULL,
     minor_version int NOT NULL,
     patch_version int NOT NULL,
-    migrated_at timestamp without time zone default (now() at time zone 'UTC') NOT NULL,
+    migrated_at timestamp with time zone default now() NOT NULL,
     PRIMARY KEY(major_version, minor_version, patch_version)
 );
 """
@@ -225,7 +225,7 @@ CREATE TABLE schema_migrations
   defp record_event_store_schema_version do
 """
 INSERT INTO schema_migrations (major_version, minor_version, patch_version)
-VALUES (0, 14, 0);
+VALUES (0, 16, 0);
 """
   end
 

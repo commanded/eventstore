@@ -184,8 +184,8 @@ defmodule EventStore.Streams.Stream do
   defp extract_event_id(event_id) when is_bitstring(event_id), do: event_id
   defp extract_event_id(invalid), do: raise ArgumentError, message: "Invalid event id, expected a UUID but got: #{inspect invalid}"
 
-  # Returns the current naive date time in UTC.
-  defp utc_now, do: NaiveDateTime.utc_now()
+  # Returns the current date time in UTC.
+  defp utc_now, do: DateTime.utc_now()
 
   defp write_to_stream(conn, prepared_events, %Stream{stream_id: stream_id}, opts) do
     Storage.append_to_stream(conn, stream_id, prepared_events, opts)
