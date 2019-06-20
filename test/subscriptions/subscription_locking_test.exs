@@ -1,10 +1,10 @@
 defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config, EventFactory, ProcessHelper}
+  alias EventStore.{Config, EventFactory, ProcessHelper, Storage}
   alias EventStore.Subscriptions.Subscription
 
-  @conn EventStore.Postgrex
+  @conn TestEventStore.EventStore.Postgrex
 
   setup do
     subscription_name = UUID.uuid4()
@@ -15,10 +15,10 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   describe "subscription lock lost" do
     setup [:create_subscription]
 
-    test "should resend in-flight events", %{subscription: subscription} do
+    test "should resend in-flight events", %{event_store: event_store, subscription: subscription} do
       assert_receive {:subscribed, ^subscription}
 
-      append_events_to_stream(3)
+      append_events_to_stream(event_store, 3)
 
       assert_receive_events([1, 2, 3])
 
@@ -35,10 +35,13 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       assert_receive_events([1, 2, 3])
     end
 
-    test "should not send ack'd events before disconnect", %{subscription: subscription} do
+    test "should not send ack'd events before disconnect", %{
+      event_store: event_store,
+      subscription: subscription
+    } do
       assert_receive {:subscribed, ^subscription}
 
-      append_events_to_stream(3)
+      append_events_to_stream(event_store, 3)
 
       assert_receive_events([1, 2, 3])
 
@@ -60,20 +63,20 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
     end
 
     test "should not send events ack'd by another subscription during disconnect", %{
+      event_store: event_store,
       subscription: subscription,
       subscription_name: subscription_name
     } do
       assert_receive {:subscribed, ^subscription}
 
-      append_events_to_stream(3)
+      append_events_to_stream(event_store, 3)
 
       assert_receive_events([1, 2, 3])
       refute_receive {:events, _received_events}
 
       :ok = disconnect(subscription)
 
-      :ok =
-        EventStore.Storage.Subscription.ack_last_seen_event(@conn, "$all", subscription_name, 2)
+      :ok = Storage.Subscription.ack_last_seen_event(@conn, "$all", subscription_name, 2)
 
       :ok = reconnect(subscription)
 
@@ -81,10 +84,13 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       assert_receive_events([3])
     end
 
-    test "should subscribe after waiting `retry_interval`", %{subscription: subscription} do
+    test "should subscribe after waiting `retry_interval`", %{
+      event_store: event_store,
+      subscription: subscription
+    } do
       assert_receive {:subscribed, ^subscription}
 
-      append_events_to_stream(3)
+      append_events_to_stream(event_store, 3)
 
       assert_receive_events([1, 2, 3])
 
@@ -104,9 +110,10 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
     test "should only allow single active subscription", %{
       conn2: conn2,
+      event_store: event_store,
       subscription: subscription
     } do
-      stream1_uuid = append_events_to_stream(1)
+      stream1_uuid = append_events_to_stream(event_store, 1)
 
       # Subscriber should not receive events until subscribed
       refute_receive {:events, _received_events}
@@ -117,7 +124,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       # Subscription should now be subscribed
       assert_receive {:subscribed, ^subscription}
 
-      stream2_uuid = append_events_to_stream(2)
+      stream2_uuid = append_events_to_stream(event_store, 2)
 
       # Subscriber should now start receiving events
       assert_receive {:events, received_events}
@@ -142,8 +149,8 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
     end
   end
 
-  defp lock_subscription(_context) do
-    config = Config.parsed() |> Config.sync_connect_postgrex_opts()
+  defp lock_subscription(context) do
+    config = Map.fetch!(context, :config) |> Config.sync_connect_postgrex_opts()
 
     {:ok, conn} = Postgrex.start_link(config)
 
@@ -156,18 +163,26 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
     [conn2: conn]
   end
 
-  defp create_subscription(%{subscription_name: subscription_name}) do
+  defp create_subscription(context) do
+    %{
+      conn: conn,
+      event_store: event_store,
+      serializer: serializer,
+      subscription_name: subscription_name
+    } = context
+
     {:ok, subscription} =
-      EventStore.Subscriptions.Subscription.start_link(
-        EventStore.Postgrex,
-        "$all",
-        subscription_name,
+      Subscription.start_link(
+        event_store: event_store,
+        conn: conn,
+        serializer: serializer,
+        stream_uuid: "$all",
+        subscription_name: subscription_name,
         buffer_size: 3,
         start_from: 0
       )
 
-    {:ok, ^subscription} =
-      EventStore.Subscriptions.Subscription.connect(subscription, self(), buffer_size: 3)
+    {:ok, ^subscription} = Subscription.connect(subscription, self(), buffer_size: 3)
 
     [subscription: subscription]
   end
@@ -186,11 +201,11 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
     )
   end
 
-  defp append_events_to_stream(count) do
+  defp append_events_to_stream(event_store, count) do
     stream_uuid = UUID.uuid4()
     stream_events = EventFactory.create_events(count)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, stream_events)
+    :ok = event_store.append_to_stream(stream_uuid, 0, stream_events)
 
     stream_uuid
   end

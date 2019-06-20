@@ -1,11 +1,13 @@
 defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, ProcessHelper, Subscriptions, Wait}
+  alias EventStore.{EventFactory, ProcessHelper, Storage, Subscriptions, Wait}
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Support.CollectingSubscriber
+  alias TestEventStore, as: EventStore
 
-  @conn EventStore.Postgrex
+  @event_store TestEventStore
+  @conn TestEventStore.EventStore.Postgrex
 
   setup do
     subscription_name = UUID.uuid4()
@@ -17,12 +19,19 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     setup [:append_events_to_another_stream]
 
     test "should receive `:subscribed` message once subscribed", %{
+      serializer: serializer,
       subscription_name: subscription_name
     } do
       stream_uuid = UUID.uuid4()
 
       {:ok, subscription} =
-        Subscriptions.subscribe_to_stream(stream_uuid, subscription_name, self())
+        Subscriptions.subscribe_to_stream(self(),
+          event_store: @event_store,
+          conn: @conn,
+          serializer: serializer,
+          stream_uuid: stream_uuid,
+          subscription_name: subscription_name
+        )
 
       assert_receive {:subscribed, ^subscription}
     end
@@ -480,10 +489,10 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream1_events = EventFactory.create_events(3)
       stream2_events = EventFactory.create_events(3)
 
-      {:ok, subscriber1} = CollectingSubscriber.start_link(subscription_name <> "-1", self())
-      {:ok, subscriber2} = CollectingSubscriber.start_link(subscription_name <> "-2", self())
-      {:ok, subscriber3} = CollectingSubscriber.start_link(subscription_name <> "-3", self())
-      {:ok, subscriber4} = CollectingSubscriber.start_link(subscription_name <> "-4", self())
+      {:ok, subscriber1} = start_collecting_subscriber(subscription_name <> "-1")
+      {:ok, subscriber2} = start_collecting_subscriber(subscription_name <> "-2")
+      {:ok, subscriber3} = start_collecting_subscriber(subscription_name <> "-3")
+      {:ok, subscriber4} = start_collecting_subscriber(subscription_name <> "-4")
 
       assert_receive {:subscribed, ^subscriber1}
       assert_receive {:subscribed, ^subscriber2}
@@ -556,7 +565,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert :ok = EventStore.delete_subscription(stream_uuid, subscription_name)
       refute Process.alive?(subscription)
 
-      assert {:ok, []} = EventStore.Storage.subscriptions(@conn)
+      assert {:ok, []} = Storage.subscriptions(@conn)
     end
   end
 
@@ -584,6 +593,14 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   # subscribe to all streams and wait for the subscription to be subscribed
   defp subscribe_to_all_streams(subscription_name, subscriber, opts \\ []) do
     subscribe_to_stream("$all", subscription_name, subscriber, opts)
+  end
+
+  defp start_collecting_subscriber(subscription_name) do
+    CollectingSubscriber.start_link(
+      event_store: @event_store,
+      notify_subscribed: self(),
+      subscription_name: subscription_name
+    )
   end
 
   defp assert_receive_events(subscription, expected_event_numbers) do

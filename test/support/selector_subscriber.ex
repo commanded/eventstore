@@ -3,6 +3,7 @@ defmodule EventStore.SelectorSubscriber do
 
   defmodule State do
     defstruct [
+      :event_store,
       :stream_uuid,
       :subscription_name,
       :subscription,
@@ -13,8 +14,9 @@ defmodule EventStore.SelectorSubscriber do
 
   alias EventStore.SelectorSubscriber.State
 
-  def start_link(stream_uuid, subscription_name, reply_to, delay \\ 0) do
+  def start_link(event_store, stream_uuid, subscription_name, reply_to, delay \\ 0) do
     state = %State{
+      event_store: event_store,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
       reply_to: reply_to,
@@ -25,10 +27,14 @@ defmodule EventStore.SelectorSubscriber do
   end
 
   def init(%State{} = state) do
-    %State{stream_uuid: stream_uuid, subscription_name: subscription_name} = state
+    %State{
+      event_store: event_store,
+      stream_uuid: stream_uuid,
+      subscription_name: subscription_name
+    } = state
 
     {:ok, subscription} =
-      EventStore.subscribe_to_stream(
+      event_store.subscribe_to_stream(
         stream_uuid,
         subscription_name,
         self(),
@@ -50,13 +56,13 @@ defmodule EventStore.SelectorSubscriber do
   end
 
   def handle_info({:events, events} = message, %State{} = state) do
-    %State{subscription: subscription, reply_to: reply_to} = state
+    %State{event_store: event_store, subscription: subscription, reply_to: reply_to} = state
 
     send(reply_to, message)
 
     processing_delay(state)
 
-    :ok = EventStore.ack(subscription, events)
+    :ok = event_store.ack(subscription, events)
 
     {:noreply, state}
   end

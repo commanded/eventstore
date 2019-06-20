@@ -3,6 +3,7 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
 
   alias EventStore.EventFactory
   alias EventStore.Subscriptions.Subscription
+  alias TestEventStore, as: EventStore
 
   describe "subscription back pressure" do
     test "should receive pending events once caught up" do

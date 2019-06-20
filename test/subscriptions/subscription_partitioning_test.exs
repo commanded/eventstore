@@ -6,6 +6,7 @@ defmodule EventStore.Subscriptions.SubscriptionPartitioningTest do
   alias EventStore.EventFactory
   alias EventStore.RecordedEvent
   alias EventStore.Subscriptions.Subscription
+  alias TestEventStore, as: EventStore
 
   describe "subscription partitioning" do
     test "should partition events by provided `partition_by/1` function" do

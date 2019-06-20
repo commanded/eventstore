@@ -14,38 +14,45 @@ defmodule EventStore.Notifications.Listener do
   alias EventStore.MonitoredServer
   alias EventStore.Notifications.Listener
 
-  defstruct demand: 0,
-            queue: :queue.new(),
-            ref: nil
+  defstruct [:listen_to, :ref, demand: 0, queue: :queue.new()]
 
-  def start_link(_args) do
-    GenStage.start_link(__MODULE__, %Listener{}, name: __MODULE__)
+  def start_link(opts \\ []) do
+    listen_to = Keyword.fetch!(opts, :listen_to)
+    start_opts = Keyword.take(opts, [:name, :timeout, :debug, :spawn_opt])
+
+    state = %Listener{listen_to: listen_to}
+
+    GenStage.start_link(__MODULE__, state, start_opts)
   end
 
   def init(%Listener{} = state) do
-    :ok = MonitoredServer.monitor(Listener.Postgrex)
+    %Listener{listen_to: listen_to} = state
+
+    :ok = MonitoredServer.monitor(listen_to)
 
     {:producer, state}
   end
 
-  def handle_info({:UP, Listener.Postgrex, _pid}, %Listener{} = state) do
+  def handle_info({:UP, listen_to, _pid}, %Listener{listen_to: listen_to} = state) do
     {:noreply, [], listen_for_events(state)}
   end
 
-  def handle_info({:DOWN, Listener.Postgrex, _pid, _reason}, %Listener{} = state) do
+  def handle_info({:DOWN, listen_to, _pid, _reason}, %Listener{listen_to: listen_to} = state) do
     {:noreply, [], %Listener{state | ref: nil}}
   end
 
   # Notification received from PostgreSQL's `NOTIFY`
   def handle_info(
         {:notification, _connection_pid, ref, channel, payload},
-        %Listener{ref: ref, queue: queue} = state
+        %Listener{queue: queue} = state
       ) do
     Logger.debug(fn ->
       "Listener received notification on channel #{inspect(channel)} with payload: #{
         inspect(payload)
       }"
     end)
+
+    %Listener{queue: queue} = state
 
     # Notify payload contains the stream uuid, stream id, and first / last stream
     # versions (e.g. "stream-12345,1,1,5")
@@ -83,8 +90,9 @@ defmodule EventStore.Notifications.Listener do
   end
 
   defp listen_for_events(%Listener{} = state) do
-    {:ok, ref} =
-      Postgrex.Notifications.listen(EventStore.Notifications.Listener.Postgrex, "events")
+    %Listener{listen_to: listen_to} = state
+
+    {:ok, ref} = Postgrex.Notifications.listen(listen_to, "events")
 
     %Listener{state | ref: ref}
   end

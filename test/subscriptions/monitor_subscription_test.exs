@@ -2,6 +2,9 @@ defmodule EventStore.Subscriptions.MonitorSubscriptionTest do
   use EventStore.StorageCase
 
   alias EventStore.{EventFactory, ProcessHelper, Subscriptions, Subscriber}
+  alias TestEventStore, as: EventStore
+
+  @event_store TestEventStore
 
   describe "monitor subscription" do
     test "should shutdown all stream subscription on subscriber shutdown" do
@@ -80,7 +83,7 @@ defmodule EventStore.Subscriptions.MonitorSubscriptionTest do
 
       {:ok, subscription} = subscribe_to_stream(stream_uuid, subscription_name, self())
 
-      :ok = Subscriptions.unsubscribe_from_stream(stream_uuid, subscription_name)
+      :ok = Subscriptions.unsubscribe_from_stream(@event_store, stream_uuid, subscription_name)
 
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 

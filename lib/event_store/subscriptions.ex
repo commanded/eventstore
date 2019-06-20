@@ -4,36 +4,8 @@ defmodule EventStore.Subscriptions do
   alias EventStore.{Storage, Subscriptions}
   alias EventStore.Subscriptions.Subscription
 
-  @all_stream "$all"
-
-  def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
-
-  def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
-  end
-
-  def subscribe_to_all_streams(subscription_name, subscriber, opts \\ [])
-
-  def subscribe_to_all_streams(subscription_name, subscriber, opts) do
-    do_subscribe_to_stream(@all_stream, subscription_name, subscriber, opts)
-  end
-
-  def unsubscribe_from_stream(stream_uuid, subscription_name) do
-    do_unsubscribe_from_stream(stream_uuid, subscription_name)
-  end
-
-  def unsubscribe_from_all_streams(subscription_name) do
-    do_unsubscribe_from_stream(@all_stream, subscription_name)
-  end
-
-  def delete_subscription(conn, stream_uuid, subscription_name, opts \\ []) do
-    :ok = Subscriptions.Supervisor.shutdown_subscription(stream_uuid, subscription_name)
-
-    Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
-  end
-
-  defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    case Subscriptions.Supervisor.start_subscription(stream_uuid, subscription_name, opts) do
+  def subscribe_to_stream(subscriber, opts \\ []) do
+    case Subscriptions.Supervisor.start_subscription(opts) do
       {:ok, subscription} ->
         Subscription.connect(subscription, subscriber, opts)
 
@@ -48,7 +20,16 @@ defmodule EventStore.Subscriptions do
     end
   end
 
-  defp do_unsubscribe_from_stream(stream_uuid, subscription_name) do
-    Subscriptions.Supervisor.unsubscribe_from_stream(stream_uuid, subscription_name)
+  def unsubscribe_from_stream(event_store, stream_uuid, subscription_name) do
+    Subscriptions.Supervisor.unsubscribe_from_stream(event_store, stream_uuid, subscription_name)
+  end
+
+  def delete_subscription(event_store, stream_uuid, subscription_name, opts \\ []) do
+    :ok =
+      Subscriptions.Supervisor.shutdown_subscription(event_store, stream_uuid, subscription_name)
+
+    conn = Module.concat(event_store, EventStore.Postgrex)
+
+    Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
   end
 end

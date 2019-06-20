@@ -6,7 +6,8 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
     alias EventStore.Storage.{Appender, CreateStream}
     alias EventStore.Subscriptions.SubscriptionFsm
 
-    @conn EventStore.Postgrex
+    @event_store TestEventStore
+    @conn TestEventStore.EventStore.Postgrex
     @subscription_name "test_subscription"
 
     setup [:start_subscriber]
@@ -424,11 +425,17 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
     end
 
     defp create_subscription(context, opts \\ []) do
-      %{stream_uuid: stream_uuid, subscriber: subscriber} = context
+      %{serializer: serializer, stream_uuid: stream_uuid, subscriber: subscriber} = context
 
-      opts = Keyword.put_new(opts, :buffer_size, 3)
+      opts =
+        opts
+        |> Keyword.put(:conn, @conn)
+        |> Keyword.put(:event_store, @event_store)
+        |> Keyword.put(:serializer, serializer)
+        |> Keyword.put_new(:buffer_size, 3)
 
-      SubscriptionFsm.new(@conn, stream_uuid, @subscription_name, opts)
+      stream_uuid
+      |> SubscriptionFsm.new(@subscription_name, opts)
       |> SubscriptionFsm.connect_subscriber(subscriber, opts)
       |> SubscriptionFsm.subscribe()
     end
@@ -485,7 +492,10 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
     end
 
     defp lock_subscription(_context) do
-      config = EventStore.Config.parsed() |> EventStore.Config.sync_connect_postgrex_opts()
+      config =
+        @event_store
+        |> EventStore.Config.parsed(:eventstore)
+        |> EventStore.Config.sync_connect_postgrex_opts()
 
       {:ok, conn} = Postgrex.start_link(config)
 

@@ -3,6 +3,7 @@ defmodule EventStore.SubscriptionHelpers do
 
   alias EventStore.{EventFactory, RecordedEvent}
   alias EventStore.Subscriptions.Subscription
+  alias TestEventStore, as: EventStore
 
   def append_to_stream(stream_uuid, event_count, expected_version \\ 0) do
     events = EventFactory.create_events(event_count, expected_version + 1)

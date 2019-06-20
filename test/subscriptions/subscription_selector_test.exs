@@ -103,7 +103,8 @@ defmodule EventStore.Subscriptions.SubscriptionSelectorTest do
   defp start_selector_subscriber(stream_uuid, delay) do
     subscription_name = UUID.uuid4()
 
-    {:ok, _pid} = SelectorSubscriber.start_link(stream_uuid, subscription_name, self(), delay)
+    {:ok, _pid} =
+      SelectorSubscriber.start_link(TestEventStore, stream_uuid, subscription_name, self(), delay)
 
     assert_receive {:subscribed, _subscription}
   end

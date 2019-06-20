@@ -7,7 +7,7 @@ defmodule EventStore.Mixfile do
     [
       app: :eventstore,
       version: @version,
-      elixir: "~> 1.5",
+      elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       description: description(),
@@ -26,17 +26,14 @@ defmodule EventStore.Mixfile do
 
   def application do
     [
-      extra_applications: [:logger, :ssl],
-      mod: {EventStore.Application, []}
+      extra_applications: [:logger, :ssl]
     ]
   end
 
-  defp elixirc_paths(:bench), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(:jsonb), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(:distributed), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(:local), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(:test), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(_), do: ["lib"]
+  defp elixirc_paths(env) when env in [:bench, :distributed, :jsonb, :local, :test],
+    do: ["lib", "test/support", "test/subscriptions/support"]
+
+  defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
     [
@@ -60,7 +57,7 @@ defmodule EventStore.Mixfile do
 
   defp description do
     """
-    EventStore using PostgreSQL for persistence.
+    Event store using PostgreSQL for persistence.
     """
   end
 

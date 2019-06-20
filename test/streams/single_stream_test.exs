@@ -1,28 +1,31 @@
 defmodule EventStore.Streams.SingleStreamTest do
   use EventStore.StorageCase
 
+  alias EventStore.EventData
   alias EventStore.EventFactory
   alias EventStore.Streams.Stream
+  alias TestEventStore, as: EventStore
 
   @subscription_name "test_subscription"
 
   describe "append events to stream" do
     setup [:append_events_to_stream]
 
-    test "should persist events", context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
-
-      {:ok, events} = Stream.read_stream_forward(conn, stream_uuid, 0, 1_000)
+    test "should persist events", %{conn: conn, serializer: serializer, stream_uuid: stream_uuid} do
+      {:ok, events} =
+        Stream.read_stream_forward(conn, stream_uuid, 0, 1_000, serializer: serializer)
 
       assert length(events) == 3
     end
 
-    test "should set created at datetime", context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
-
+    test "should set created at datetime", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
       utc_now = DateTime.utc_now()
 
-      {:ok, [event]} = Stream.read_stream_forward(conn, stream_uuid, 0, 1)
+      {:ok, [event]} = Stream.read_stream_forward(conn, stream_uuid, 0, 1, serializer: serializer)
 
       created_at = event.created_at
       assert created_at != nil
@@ -37,11 +40,14 @@ defmodule EventStore.Streams.SingleStreamTest do
       assert diff < 60_000
     end
 
-    test "for wrong expected version should error", context do
-      %{conn: conn, events: events, stream_uuid: stream_uuid} = context
-
+    test "for wrong expected version should error", %{
+      conn: conn,
+      serializer: serializer,
+      events: events,
+      stream_uuid: stream_uuid
+    } do
       assert {:error, :wrong_expected_version} =
-               Stream.append_to_stream(conn, stream_uuid, 0, events)
+               Stream.append_to_stream(conn, stream_uuid, 0, events, serializer: serializer)
     end
   end
 
@@ -51,18 +57,21 @@ defmodule EventStore.Streams.SingleStreamTest do
       :append_event_to_another_stream
     ]
 
-    test "should link events", context do
-      %{
-        conn: conn,
-        stream_uuid: source_stream_uuid,
-        other_stream_uuid: target_stream_uuid
-      } = context
-
-      {:ok, source_events} = Stream.read_stream_forward(conn, source_stream_uuid, 0, 1_000)
+    test "should link events", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: source_stream_uuid,
+      other_stream_uuid: target_stream_uuid
+    } do
+      {:ok, source_events} =
+        Stream.read_stream_forward(conn, source_stream_uuid, 0, 1_000, serializer: serializer)
 
       assert :ok = Stream.link_to_stream(conn, target_stream_uuid, 1, source_events)
 
-      assert {:ok, events} = Stream.read_stream_forward(conn, target_stream_uuid, 0, 1_000)
+      assert {:ok, events} =
+               Stream.read_stream_forward(conn, target_stream_uuid, 0, 1_000,
+                 serializer: serializer
+               )
 
       assert length(events) == 4
       assert Enum.map(events, & &1.event_number) == [1, 2, 3, 4]
@@ -81,26 +90,26 @@ defmodule EventStore.Streams.SingleStreamTest do
       end
     end
 
-    test "should link events with `:any_version` expected version", context do
-      %{
-        conn: conn,
-        stream_uuid: source_stream_uuid,
-        other_stream_uuid: target_stream_uuid
-      } = context
-
-      {:ok, source_events} = Stream.read_stream_forward(conn, source_stream_uuid, 0, 1_000)
+    test "should link events with `:any_version` expected version", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: source_stream_uuid,
+      other_stream_uuid: target_stream_uuid
+    } do
+      {:ok, source_events} =
+        Stream.read_stream_forward(conn, source_stream_uuid, 0, 1_000, serializer: serializer)
 
       assert :ok = Stream.link_to_stream(conn, target_stream_uuid, :any_version, source_events)
     end
 
-    test "should fail when wrong expected version", context do
-      %{
-        conn: conn,
-        stream_uuid: source_stream_uuid,
-        other_stream_uuid: target_stream_uuid
-      } = context
-
-      {:ok, source_events} = Stream.read_stream_forward(conn, source_stream_uuid, 0, 1_000)
+    test "should fail when wrong expected version", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: source_stream_uuid,
+      other_stream_uuid: target_stream_uuid
+    } do
+      {:ok, source_events} =
+        Stream.read_stream_forward(conn, source_stream_uuid, 0, 1_000, serializer: serializer)
 
       assert {:error, :wrong_expected_version} =
                Stream.link_to_stream(conn, target_stream_uuid, 0, source_events)
@@ -113,14 +122,14 @@ defmodule EventStore.Streams.SingleStreamTest do
       assert {:error, :not_found} = Stream.link_to_stream(conn, stream_uuid, 0, event_ids)
     end
 
-    test "should prevent duplicate linked events", context do
-      %{
-        conn: conn,
-        stream_uuid: source_stream_uuid,
-        other_stream_uuid: target_stream_uuid
-      } = context
-
-      {:ok, source_events} = Stream.read_stream_forward(conn, source_stream_uuid, 0, 1_000)
+    test "should prevent duplicate linked events", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: source_stream_uuid,
+      other_stream_uuid: target_stream_uuid
+    } do
+      {:ok, source_events} =
+        Stream.read_stream_forward(conn, source_stream_uuid, 0, 1_000, serializer: serializer)
 
       :ok = Stream.link_to_stream(conn, target_stream_uuid, 1, source_events)
 
@@ -128,9 +137,11 @@ defmodule EventStore.Streams.SingleStreamTest do
                Stream.link_to_stream(conn, target_stream_uuid, 4, source_events)
     end
 
-    test "should guess the event type when not passed", context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
-
+    test "should guess the event type when not passed", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
       {:ok, _subscription} =
         EventStore.subscribe_to_stream(
           stream_uuid,
@@ -141,37 +152,46 @@ defmodule EventStore.Streams.SingleStreamTest do
 
       wait_for_event_store()
 
-      event = %EventStore.EventData{
-        data: %EventStore.EventFactory.Event{event: "foo"}
-      }
+      event = %EventData{data: %EventFactory.Event{event: "foo"}}
 
-      :ok = Stream.append_to_stream(conn, stream_uuid, :any_version, [event])
+      :ok =
+        Stream.append_to_stream(conn, stream_uuid, :any_version, [event], serializer: serializer)
 
       assert_receive {:events, [received_event | _]}
       assert received_event.event_type == "Elixir.EventStore.EventFactory.Event"
     end
   end
 
-  test "attempt to read an unknown stream forward should error stream not found", %{conn: conn} do
+  test "attempt to read an unknown stream forward should error stream not found", %{
+    conn: conn,
+    serializer: serializer
+  } do
     unknown_stream_uuid = UUID.uuid4()
 
     assert {:error, :stream_not_found} =
-             Stream.read_stream_forward(conn, unknown_stream_uuid, 0, 1)
+             Stream.read_stream_forward(conn, unknown_stream_uuid, 0, 1, serializer: serializer)
   end
 
-  test "attempt to stream an unknown stream should error stream not found", %{conn: conn} do
+  test "attempt to stream an unknown stream should error stream not found", %{
+    conn: conn,
+    serializer: serializer
+  } do
     unknown_stream_uuid = UUID.uuid4()
 
-    assert {:error, :stream_not_found} = Stream.stream_forward(conn, unknown_stream_uuid, 0, 1)
+    assert {:error, :stream_not_found} =
+             Stream.stream_forward(conn, unknown_stream_uuid, 0, 1, serializer: serializer)
   end
 
   describe "read stream forward" do
     setup [:append_events_to_stream]
 
-    test "should fetch all events", context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
-
-      {:ok, read_events} = Stream.read_stream_forward(conn, stream_uuid, 0, 1_000)
+    test "should fetch all events", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      {:ok, read_events} =
+        Stream.read_stream_forward(conn, stream_uuid, 0, 1_000, serializer: serializer)
 
       assert length(read_events) == 3
     end
@@ -180,36 +200,49 @@ defmodule EventStore.Streams.SingleStreamTest do
   describe "stream forward" do
     setup [:append_events_to_stream]
 
-    test "should stream events from single stream using single event batch size", context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
-
-      read_events = Stream.stream_forward(conn, stream_uuid, 0, 1) |> Enum.to_list()
+    test "should stream events from single stream using single event batch size", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      read_events =
+        Stream.stream_forward(conn, stream_uuid, 0, 1, serializer: serializer) |> Enum.to_list()
 
       assert length(read_events) == 3
       assert pluck(read_events, :event_number) == [1, 2, 3]
       assert pluck(read_events, :stream_version) == [1, 2, 3]
     end
 
-    test "should stream events from single stream using two event batch size", context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
-
-      read_events = Stream.stream_forward(conn, stream_uuid, 0, 2) |> Enum.to_list()
-
-      assert length(read_events) == 3
-    end
-
-    test "should stream events from single stream uisng large batch size", context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
-
-      read_events = Stream.stream_forward(conn, stream_uuid, 0, 1_000) |> Enum.to_list()
+    test "should stream events from single stream using two event batch size", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      read_events =
+        Stream.stream_forward(conn, stream_uuid, 0, 2, serializer: serializer) |> Enum.to_list()
 
       assert length(read_events) == 3
     end
 
-    test "should stream events from single stream with starting version offset", context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
+    test "should stream events from single stream uisng large batch size", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      read_events =
+        Stream.stream_forward(conn, stream_uuid, 0, 1_000, serializer: serializer)
+        |> Enum.to_list()
 
-      read_events = Stream.stream_forward(conn, stream_uuid, 2, 1) |> Enum.to_list()
+      assert length(read_events) == 3
+    end
+
+    test "should stream events from single stream with starting version offset", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      read_events =
+        Stream.stream_forward(conn, stream_uuid, 2, 1, serializer: serializer) |> Enum.to_list()
 
       assert length(read_events) == 2
       assert pluck(read_events, :event_number) == [2, 3]
@@ -217,10 +250,9 @@ defmodule EventStore.Streams.SingleStreamTest do
     end
 
     test "should stream events from single stream with starting version offset outside range",
-         context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
-
-      read_events = Stream.stream_forward(conn, stream_uuid, 4, 1) |> Enum.to_list()
+         %{conn: conn, serializer: serializer, stream_uuid: stream_uuid} do
+      read_events =
+        Stream.stream_forward(conn, stream_uuid, 4, 1, serializer: serializer) |> Enum.to_list()
 
       assert length(read_events) == 0
     end
@@ -229,9 +261,7 @@ defmodule EventStore.Streams.SingleStreamTest do
   describe "subscribe to stream" do
     setup [:append_events_to_stream]
 
-    test "from origin should receive all events", context do
-      %{stream_uuid: stream_uuid} = context
-
+    test "from origin should receive all events", %{stream_uuid: stream_uuid} do
       {:ok, _subscription} =
         EventStore.subscribe_to_stream(
           stream_uuid,
@@ -245,9 +275,11 @@ defmodule EventStore.Streams.SingleStreamTest do
       assert length(received_events) == 3
     end
 
-    test "from current should receive only new events", context do
-      %{conn: conn, stream_uuid: stream_uuid} = context
-
+    test "from current should receive only new events", %{
+      conn: conn,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
       {:ok, _subscription} =
         EventStore.subscribe_to_stream(
           stream_uuid,
@@ -261,15 +293,13 @@ defmodule EventStore.Streams.SingleStreamTest do
       wait_for_event_store()
 
       events = EventFactory.create_events(1, 4)
-      :ok = Stream.append_to_stream(conn, stream_uuid, 3, events)
+      :ok = Stream.append_to_stream(conn, stream_uuid, 3, events, serializer: serializer)
 
       assert_receive {:events, received_events}
       assert length(received_events) == 1
     end
 
-    test "from given stream version should receive only later events", context do
-      %{stream_uuid: stream_uuid} = context
-
+    test "from given stream version should receive only later events", %{stream_uuid: stream_uuid} do
       {:ok, _subscription} =
         EventStore.subscribe_to_stream(stream_uuid, @subscription_name, self(), start_from: 2)
 
@@ -278,26 +308,26 @@ defmodule EventStore.Streams.SingleStreamTest do
     end
   end
 
-  test "should return stream version", %{conn: conn} do
+  test "should return stream version", %{conn: conn, serializer: serializer} do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
-    :ok = Stream.append_to_stream(conn, stream_uuid, 0, events)
+    :ok = Stream.append_to_stream(conn, stream_uuid, 0, events, serializer: serializer)
 
     # stream above needed for preventing accidental event_number/stream_version match
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
-    :ok = Stream.append_to_stream(conn, stream_uuid, 0, events)
+    :ok = Stream.append_to_stream(conn, stream_uuid, 0, events, serializer: serializer)
 
     assert {:ok, 3} = Stream.stream_version(conn, stream_uuid)
   end
 
-  defp append_events_to_stream(%{conn: conn}) do
+  defp append_events_to_stream(%{conn: conn, serializer: serializer}) do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
-    :ok = Stream.append_to_stream(conn, stream_uuid, 0, events)
+    :ok = Stream.append_to_stream(conn, stream_uuid, 0, events, serializer: serializer)
 
     [
       stream_uuid: stream_uuid,
@@ -305,11 +335,11 @@ defmodule EventStore.Streams.SingleStreamTest do
     ]
   end
 
-  defp append_event_to_another_stream(%{conn: conn}) do
+  defp append_event_to_another_stream(%{conn: conn, serializer: serializer}) do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(1)
 
-    :ok = Stream.append_to_stream(conn, stream_uuid, 0, events)
+    :ok = Stream.append_to_stream(conn, stream_uuid, 0, events, serializer: serializer)
 
     [
       other_stream_uuid: stream_uuid,

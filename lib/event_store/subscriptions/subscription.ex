@@ -20,15 +20,20 @@ defmodule EventStore.Subscriptions.Subscription do
     :retry_interval
   ]
 
-  def start_link(conn, stream_uuid, subscription_name, subscription_opts, opts \\ []) do
+  def start_link(opts \\ []) do
+    {start_opts, subscription_opts} = Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt])
+
+    stream_uuid = Keyword.fetch!(subscription_opts, :stream_uuid)
+    subscription_name = Keyword.fetch!(subscription_opts, :subscription_name)
+
     state = %Subscription{
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
-      subscription: SubscriptionFsm.new(conn, stream_uuid, subscription_name, subscription_opts),
+      subscription: SubscriptionFsm.new(stream_uuid, subscription_name, subscription_opts),
       retry_interval: subscription_retry_interval()
     }
 
-    GenServer.start_link(__MODULE__, state, opts)
+    GenServer.start_link(__MODULE__, state, start_opts)
   end
 
   @doc """

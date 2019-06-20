@@ -8,9 +8,10 @@ defmodule EventStore.Config do
   @doc """
   Get the event store configuration for the environment.
   """
-  def get do
-    Application.get_env(:eventstore, EventStore.Storage) ||
-      raise ArgumentError, "EventStore storage configuration not specified in environment"
+  def get(event_store, otp_app) do
+    Application.get_env(otp_app, event_store) ||
+      raise ArgumentError,
+            "#{inspect(event_store)} storage configuration not specified in environment"
   end
 
   @doc """
@@ -26,8 +27,8 @@ defmodule EventStore.Config do
   @doc """
   Get the event store configuration for the environment.
   """
-  def parsed do
-    get() |> parse()
+  def parsed(event_store, otp_app) do
+    event_store |> get(otp_app) |> parse()
   end
 
   @doc """
@@ -44,7 +45,6 @@ defmodule EventStore.Config do
     end)
     |> Keyword.merge(pool: EventStore.Config.get_pool())
   end
-
 
   @doc """
   Converts a database url into a Keyword list
@@ -67,13 +67,17 @@ defmodule EventStore.Config do
     destructure [username, password], info.userinfo && String.split(info.userinfo, ":")
     "/" <> database = info.path
 
-    opts = Enum.reject([
-      username: username,
-      password: password,
-      database: database,
-      hostname: info.host,
-      port: info.port
-    ], fn {_k, v} -> is_nil(v) end)
+    opts =
+      Enum.reject(
+        [
+          username: username,
+          password: password,
+          database: database,
+          hostname: info.host,
+          port: info.port
+        ],
+        fn {_k, v} -> is_nil(v) end
+      )
 
     query_opts = parse_uri_query(info)
 
@@ -84,6 +88,7 @@ defmodule EventStore.Config do
 
   defp parse_uri_query(%URI{query: nil}),
     do: []
+
   defp parse_uri_query(%URI{query: query}) do
     query
     |> URI.query_decoder()
@@ -108,7 +113,8 @@ defmodule EventStore.Config do
         int
 
       _ ->
-        raise ArgumentError, message: "can not parse value `#{value}` for parameter `#{key}` as an integer"
+        raise ArgumentError,
+          message: "can not parse value `#{value}` for parameter `#{key}` as an integer"
     end
   end
 
@@ -138,10 +144,10 @@ defmodule EventStore.Config do
   @doc """
   Get the serializer configured for the environment.
   """
-  def serializer do
-    Application.get_env(:eventstore, EventStore.Storage, [])[:serializer] ||
+  def serializer(event_store) do
+    Application.get_env(:eventstore, event_store, [])[:serializer] ||
       raise ArgumentError,
-            "EventStore storage configuration expects :serializer to be configured in environment"
+            "#{event_store} configuration expects :serializer to be configured"
   end
 
   @default_postgrex_opts [
@@ -162,6 +168,8 @@ defmodule EventStore.Config do
   end
 
   def postgrex_opts(config) do
+    event_store = Keyword.fetch!(config, :event_store)
+
     [
       pool_size: 10,
       pool_overflow: 0
@@ -176,7 +184,7 @@ defmodule EventStore.Config do
         ]
     )
     |> Keyword.put(:backoff_type, :exp)
-    |> Keyword.put(:name, EventStore.Postgrex)
+    |> Keyword.put(:name, Module.concat([event_store, EventStore.Postgrex]))
   end
 
   def sync_connect_postgrex_opts(config) do

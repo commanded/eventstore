@@ -7,7 +7,7 @@ config :ex_unit,
   assert_receive_timeout: 2_000,
   refute_receive_timeout: 1_000
 
-config :eventstore, EventStore.Storage,
+config :eventstore, TestEventStore,
   serializer: EventStore.JsonbSerializer,
   types: EventStore.PostgresTypes,
   username: "postgres",

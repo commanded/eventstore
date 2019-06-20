@@ -4,8 +4,8 @@ defmodule EventStore.Support.CollectingSubscriber do
   alias EventStore.Subscriptions
   alias EventStore.Subscriptions.Subscription
 
-  def start_link(subscription_name, notify_subscribed) do
-    GenServer.start_link(__MODULE__, [subscription_name, notify_subscribed])
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts)
   end
 
   def received_events(subscriber) do
@@ -16,11 +16,16 @@ defmodule EventStore.Support.CollectingSubscriber do
     GenServer.call(subscriber, {:unsubscribe})
   end
 
-  def init([subscription_name, notify_subscribed]) do
-    {:ok, subscription} = Subscriptions.subscribe_to_all_streams(subscription_name, self())
+  def init(opts) do
+    event_store = Keyword.fetch!(opts, :event_store)
+    subscription_name = Keyword.fetch!(opts, :subscription_name)
+    notify_subscribed = Keyword.fetch!(opts, :notify_subscribed)
+
+    {:ok, subscription} = event_store.subscribe_to_all_streams(subscription_name, self())
 
     state = %{
       events: [],
+      event_store: event_store,
       subscription: subscription,
       subscription_name: subscription_name,
       notify_subscribed: notify_subscribed
@@ -29,20 +34,23 @@ defmodule EventStore.Support.CollectingSubscriber do
     {:ok, state}
   end
 
-  def handle_call({:received_events}, _from, %{events: events} = state) do
+  def handle_call({:received_events}, _from, state) do
+    %{events: events} = state
+
     {:reply, events, state}
   end
 
-  def handle_call({:unsubscribe}, _from, %{subscription_name: subscription_name} = state) do
-    Subscriptions.unsubscribe_from_all_streams(subscription_name)
+  def handle_call({:unsubscribe}, _from, state) do
+    %{event_store: event_store, subscription_name: subscription_name} = state
+
+    event_store.unsubscribe_from_all_streams(subscription_name)
 
     {:reply, :ok, state}
   end
 
-  def handle_info(
-        {:subscribed, subscription},
-        %{subscription: subscription, notify_subscribed: notify_subscribed} = state
-      ) do
+  def handle_info({:subscribed, subscription}, %{subscription: subscription} = state) do
+    %{notify_subscribed: notify_subscribed} = state
+
     send(notify_subscribed, {:subscribed, self()})
 
     {:noreply, state}

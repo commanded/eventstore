@@ -18,8 +18,10 @@ defmodule EventStore.MonitoredServer do
     defstruct [:mfa, :name, :backoff, :pid, :shutdown, :queue, monitors: MapSet.new()]
   end
 
-  def start_link([{_module, _fun, _args} = mfa, opts]) do
+  def start_link(opts) do
     {start_opts, monitor_opts} = Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt])
+
+    {_module, _fun, _args} = mfa = Keyword.fetch!(monitor_opts, :mfa)
 
     state = %State{
       backoff: Backoff.new(backoff_type: :exp),

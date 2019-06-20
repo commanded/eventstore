@@ -1,11 +1,16 @@
 defmodule EventStoreTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, RecordedEvent}
+  alias EventStore.{EventData, EventFactory, RecordedEvent}
   alias EventStore.Snapshots.SnapshotData
+  alias TestEventStore, as: EventStore
 
   @all_stream "$all"
   @subscription_name "test_subscription"
+
+  test "returns already started for started event store" do
+    assert {:error, {:already_started, _}} = EventStore.start_link()
+  end
 
   describe "append to event store" do
     test "should append single event" do
@@ -121,9 +126,9 @@ defmodule EventStoreTest do
     unicode_text = "Unicode characters are supported ✅"
     stream_uuid = UUID.uuid4()
 
-    event = %EventStore.EventData{
+    event = %EventData{
       event_type: "Elixir.EventStore.EventFactory.Event",
-      data: %EventStore.EventFactory.Event{
+      data: %EventFactory.Event{
         event: unicode_text
       }
     }

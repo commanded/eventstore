@@ -1,22 +1,14 @@
 defmodule EventStore.Notifications.NotifyEventsTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config, EventFactory, ProcessHelper}
+  alias EventStore.{Config, EventFactory}
+  alias TestEventStore, as: EventStore
 
   @channel "events"
 
   setup do
-    listener_opts =
-      Config.parsed()
-      |> Config.sync_connect_postgrex_opts()
-      |> Keyword.put(:name, __MODULE__)
-
-    {:ok, conn} = Postgrex.Notifications.start_link(listener_opts)
+    {:ok, conn} = start_listener()
     {:ok, ref} = Postgrex.Notifications.listen(conn, @channel)
-
-    on_exit(fn ->
-      ProcessHelper.shutdown(conn)
-    end)
 
     [ref: ref]
   end
@@ -41,5 +33,17 @@ defmodule EventStore.Notifications.NotifyEventsTest do
     events = EventFactory.create_events(count, expected_version)
 
     :ok = EventStore.append_to_stream(stream_uuid, expected_version, events)
+  end
+
+  defp start_listener do
+    listener_opts =
+      Config.parsed(TestEventStore, :eventstore)
+      |> Config.sync_connect_postgrex_opts()
+      |> Keyword.put(:name, __MODULE__)
+
+    start_supervised(%{
+      id: Postgrex.Notifications,
+      start: {Postgrex.Notifications, :start_link, [listener_opts]}
+    })
   end
 end

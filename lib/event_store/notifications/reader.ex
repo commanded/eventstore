@@ -6,40 +6,52 @@ defmodule EventStore.Notifications.Reader do
   use GenStage
 
   alias EventStore.Notifications.Listener
-  alias EventStore.{RecordedEvent, Storage}
+  alias EventStore.RecordedEvent
+  alias EventStore.Storage
 
-  @conn EventStore.Notifications.Reader.Postgrex
+  defmodule State do
+    defstruct [:conn, :serializer, :subscribe_to]
+  end
 
-  def start_link(serializer) do
-    GenStage.start_link(__MODULE__, serializer, name: __MODULE__)
+  def start_link(opts \\ []) do
+    state = %State{
+      conn: Keyword.fetch!(opts, :conn),
+      serializer: Keyword.fetch!(opts, :serializer),
+      subscribe_to: Keyword.fetch!(opts, :subscribe_to)
+    }
+
+    start_opts = Keyword.take(opts, [:name, :timeout, :debug, :spawn_opt])
+
+    GenStage.start_link(__MODULE__, state, start_opts)
   end
 
   # Starts a permanent subscription to the listener producer stage which will
   # automatically start requesting items.
-  def init(serializer) do
-    opts = [
-      dispatcher: GenStage.BroadcastDispatcher,
-      subscribe_to: [{Listener, max_demand: 1}]
-    ]
+  def init(%State{} = state) do
+    %State{subscribe_to: subscribe_to} = state
 
-    {:producer_consumer, serializer, opts}
+    {:producer_consumer, state,
+     [
+       dispatcher: GenStage.BroadcastDispatcher,
+       subscribe_to: [{subscribe_to, max_demand: 1}]
+     ]}
   end
 
   # Fetch events from storage and pass onwards to subscibers
   def handle_events(events, _from, state) do
-    stream_events =
-      Enum.map(events, fn {stream_uuid, stream_id, first_stream_version, last_stream_version} ->
-        read_events(stream_uuid, stream_id, first_stream_version, last_stream_version, state)
-      end)
+    stream_events = Enum.map(events, &read_events(&1, state))
 
     {:noreply, stream_events, state}
   end
 
-  defp read_events(stream_uuid, stream_id, from_stream_version, to_stream_version, serializer) do
+  defp read_events(event, %State{} = state) do
+    {stream_uuid, stream_id, from_stream_version, to_stream_version} = event
+    %State{conn: conn, serializer: serializer} = state
+
     count = to_stream_version - from_stream_version + 1
 
     with {:ok, events} <-
-           Storage.read_stream_forward(@conn, stream_id, from_stream_version, count),
+           Storage.read_stream_forward(conn, stream_id, from_stream_version, count),
          deserialized_events <- deserialize_recorded_events(events, serializer) do
       {stream_uuid, deserialized_events}
     end

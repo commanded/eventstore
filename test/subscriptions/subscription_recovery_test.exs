@@ -5,6 +5,7 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
 
   alias EventStore.{EventFactory, RecordedEvent}
   alias EventStore.Subscriptions.Subscription
+  alias TestEventStore, as: EventStore
 
   describe "subscription recovery" do
     test "should receive events after socket is closed" do
@@ -59,7 +60,7 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
 
   defp get_port do
     pid =
-      GenServer.whereis(EventStore.Notifications.Listener.Postgrex)
+      GenServer.whereis(TestEventStore.EventStore.Notifications.Listener.Postgrex)
       |> :sys.get_state()
       |> Map.get(:pid)
 

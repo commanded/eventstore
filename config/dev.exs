@@ -4,12 +4,3 @@ use Mix.Config
 config :logger, :console, format: "[$level] $message\n"
 
 config :mix_test_watch, clear: true
-
-config :eventstore, EventStore.Storage,
-  serializer: EventStore.TermSerializer,
-  username: "postgres",
-  password: "postgres",
-  database: "eventstore_dev",
-  hostname: "localhost",
-  pool_size: 10,
-  pool_overflow: 5

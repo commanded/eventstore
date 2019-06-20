@@ -4,40 +4,41 @@ defmodule EventStore.StorageCase do
   alias EventStore.Config
   alias EventStore.Storage
 
+  @event_store TestEventStore
+
   setup_all do
-    config = Config.parsed()
+    config = Config.parsed(@event_store, :eventstore)
+    serializer = Keyword.fetch!(config, :serializer)
+
     postgrex_config = Config.default_postgrex_opts(config)
 
     {:ok, conn} = Postgrex.start_link(postgrex_config)
 
-    [conn: conn]
+    [
+      event_store: @event_store,
+      conn: conn,
+      config: config,
+      postgrex_config: postgrex_config,
+      serializer: serializer
+    ]
   end
 
   setup %{conn: conn} do
-    registry = Application.get_env(:eventstore, :registry, :local)
-
     Storage.Initializer.reset!(conn)
 
-    after_reset(registry)
+    case Application.get_env(:eventstore, :registry, :local) do
+      :local ->
+        {:ok, _pid} = start_supervised({@event_store, name: @event_store})
 
-    on_exit(fn ->
-      after_exit(registry)
-    end)
-  end
+        :ok
 
-  defp after_exit(:local) do
-    Application.stop(:eventstore)
-  end
+      :distributed ->
+        reply = :rpc.multicall(@event_store, :start_link, [])
 
-  defp after_exit(:distributed) do
-    _ = :rpc.multicall(Application, :stop, [:eventstore])
-  end
-
-  defp after_reset(:local) do
-    {:ok, _} = Application.ensure_all_started(:eventstore)
-  end
-
-  defp after_reset(:distributed) do
-    _ = :rpc.multicall(Application, :ensure_all_started, [:eventstore])
+        IO.inspect(reply, label: ":rpc.multicall")
+        # on_exit(fn ->
+        #   after_exit(registry, pid)
+        # end)
+    end
   end
 end

@@ -2,24 +2,27 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   @moduledoc false
 
   alias EventStore.{AdvisoryLocks, RecordedEvent, Registration, Storage}
+  alias EventStore.Streams.Stream
   alias EventStore.Subscriptions.{SubscriptionState, Subscriber}
 
   use Fsm, initial_state: :initial, initial_data: %SubscriptionState{}
 
   require Logger
 
-  def new(conn, stream_uuid, subscription_name, subscription_opts) do
+  def new(stream_uuid, subscription_name, opts) do
     new(
       data: %SubscriptionState{
-        conn: conn,
+        conn: Keyword.fetch!(opts, :conn),
+        event_store: Keyword.fetch!(opts, :event_store),
         stream_uuid: stream_uuid,
         subscription_name: subscription_name,
-        start_from: subscription_opts[:start_from] || 0,
-        mapper: subscription_opts[:mapper],
-        selector: subscription_opts[:selector],
-        partition_by: subscription_opts[:partition_by],
-        buffer_size: subscription_opts[:buffer_size] || 1,
-        max_size: subscription_opts[:max_size] || 1_000
+        serializer: Keyword.fetch!(opts, :serializer),
+        start_from: opts[:start_from] || 0,
+        mapper: opts[:mapper],
+        selector: opts[:selector],
+        partition_by: opts[:partition_by],
+        buffer_size: opts[:buffer_size] || 1,
+        max_size: opts[:max_size] || 1_000
       }
     )
   end
@@ -40,7 +43,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       }
 
       with {:ok, subscription} <- create_subscription(data),
-           {:ok, lock_ref} <- try_acquire_exclusive_lock(subscription),
+           {:ok, lock_ref} <- try_acquire_exclusive_lock(data, subscription),
            :ok <- subscribe_to_events(data) do
         %Storage.Subscription{subscription_id: subscription_id, last_seen: last_seen} =
           subscription
@@ -164,7 +167,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     # Attempt to subscribe
     defevent subscribe, data: %SubscriptionState{} = data do
       with {:ok, subscription} <- create_subscription(data),
-           {:ok, lock_ref} <- try_acquire_exclusive_lock(subscription) do
+           {:ok, lock_ref} <- try_acquire_exclusive_lock(data, subscription) do
         %Storage.Subscription{
           subscription_id: subscription_id,
           last_seen: last_seen
@@ -269,8 +272,16 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     )
   end
 
-  defp try_acquire_exclusive_lock(%Storage.Subscription{subscription_id: subscription_id}) do
-    AdvisoryLocks.try_advisory_lock(subscription_id)
+  defp try_acquire_exclusive_lock(
+         %SubscriptionState{} = data,
+         %Storage.Subscription{} = subscription
+       ) do
+    %Storage.Subscription{subscription_id: subscription_id} = subscription
+    %SubscriptionState{event_store: event_store} = data
+
+    server = Module.concat(event_store, AdvisoryLocks)
+
+    AdvisoryLocks.try_advisory_lock(server, subscription_id)
   end
 
   defp subscribe_to_events(%SubscriptionState{} = data) do
@@ -388,17 +399,13 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp read_stream_forward(%SubscriptionState{} = data) do
     %SubscriptionState{
       conn: conn,
+      serializer: serializer,
       stream_uuid: stream_uuid,
       last_sent: last_sent,
       max_size: max_size
     } = data
 
-    EventStore.Streams.Stream.read_stream_forward(
-      conn,
-      stream_uuid,
-      last_sent + 1,
-      max_size
-    )
+    Stream.read_stream_forward(conn, stream_uuid, last_sent + 1, max_size, serializer: serializer)
   end
 
   defp enqueue_events(%SubscriptionState{} = data, []), do: data
