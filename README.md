@@ -185,6 +185,8 @@ You should include unit tests to cover any changes.
 
 ### Contributors
 
+EventStore exists thanks to the following people who have contributed.
+
 - [Andrey Akulov](https://github.com/astery)
 - [Ben Smith](https://github.com/slashdotdash)
 - [Bruce Williams](https://github.com/bruce)

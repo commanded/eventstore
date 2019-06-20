@@ -70,7 +70,7 @@ defmodule EventStore.Storage.Reader do
 
     defp from_timestamp(%DateTime{} = timestamp), do: timestamp
 
-    if (Code.ensure_loaded?(Postgrex.Timestamp)) do
+    if Code.ensure_loaded?(Postgrex.Timestamp) do
       defp from_timestamp(%Postgrex.Timestamp{} = timestamp) do
         %Postgrex.Timestamp{
           year: year,
@@ -83,8 +83,8 @@ defmodule EventStore.Storage.Reader do
         } = timestamp
 
         with {:ok, naive} <-
-        NaiveDateTime.new(year, month, day, hour, minute, second, {microsecond, 6}),
-        {:ok, datetime} <- DateTime.from_naive(naive, "Etc/UTC") do
+               NaiveDateTime.new(year, month, day, hour, minute, second, {microsecond, 6}),
+             {:ok, datetime} <- DateTime.from_naive(naive, "Etc/UTC") do
           datetime
         end
       end

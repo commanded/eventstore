@@ -5,6 +5,25 @@
 ### Enhancements
 
 - SSL support including Mix tasks ([#161](https://github.com/commanded/eventstore/pull/161)).
+- Use `timestamp with time zone` for timestamp fields ([#150](https://github.com/commanded/eventstore/pull/150)).
+
+### Upgrading
+
+Upgrade your existing EventStore database by running:
+
+```console
+mix event_store.migrate
+```
+
+**Note**: The migrate command is idempotent and can be safely run multiple times.
+
+You can drop and recreate an EventStore database by running:
+
+```console
+mix do event_store.drop, event_store.create, event_store.init
+```
+
+---
 
 ## v0.16.2
 
@@ -55,6 +74,8 @@
   end
   ```
 
+---
+
 ## 0.15.1
 
 ### Enhancements
@@ -74,6 +95,8 @@
 - Remove dependency on `psql` for `event_store.create`, `event_store.init`, `event_store.migrate`, and `event_store.drop` mix tasks ([#117](https://github.com/commanded/eventstore/pull/117)).
 - Supports query parameters in URL for database connection ([#119](https://github.com/commanded/eventstore/pull/119)).
 - Improve typespecs and include Dialyzer in Travis CI build ([#121](https://github.com/commanded/eventstore/pull/121)).
+
+---
 
 ## 0.14.0
 
@@ -107,6 +130,8 @@ You can drop and recreate an EventStore database by running:
 mix do event_store.drop, event_store.create, event_store.init
 ```
 
+---
+
 ## v0.13.2
 
 ### Bug fixes
@@ -137,6 +162,8 @@ Upgrade your existing EventStore database by running: `mix event_store.migrate`
 
 Or you can drop and recreate the EventStore database by running: `mix do event_store.drop, event_store.create, event_store.init`
 
+---
+
 ## v0.12.1
 
 ### Bug fixes
@@ -153,6 +180,8 @@ Or you can drop and recreate the EventStore database by running: `mix do event_s
 
 - Fix issue where subscription doesn't immediately receive events published while transitioning between catch-up and subscribed. Any missed events would be noticed and replayed upon next event publish.
 
+---
+
 ## v0.11.0
 
 ### Enhancements
@@ -164,6 +193,8 @@ Or you can drop and recreate the EventStore database by running: `mix do event_s
 ### Upgrading
 
 Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) script against your event store database.
+
+---
 
 ## v0.10.1
 
@@ -181,6 +212,8 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 
 - Use [DBConnection](https://hexdocs.pm/db_connection/DBConnection.html)'s built in support for connection pools (using poolboy).
 
+---
+
 ## v0.9.0
 
 ### Enhancements
@@ -196,6 +229,8 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
   ```
 
 - Subscribers now receive an `{:events, events}` tuple and should acknowledge receipt by: `EventStore.ack(subscription, events)`
+
+---
 
 ## v0.8.1
 
@@ -213,6 +248,8 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 ### Enhancements
 
 - Stream events from a single stream forward.
+
+---
 
 ## v0.7.4
 
@@ -244,6 +281,8 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 
 - Subscribe to a single stream, or all streams, from a specified start position ([#17](https://github.com/commanded/eventstore/issues/17)).
 
+---
+
 ## v0.6.2
 
 ### Bug fixes
@@ -261,6 +300,8 @@ Run the schema migration [v0.11.0.sql](priv/event_store/migrations/v0.11.0.sql) 
 ### Enhancements
 
 - Use `NaiveDateTime` for each recorded event's `created_at` property.
+
+---
 
 ## v0.5.2
 
