@@ -266,7 +266,7 @@ defmodule EventStore do
 
       @doc false
       def delete_all_streams_subscription(subscription_name) do
-        EventStore.delete_subscription(__MODULE__, @all_stream, subscription_name)
+        Subscriptions.delete_subscription(__MODULE__, @all_stream, subscription_name)
       end
 
       @doc false

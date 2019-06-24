@@ -18,4 +18,5 @@ config :eventstore, TestEventStore,
 
 config :eventstore,
   registry: :local,
-  subscription_retry_interval: 1_000
+  subscription_retry_interval: 1_000,
+  event_stores: [TestEventStore]

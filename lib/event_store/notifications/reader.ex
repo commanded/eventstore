@@ -5,7 +5,6 @@ defmodule EventStore.Notifications.Reader do
 
   use GenStage
 
-  alias EventStore.Notifications.Listener
   alias EventStore.RecordedEvent
   alias EventStore.Storage
 

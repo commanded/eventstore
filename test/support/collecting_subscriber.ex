@@ -1,7 +1,6 @@
 defmodule EventStore.Support.CollectingSubscriber do
   use GenServer
 
-  alias EventStore.Subscriptions
   alias EventStore.Subscriptions.Subscription
 
   def start_link(opts) do

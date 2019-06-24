@@ -42,14 +42,10 @@ defmodule EventStore.Notifications.Listener do
   end
 
   # Notification received from PostgreSQL's `NOTIFY`
-  def handle_info(
-        {:notification, _connection_pid, ref, channel, payload},
-        %Listener{queue: queue} = state
-      ) do
+  def handle_info({:notification, _connection_pid, _ref, channel, payload}, %Listener{} = state) do
     Logger.debug(fn ->
-      "Listener received notification on channel #{inspect(channel)} with payload: #{
-        inspect(payload)
-      }"
+      "Listener received notification on channel " <>
+        inspect(channel) <> " with payload: " <> inspect(payload)
     end)
 
     %Listener{queue: queue} = state
