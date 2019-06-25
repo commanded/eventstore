@@ -46,7 +46,7 @@ defmodule Mix.Tasks.EventStore.Init do
       ensure_event_store(event_store, args)
       config = event_store.config()
 
-      Init.exec(config, Keyword.put(opts, :is_mix, true))
+      Init.exec(event_store, config, Keyword.put(opts, :is_mix, true))
     end)
 
     Mix.Task.reenable("event_store.init")

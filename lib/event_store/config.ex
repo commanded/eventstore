@@ -128,16 +128,16 @@ defmodule EventStore.Config do
       that makes it slightly slower to input due to added conversion overhead,
       but significantly faster to process, since no reparsing is needed
   """
-  def column_data_type do
-    case Application.get_env(:eventstore, :column_data_type, "bytea") do
+  def column_data_type(event_store, config) do
+    case Keyword.get(config, :column_data_type, "bytea") do
       valid when valid in ["bytea", "jsonb"] ->
         valid
 
       invalid ->
         raise ArgumentError,
-              "EventStore `:column_data_type` expects either \"bytea\" or \"jsonb\" but got: #{
+              inspect(event_store) <>
+                " `:column_data_type` expects either \"bytea\" or \"jsonb\" but got: " <>
                 inspect(invalid)
-              }"
     end
   end
 

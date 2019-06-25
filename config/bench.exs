@@ -7,7 +7,7 @@ config :ex_unit,
   assert_receive_timeout: 2_000,
   refute_receive_timeout: 1_000
 
-config :eventstore, EventStore.Storage,
+config :eventstore, TestEventStore,
   serializer: EventStore.TermSerializer,
   username: "postgres",
   password: "postgres",
@@ -15,3 +15,5 @@ config :eventstore, EventStore.Storage,
   hostname: "localhost",
   pool_size: 10,
   pool_overflow: 5
+
+config :eventstore, event_stores: [TestEventStore]

@@ -10,7 +10,13 @@ defmodule EventStore do
   event store as follows:
 
       defmodule MyApp.EventStore do
-        use EventStore, otp_app: :my_app
+        use EventStore,
+          otp_app: :my_app
+
+        # Optional `init/1` function to modify config at runtime.
+        def init(config) do
+          {:ok, config}
+        end
       end
 
   Where the configuration for the event store must be in your application

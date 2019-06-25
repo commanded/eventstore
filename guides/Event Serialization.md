@@ -6,10 +6,10 @@ You must implement the `EventStore.Serializer` behaviour to provide your preferr
 
 ## JSON serialization using Jason
 
-EventStore includes a JSON serializer using Jason in the `EventStore.JsonSerializer` module. To include it add `{:jason, "~> 1.1"}` to your application's mix dependencies and configure EventStore as below.
+EventStore includes a JSON serializer using Jason in the `EventStore.JsonSerializer` module. To include it, add `{:jason, "~> 1.1"}` to your application's mix dependencies and configure your EventStore as below.
 
 ```elixir
-config :eventstore, EventStore.Storage, serializer: EventStore.JsonSerializer
+config :eventstore, MyEventStore, serializer: EventStore.JsonSerializer
 ```
 
 ## Example JSON serializer using Poison
@@ -44,10 +44,10 @@ defmodule JsonSerializer do
 end
 ```
 
-Configure your serializer by setting the `serializer` option in the mix environment configuration file (e.g. `config/dev.exs`).
+Configure the JSON serializer for your event store by setting the `serializer` option in the mix environment configuration file (e.g. `config/dev.exs`):
 
 ```elixir
-config :eventstore, EventStore.Storage, serializer: JsonSerializer
+config :eventstore, MyEventStore, serializer: JsonSerializer
 ```
 
 You must set the `event_type` field to a string representing the type of event being persisted when using this serializer:

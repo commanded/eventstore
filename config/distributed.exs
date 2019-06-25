@@ -21,6 +21,7 @@ config :eventstore, TestEventStore,
   pool_overflow: 0
 
 config :eventstore,
+  event_stores: [TestEventStore],
   registry: :distributed,
   restart_stream_timeout: 1_000,
   subscription_retry_interval: 1_000

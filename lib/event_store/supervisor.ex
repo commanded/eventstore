@@ -81,8 +81,6 @@ defmodule EventStore.Supervisor do
             {Notifications.Supervisor, {event_store, config}}
           ] ++ Registration.child_spec()
 
-        # TODO: Add `event_store` to `Registration.child_spec/0`
-
         Supervisor.init(children, strategy: :one_for_all)
 
       :ignore ->
