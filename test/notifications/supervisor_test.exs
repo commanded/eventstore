@@ -1,7 +1,10 @@
 defmodule EventStore.Notifications.SupervisorTest do
   use ExUnit.Case
 
-  alias EventStore.{Config, ProcessHelper}
+  alias EventStore.Config
+  alias EventStore.ProcessHelper
+  alias EventStore.Registration
+  alias EventStore.Serializer
 
   @event_store TestEventStore
   @supervisor TestEventStore.EventStore.Notifications.Supervisor
@@ -19,13 +22,15 @@ defmodule EventStore.Notifications.SupervisorTest do
 
   test "should succeed when globally named supervisor process killed during `start_link/1`" do
     config = Config.parsed(@event_store, :eventstore)
+    registry = Registration.registry(@event_store, config)
+    serializer = Serializer.serializer(@event_store, config)
 
     spawn_link(&kill_notifications_supervisor/0)
 
     {:ok, _pid} =
       Supervisor.start_link(
         [
-          {EventStore.Notifications.Supervisor, {@event_store, config}}
+          {EventStore.Notifications.Supervisor, {@event_store, registry, serializer, config}}
         ],
         strategy: :one_for_one
       )

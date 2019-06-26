@@ -9,15 +9,21 @@ defmodule EventStore.Supervisor do
     MonitoredServer,
     Notifications,
     Registration,
+    Serializer,
     Subscriptions
   }
 
   @doc """
   Starts the event store supervisor.
   """
-  def start_link(event_store, otp_app, opts) do
+  def start_link(event_store, otp_app, serializer, registry, opts) do
     sup_opts = if name = Keyword.get(opts, :name, event_store), do: [name: name], else: []
-    Supervisor.start_link(__MODULE__, {event_store, otp_app, opts}, sup_opts)
+
+    Supervisor.start_link(
+      __MODULE__,
+      {event_store, otp_app, serializer, registry, opts},
+      sup_opts
+    )
   end
 
   @doc """
@@ -26,22 +32,20 @@ defmodule EventStore.Supervisor do
   def compile_config(event_store, opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
     config = Config.get(event_store, otp_app)
+    serializer = Serializer.serializer(event_store, config)
+    registry = Registration.registry(event_store, config)
 
-    case Keyword.fetch(config, :serializer) do
-      {:ok, serializer} ->
-        {otp_app, config, serializer}
-
-      :error ->
-        raise ArgumentError, "#{event_store} configuration expects :serializer to be configured"
-    end
+    {otp_app, config, serializer, registry}
   end
 
   @doc """
   Retrieves the runtime configuration.
   """
   def runtime_config(event_store, otp_app, opts) do
-    config = Application.get_env(otp_app, event_store, [])
-    config = [otp_app: otp_app, event_store: event_store] ++ Keyword.merge(config, opts)
+    config =
+      Application.get_env(otp_app, event_store, [])
+      |> Keyword.merge(opts)
+      |> Keyword.merge(otp_app: otp_app, event_store: event_store)
 
     case event_store_init(event_store, config) do
       {:ok, config} ->
@@ -57,7 +61,7 @@ defmodule EventStore.Supervisor do
   ## Supervisor callbacks
 
   @doc false
-  def init({event_store, otp_app, opts}) do
+  def init({event_store, otp_app, serializer, registry, opts}) do
     case runtime_config(event_store, otp_app, opts) do
       {:ok, config} ->
         advisory_locks_name = Module.concat([event_store, AdvisoryLocks])
@@ -78,8 +82,8 @@ defmodule EventStore.Supervisor do
               {Registry, keys: :unique, name: subscriptions_registry_name},
               id: subscriptions_registry_name
             ),
-            {Notifications.Supervisor, {event_store, config}}
-          ] ++ Registration.child_spec()
+            {Notifications.Supervisor, {event_store, registry, serializer, config}}
+          ] ++ Registration.child_spec(event_store, registry)
 
         Supervisor.init(children, strategy: :one_for_all)
 

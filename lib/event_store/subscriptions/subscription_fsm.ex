@@ -16,6 +16,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         event_store: Keyword.fetch!(opts, :event_store),
         stream_uuid: stream_uuid,
         subscription_name: subscription_name,
+        registry: Keyword.fetch!(opts, :registry),
         serializer: Keyword.fetch!(opts, :serializer),
         start_from: opts[:start_from] || 0,
         mapper: opts[:mapper],
@@ -285,9 +286,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defp subscribe_to_events(%SubscriptionState{} = data) do
-    %SubscriptionState{stream_uuid: stream_uuid} = data
+    %SubscriptionState{event_store: event_store, registry: registry, stream_uuid: stream_uuid} =
+      data
 
-    Registration.subscribe(stream_uuid)
+    Registration.subscribe(event_store, registry, stream_uuid)
   end
 
   defp monitor_subscriber(%SubscriptionState{} = data, pid, opts)

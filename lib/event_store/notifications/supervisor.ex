@@ -21,7 +21,7 @@ defmodule EventStore.Notifications.Supervisor do
   This is to ensure only a single instance of the supervisor, and its
   supervised children, is kept running on a cluster of nodes.
   """
-  def start_link({event_store, _config} = args) do
+  def start_link({event_store, _registry, _serializer, _config} = args) do
     name = {:global, Module.concat([event_store, __MODULE__])}
 
     case Supervisor.start_link(__MODULE__, args, name: name) do
@@ -44,9 +44,7 @@ defmodule EventStore.Notifications.Supervisor do
   end
 
   @impl Supervisor
-  def init({event_store, config}) do
-    serializer = Keyword.fetch!(config, :serializer)
-
+  def init({event_store, registry, serializer, config}) do
     postgrex_config = Config.sync_connect_postgrex_opts(config)
 
     listener_name = Module.concat([event_store, Listener])
@@ -74,7 +72,11 @@ defmodule EventStore.Notifications.Supervisor do
          serializer: serializer,
          subscribe_to: listener_name,
          name: reader_name},
-        {Broadcaster, subscribe_to: reader_name, name: broadcaster_name}
+        {Broadcaster,
+         event_store: event_store,
+         registry: registry,
+         subscribe_to: reader_name,
+         name: broadcaster_name}
       ],
       strategy: :one_for_all
     )

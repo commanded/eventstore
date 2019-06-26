@@ -80,11 +80,13 @@ defmodule EventStore do
       alias EventStore.Subscriptions.Subscription
       alias EventStore.Streams.Stream
 
-      {otp_app, config, serializer} = EventStore.Supervisor.compile_config(__MODULE__, opts)
+      {otp_app, config, serializer, registry} =
+        EventStore.Supervisor.compile_config(__MODULE__, opts)
 
       @otp_app otp_app
       @config config
       @serializer serializer
+      @registry registry
 
       @all_stream "$all"
       @default_batch_size 1_000
@@ -111,7 +113,7 @@ defmodule EventStore do
 
       @doc false
       def start_link(opts \\ []) do
-        EventStore.Supervisor.start_link(__MODULE__, @otp_app, opts)
+        EventStore.Supervisor.start_link(__MODULE__, @otp_app, @serializer, @registry, opts)
       end
 
       @doc false
@@ -224,7 +226,7 @@ defmodule EventStore do
 
       @doc false
       def subscribe(stream_uuid, opts \\ []) do
-        Registration.subscribe(stream_uuid, opts)
+        Registration.subscribe(__MODULE__, @registry, stream_uuid, opts)
       end
 
       @doc false
@@ -235,6 +237,7 @@ defmodule EventStore do
             Keyword.merge(opts,
               conn: @conn,
               event_store: __MODULE__,
+              registry: @registry,
               serializer: @serializer,
               stream_uuid: stream_uuid,
               subscription_name: subscription_name,

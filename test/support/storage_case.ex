@@ -2,23 +2,26 @@ defmodule EventStore.StorageCase do
   use ExUnit.CaseTemplate
 
   alias EventStore.Config
+  alias EventStore.Registration
+  alias EventStore.Serializer
   alias EventStore.Storage
 
   @event_store TestEventStore
 
   setup_all do
     config = Config.parsed(@event_store, :eventstore)
-    serializer = Keyword.fetch!(config, :serializer)
-
+    registry = Registration.registry(@event_store, config)
+    serializer = Serializer.serializer(@event_store, config)
     postgrex_config = Config.default_postgrex_opts(config)
 
     {:ok, conn} = Postgrex.start_link(postgrex_config)
 
     [
-      event_store: @event_store,
       conn: conn,
       config: config,
+      event_store: @event_store,
       postgrex_config: postgrex_config,
+      registry: registry,
       serializer: serializer
     ]
   end
