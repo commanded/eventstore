@@ -31,6 +31,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
           conn: @conn,
           registry: registry,
           serializer: serializer,
+          retry_interval: 1_000,
           stream_uuid: stream_uuid,
           subscription_name: subscription_name
         )

@@ -6,7 +6,7 @@ defmodule EventStore.EventFactory do
 
   defmodule Event do
     @derive Jason.Encoder
-    defstruct event: nil
+    defstruct [:event]
   end
 
   def create_events(number_of_events, initial_event_number \\ 1) when number_of_events > 0 do

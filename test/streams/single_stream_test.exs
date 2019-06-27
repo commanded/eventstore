@@ -150,8 +150,6 @@ defmodule EventStore.Streams.SingleStreamTest do
           start_from: :current
         )
 
-      wait_for_event_store()
-
       event = %EventData{data: %EventFactory.Event{event: "foo"}}
 
       :ok =
@@ -290,8 +288,6 @@ defmodule EventStore.Streams.SingleStreamTest do
 
       refute_receive {:events, _received_events}
 
-      wait_for_event_store()
-
       events = EventFactory.create_events(1, 4)
       :ok = Stream.append_to_stream(conn, stream_uuid, 3, events, serializer: serializer)
 
@@ -345,13 +341,6 @@ defmodule EventStore.Streams.SingleStreamTest do
       other_stream_uuid: stream_uuid,
       other_events: events
     ]
-  end
-
-  defp wait_for_event_store do
-    case Application.get_env(:eventstore, :restart_stream_timeout) do
-      nil -> :ok
-      timeout -> :timer.sleep(timeout)
-    end
   end
 
   defp pluck(enumerable, field), do: Enum.map(enumerable, &Map.get(&1, field))

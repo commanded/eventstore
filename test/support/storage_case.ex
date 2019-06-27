@@ -29,19 +29,8 @@ defmodule EventStore.StorageCase do
   setup %{conn: conn} do
     Storage.Initializer.reset!(conn)
 
-    case Application.get_env(:eventstore, :registry, :local) do
-      :local ->
-        {:ok, _pid} = start_supervised({@event_store, name: @event_store})
+    {:ok, _pid} = start_supervised({@event_store, name: @event_store})
 
-        :ok
-
-      :distributed ->
-        reply = :rpc.multicall(@event_store, :start_link, [])
-
-        IO.inspect(reply, label: ":rpc.multicall")
-        # on_exit(fn ->
-        #   after_exit(registry, pid)
-        # end)
-    end
+    :ok
   end
 end

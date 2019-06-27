@@ -178,6 +178,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
         conn: conn,
         registry: registry,
         serializer: serializer,
+        retry_interval: 1_000,
         stream_uuid: "$all",
         subscription_name: subscription_name,
         buffer_size: 3,

@@ -16,10 +16,10 @@ PostgreSQL's [advisory locks](https://www.postgresql.org/docs/current/static/exp
 
 ## Running on a cluster
 
-1. Configure the EventStore to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
+1. Configure your EventStore module to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
 
       ```elixir
-      config :eventstore, registry: :distributed
+      config :my_app, MyApp.EventStore, registry: :distributed
       ```
 
 ## Automatic cluster formation

@@ -9,7 +9,6 @@ defmodule EventStore.Supervisor do
     MonitoredServer,
     Notifications,
     Registration,
-    Serializer,
     Subscriptions
   }
 
@@ -32,10 +31,8 @@ defmodule EventStore.Supervisor do
   def compile_config(event_store, opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
     config = Config.get(event_store, otp_app)
-    serializer = Serializer.serializer(event_store, config)
-    registry = Registration.registry(event_store, config)
 
-    {otp_app, config, serializer, registry}
+    {otp_app, config}
   end
 
   @doc """

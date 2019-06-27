@@ -32,4 +32,29 @@ defmodule EventStore.Subscriptions do
 
     Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
   end
+
+  @doc """
+  Get the delay between subscription retry attempts, in milliseconds, from the
+  event store config.
+
+  The default value is one minute and the minimum allowed value is one second.
+  """
+  def retry_interval(event_store, config) do
+    case Keyword.get(config, :subscription_retry_interval) do
+      interval when is_integer(interval) and interval > 0 ->
+        # Ensure interval is no less than one second
+        max(interval, 1_000)
+
+      nil ->
+        # Default to 60 seconds when not configured
+        60_000
+
+      invalid ->
+        raise ArgumentError,
+          message:
+            "Invalid `:subscription_retry_interval` setting in " <>
+              inspect(event_store) <>
+              " config. Expected an integer in milliseconds but got: " <> inspect(invalid)
+    end
+  end
 end

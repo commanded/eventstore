@@ -75,18 +75,22 @@ defmodule EventStore do
     quote bind_quoted: [opts: opts] do
       @behaviour EventStore
 
-      alias EventStore.{Config, EventData, Registration, Subscriptions}
+      alias EventStore.{Config, EventData, Registration, Serializer, Subscriptions}
       alias EventStore.Snapshots.{SnapshotData, Snapshotter}
       alias EventStore.Subscriptions.Subscription
       alias EventStore.Streams.Stream
 
-      {otp_app, config, serializer, registry} =
-        EventStore.Supervisor.compile_config(__MODULE__, opts)
+      {otp_app, config} = EventStore.Supervisor.compile_config(__MODULE__, opts)
+
+      serializer = Serializer.serializer(__MODULE__, config)
+      registry = Registration.registry(__MODULE__, config)
+      subscription_retry_interval = Subscriptions.retry_interval(__MODULE__, config)
 
       @otp_app otp_app
       @config config
       @serializer serializer
       @registry registry
+      @subscription_retry_interval subscription_retry_interval
 
       @all_stream "$all"
       @default_batch_size 1_000
@@ -239,6 +243,7 @@ defmodule EventStore do
               event_store: __MODULE__,
               registry: @registry,
               serializer: @serializer,
+              retry_interval: @subscription_retry_interval,
               stream_uuid: stream_uuid,
               subscription_name: subscription_name,
               start_from: start_from

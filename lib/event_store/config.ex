@@ -141,15 +141,6 @@ defmodule EventStore.Config do
     end
   end
 
-  @doc """
-  Get the serializer configured for the environment.
-  """
-  def serializer(event_store) do
-    Application.get_env(:eventstore, event_store, [])[:serializer] ||
-      raise ArgumentError,
-            "#{event_store} configuration expects :serializer to be configured"
-  end
-
   @default_postgrex_opts [
     :username,
     :password,

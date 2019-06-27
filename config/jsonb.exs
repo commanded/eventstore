@@ -9,16 +9,15 @@ config :ex_unit,
 
 config :eventstore, TestEventStore,
   column_data_type: "jsonb",
-  serializer: EventStore.JsonbSerializer,
-  types: EventStore.PostgresTypes,
   username: "postgres",
   password: "postgres",
   database: "eventstore_jsonb_test",
   hostname: "localhost",
   pool_size: 1,
-  pool_overflow: 0
-
-config :eventstore,
-  event_stores: [TestEventStore],
+  pool_overflow: 0,
   registry: :local,
-  subscription_retry_interval: 1_000
+  serializer: EventStore.JsonbSerializer,
+  subscription_retry_interval: 1_000,
+  types: EventStore.PostgresTypes
+
+config :eventstore, event_stores: [TestEventStore]
