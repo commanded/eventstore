@@ -2,7 +2,7 @@
 
 ## Writing to a stream
 
-Create a unique identity for each stream. It **must** be a string. This example uses the [uuid](https://hex.pm/packages/uuid) package.
+Create a unique identity for each stream. It **must** be a string. This example uses the [elixir_uuid](https://hex.pm/packages/elixir_uuid) package.
 
 ```elixir
 stream_uuid = UUID.uuid4()
@@ -51,7 +51,7 @@ stream_version = length(events)
 Append new events to the existing stream:
 
 ```elixir
-new_events = [ %EventStore.EventData{...}, ... ]
+new_events = [ %EventStore.EventData{..}, ... ]
 
 :ok = EventStore.append_to_stream(stream_uuid, stream_version, new_events)
 ```

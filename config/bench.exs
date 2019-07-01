@@ -16,4 +16,13 @@ config :eventstore, TestEventStore,
   pool_overflow: 5,
   serializer: EventStore.TermSerializer
 
+config :eventstore, SecondEventStore,
+  username: "postgres",
+  password: "postgres",
+  database: "eventstore_test_2",
+  hostname: "localhost",
+  pool_size: 1,
+  pool_overflow: 0,
+  serializer: EventStore.TermSerializer
+
 config :eventstore, event_stores: [TestEventStore]

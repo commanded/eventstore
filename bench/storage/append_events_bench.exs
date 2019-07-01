@@ -1,14 +1,25 @@
 defmodule AppendEventsBench do
   use Benchfella
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, ProcessHelper, StorageInitializer}
+  alias TestEventStore, as: EventStore
 
   @await_timeout_ms 100_000
 
   before_each_bench(_) do
-    EventStore.StorageInitializer.reset_storage!()
+    StorageInitializer.reset_storage!()
 
-    {:ok, EventFactory.create_events(100)}
+    {:ok, pid} = TestEventStore.start_link()
+
+    context = [events: EventFactory.create_events(100), pid: pid]
+
+    {:ok, context}
+  end
+
+  after_each_bench(context) do
+    pid = Keyword.fetch!(context, :pid)
+
+    ProcessHelper.shutdown(pid)
   end
 
   bench "append events, single writer" do
@@ -27,14 +38,17 @@ defmodule AppendEventsBench do
     append_events(bench_context, 50)
   end
 
-  defp append_events(events, concurrency) do
-    tasks = Enum.map 1..concurrency, fn (_) ->
-      stream_uuid = UUID.uuid4
+  defp append_events(context, concurrency) do
+    events = Keyword.fetch!(context, :events)
 
-      Task.async fn ->
-        EventStore.append_to_stream(stream_uuid, 0, events)
-      end
-    end
+    tasks =
+      Enum.map(1..concurrency, fn _ ->
+        stream_uuid = UUID.uuid4()
+
+        Task.async(fn ->
+          EventStore.append_to_stream(stream_uuid, 0, events)
+        end)
+      end)
 
     Enum.each(tasks, &Task.await(&1, @await_timeout_ms))
   end

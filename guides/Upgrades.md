@@ -8,6 +8,8 @@ You can upgrade an existing EventStore database using the following mix task:
 $ mix event_store.migrate
 ```
 
+Or use `mix event_store.migrate -e MyApp.EventStore` to specify an event store as an argument.
+
 Run this command each time you upgrade; it is safe to run multiple times.
 
 You must stop your application to apply an upgrade. It is *always* worth taking a full backup of the EventStore database before applying an upgrade.

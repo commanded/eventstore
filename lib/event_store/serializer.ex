@@ -18,28 +18,17 @@ defmodule EventStore.Serializer do
   """
   @callback deserialize(binary | map, config) :: any
 
+  @doc """
+  Get the serializer module from the given config for the event store.
+  """
   def serializer(event_store, config) do
     case Keyword.fetch(config, :serializer) do
       {:ok, serializer} ->
-        if implements?(serializer, EventStore.Serializer) do
-          serializer
-        else
-          raise ArgumentError,
-            message: "#{inspect(serializer)} is not an EventStore.Serializer"
-        end
-
         serializer
 
       :error ->
         raise ArgumentError,
           message: "#{inspect(event_store)} configuration expects :serializer to be configured"
     end
-  end
-
-  # Returns `true` if module implements behaviour.
-  defp implements?(module, behaviour) do
-    all = Keyword.take(module.__info__(:attributes), [:behaviour])
-
-    [behaviour] in Keyword.values(all)
   end
 end

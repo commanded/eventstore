@@ -51,18 +51,31 @@ MIT License
 
 ## Example usage
 
+Define an event store module:
+
+```elixir
+defmodule MyApp.EventStore do
+  use EventStore, otp_app: :my_app
+end
+```
+
 Append events to a stream:
 
 ```elixir
-defmodule ExampleEvent, do: defstruct [:key]
+alias MyApp.EventStore
+
+defmodule ExampleEvent do
+  defstruct [:key]
+end
 
 stream_uuid = UUID.uuid4()
 expected_version = 0
+
 events = [
   %EventStore.EventData{
     event_type: "Elixir.ExampleEvent",
     data: %ExampleEvent{key: "value"},
-    metadata: %{user: "someuser@example.com"},
+    metadata: %{user: "someuser@example.com"}
   }
 ]
 
@@ -72,6 +85,8 @@ events = [
 Read all events from a single stream, starting at the stream's first event:
 
 ```elixir
+alias MyApp.EventStore
+
 {:ok, events} = EventStore.read_stream_forward(stream_uuid)
 ```
 
@@ -80,28 +95,30 @@ More: [Using the EventStore](guides/Usage.md)
 Subscribe to events appended to all streams:
 
 ```elixir
+alias MyApp.EventStore
+
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self())
 
-# wait for the subscription confirmation
+# Wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
     IO.puts("Successfully subscribed to all streams")
 end
 
 receive_loop = fn loop ->
-  # receive a batch of events appended to the event store
+  # Receive a batch of events appended to the event store
   receive do
     {:events, events} ->
       IO.puts("Received events: #{inspect events}")
 
-      # ack successful receipt of events
+      # Acknowledge successful receipt of events
       EventStore.ack(subscription, events)
   end
 
   loop.(loop)
 end
 
-# infinite receive loop
+# Infinite receive loop
 receive_loop.(receive_loop)
 ```
 

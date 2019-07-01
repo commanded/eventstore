@@ -9,7 +9,7 @@ You must implement the `EventStore.Serializer` behaviour to provide your preferr
 EventStore includes a JSON serializer using Jason in the `EventStore.JsonSerializer` module. To include it, add `{:jason, "~> 1.1"}` to your application's mix dependencies and configure your EventStore as below.
 
 ```elixir
-config :eventstore, MyEventStore, serializer: EventStore.JsonSerializer
+config :eventstore, MyApp.EventStore, serializer: EventStore.JsonSerializer
 ```
 
 ## Example JSON serializer using Poison
