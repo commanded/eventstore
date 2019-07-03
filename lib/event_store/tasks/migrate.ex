@@ -9,7 +9,7 @@ defmodule EventStore.Tasks.Migrate do
   @available_migrations [
     "0.13.0",
     "0.14.0",
-    "0.16.0"
+    "0.17.0"
   ]
 
   @dialyzer {:no_return, exec: 2, handle_response: 1}

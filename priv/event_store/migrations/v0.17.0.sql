@@ -17,7 +17,7 @@ BEGIN
   ALTER TABLE schema_migrations ALTER COLUMN migrated_at SET DEFAULT now();
 
   -- record schema migration
-  INSERT INTO schema_migrations (major_version, minor_version, patch_version) VALUES (0, 16, 0);
+  INSERT INTO schema_migrations (major_version, minor_version, patch_version) VALUES (0, 17, 0);
 
 END;
 $$ LANGUAGE plpgsql;

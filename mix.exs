@@ -1,7 +1,7 @@
 defmodule EventStore.Mixfile do
   use Mix.Project
 
-  @version "0.16.2"
+  @version "0.17.0"
 
   def project do
     [
@@ -51,10 +51,9 @@ defmodule EventStore.Mixfile do
 
       # Test & release tooling
       {:benchfella, "~> 0.3", only: :bench},
-      {:credo, "~> 1.0", only: [:dev, :test]},
+      {:credo, "~> 1.1", only: [:dev, :test]},
       {:dialyxir, "~> 0.5", only: [:dev, :test]},
       {:ex_doc, "~> 0.20", only: :dev},
-      {:markdown, github: "devinus/markdown", only: :dev},
       {:mix_test_watch, "~> 0.9", only: :dev}
     ]
   end
@@ -97,11 +96,11 @@ defmodule EventStore.Mixfile do
 
   defp aliases do
     [
-      "event_store.setup": ["event_store.create", "event_store.init"],
-      "event_store.reset": ["event_store.drop", "event_store.setup"],
-      "es.setup": ["event_store.setup"],
-      "es.reset": ["event_store.reset"],
       benchmark: ["es.reset", "app.start", "bench"],
+      "event_store.reset": ["event_store.drop", "event_store.setup"],
+      "event_store.setup": ["event_store.create", "event_store.init"],
+      "es.reset": ["event_store.reset"],
+      "es.setup": ["event_store.setup"],
       "test.all": ["test.local", "test.jsonb", "test --only slow"],
       "test.distributed": &test_distributed/1,
       "test.jsonb": &test_jsonb/1,

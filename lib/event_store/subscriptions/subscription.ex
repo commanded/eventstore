@@ -294,7 +294,7 @@ defmodule EventStore.Subscriptions.Subscription do
   defp ensure_within_concurrency_limit(subscribers, opts) do
     concurrency_limit = Keyword.get(opts, :concurrency_limit, 1)
 
-    if Map.size(subscribers) < concurrency_limit do
+    if map_size(subscribers) < concurrency_limit do
       :ok
     else
       {:error, :too_many_subscribers}
