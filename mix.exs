@@ -68,13 +68,17 @@ defmodule EventStore.Mixfile do
       source_ref: "v#{@version}",
       extra_section: "GUIDES",
       extras: [
+        "CHANGELOG.md",
         "guides/Getting Started.md",
         "guides/Usage.md",
         "guides/Subscriptions.md",
         "guides/Cluster.md",
         "guides/Event Serialization.md",
         "guides/Upgrades.md",
-        "CHANGELOG.md"
+        "guides/upgrades/0.17-1.0.md": [
+          filename: "0.17-1.0",
+          title: "Upgrade guide v0.17.x to 1.0"
+        ]
       ],
       groups_for_extras: [
         Introduction: [
@@ -89,7 +93,8 @@ defmodule EventStore.Mixfile do
           "guides/Cluster.md"
         ],
         Upgrades: [
-          "guides/Upgrades.md"
+          "guides/Upgrades.md",
+          "guides/upgrades/0.17-1.0.md"
         ]
       ],
       groups_for_modules: [

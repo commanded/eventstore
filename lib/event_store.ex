@@ -22,25 +22,25 @@ defmodule EventStore do
   Where the configuration for the event store must be in your application
   environment, usually defined in `config/config.exs`:
 
-    config :my_app, MyApp.EventStore,
-      serializer: EventStore.JsonSerializer,
-      username: "postgres",
-      password: "postgres",
-      database: "eventstore",
-      hostname: "localhost",
-      # OR use a URL to connect instead
-      url: "postgres://postgres:postgres@localhost/eventstore",
-      pool_size: 1
+      config :my_app, MyApp.EventStore,
+        serializer: EventStore.JsonSerializer,
+        username: "postgres",
+        password: "postgres",
+        database: "eventstore",
+        hostname: "localhost",
+        # OR use a URL to connect instead
+        url: "postgres://postgres:postgres@localhost/eventstore",
+        pool_size: 1
 
-    The event store module defines a `start_link/0` function that needs to be
-    invoked before using the event store. In general, this function is not
-    called directly, but included as part of your application supervision tree.
+  The event store module defines a `start_link/1` function that needs to be
+  invoked before using the event store. In general, this function is not
+  called directly, but included as part of your application supervision tree.
 
-    If your application was generated with a supervisor (by passing `--sup`
-    to `mix new`) you will have a `lib/my_app/application.ex` file
-    containing the application start callback that defines and starts your
-    supervisor. You just need to edit the `start/2` function to start the event
-    store in your application's supervisor:
+  If your application was generated with a supervisor (by passing `--sup`
+  to `mix new`) you will have a `lib/my_app/application.ex` file
+  containing the application start callback that defines and starts your
+  supervisor. You just need to edit the `start/2` function to start the event
+  store in your application's supervisor:
 
         def start(_type, _args) do
           children = [
@@ -99,14 +99,12 @@ defmodule EventStore do
 
       @conn Module.concat([__MODULE__, EventStore.Postgrex])
 
-      @doc false
       def config do
         with {:ok, config} <- EventStore.Supervisor.runtime_config(__MODULE__, @otp_app, []) do
           config
         end
       end
 
-      @doc false
       def child_spec(opts) do
         %{
           id: __MODULE__,
@@ -115,29 +113,23 @@ defmodule EventStore do
         }
       end
 
-      @doc false
       def start_link(opts \\ []) do
         EventStore.Supervisor.start_link(__MODULE__, @otp_app, @serializer, @registry, opts)
       end
 
-      @doc false
       def stop(pid, timeout \\ 5000) do
         Supervisor.stop(pid, :normal, timeout)
       end
 
-      @doc false
       def append_to_stream(stream_uuid, expected_version, events, timeout \\ @default_timeout)
 
-      @doc false
       def append_to_stream(@all_stream, _expected_version, _events, _timeout),
         do: {:error, :cannot_append_to_all_stream}
 
-      @doc false
       def append_to_stream(stream_uuid, expected_version, events, timeout) do
         Stream.append_to_stream(@conn, stream_uuid, expected_version, events, opts(timeout))
       end
 
-      @doc false
       def link_to_stream(
             stream_uuid,
             expected_version,
@@ -145,11 +137,9 @@ defmodule EventStore do
             timeout \\ @default_timeout
           )
 
-      @doc false
       def link_to_stream(@all_stream, _expected_version, _events_or_event_ids, _timeout),
         do: {:error, :cannot_append_to_all_stream}
 
-      @doc false
       def link_to_stream(stream_uuid, expected_version, events_or_event_ids, timeout) do
         Stream.link_to_stream(
           @conn,
@@ -160,7 +150,6 @@ defmodule EventStore do
         )
       end
 
-      @doc false
       def read_stream_forward(
             stream_uuid,
             start_version \\ 0,
@@ -168,19 +157,16 @@ defmodule EventStore do
             timeout \\ @default_timeout
           )
 
-      @doc false
       def read_stream_forward(stream_uuid, start_version, count, timeout) do
         Stream.read_stream_forward(@conn, stream_uuid, start_version, count, opts(timeout))
       end
 
-      @doc false
       def read_all_streams_forward(
             start_event_number \\ 0,
             count \\ @default_count,
             timeout \\ @default_timeout
           )
 
-      @doc false
       def read_all_streams_forward(start_event_number, count, timeout) do
         Stream.read_stream_forward(
           @conn,
@@ -191,7 +177,6 @@ defmodule EventStore do
         )
       end
 
-      @doc false
       def stream_forward(
             stream_uuid,
             start_version \\ 0,
@@ -199,7 +184,6 @@ defmodule EventStore do
             timeout \\ @default_timeout
           )
 
-      @doc false
       def stream_forward(stream_uuid, start_version, read_batch_size, timeout) do
         Stream.stream_forward(
           @conn,
@@ -210,14 +194,12 @@ defmodule EventStore do
         )
       end
 
-      @doc false
       def stream_all_forward(
             start_event_number \\ 0,
             read_batch_size \\ @default_batch_size,
             timeout \\ @default_timeout
           )
 
-      @doc false
       def stream_all_forward(start_event_number, read_batch_size, timeout) do
         Stream.stream_forward(
           @conn,
@@ -228,12 +210,10 @@ defmodule EventStore do
         )
       end
 
-      @doc false
       def subscribe(stream_uuid, opts \\ []) do
         Registration.subscribe(__MODULE__, @registry, stream_uuid, opts)
       end
 
-      @doc false
       def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ []) do
         with {start_from, opts} <- Keyword.pop(opts, :start_from, :origin),
              {:ok, start_from} <- Stream.start_from(@conn, stream_uuid, start_from) do
@@ -253,47 +233,38 @@ defmodule EventStore do
         end
       end
 
-      @doc false
       def subscribe_to_all_streams(subscription_name, subscriber, opts \\ []) do
         subscribe_to_stream(@all_stream, subscription_name, subscriber, opts)
       end
 
-      @doc false
       def ack(subscription, ack) do
         Subscription.ack(subscription, ack)
       end
 
-      @doc false
       def unsubscribe_from_stream(stream_uuid, subscription_name) do
         Subscriptions.unsubscribe_from_stream(__MODULE__, stream_uuid, subscription_name)
       end
 
-      @doc false
       def unsubscribe_from_all_streams(subscription_name) do
         Subscriptions.unsubscribe_from_stream(__MODULE__, @all_stream, subscription_name)
       end
 
-      @doc false
       def delete_subscription(stream_uuid, subscription_name) do
         Subscriptions.delete_subscription(__MODULE__, stream_uuid, subscription_name)
       end
 
-      @doc false
       def delete_all_streams_subscription(subscription_name) do
         Subscriptions.delete_subscription(__MODULE__, @all_stream, subscription_name)
       end
 
-      @doc false
       def read_snapshot(source_uuid) do
         Snapshotter.read_snapshot(@conn, source_uuid, @serializer)
       end
 
-      @doc false
       def record_snapshot(%SnapshotData{} = snapshot) do
         Snapshotter.record_snapshot(@conn, snapshot, @serializer)
       end
 
-      @doc false
       def delete_snapshot(source_uuid) do
         Snapshotter.delete_snapshot(@conn, source_uuid)
       end
@@ -373,7 +344,12 @@ defmodule EventStore do
       expected version was `:stream_exists`.
 
   """
-  @callback append_to_stream(String.t(), expected_version, list(EventData.t()), timeout() | nil) ::
+  @callback append_to_stream(
+              stream_uuid :: String.t(),
+              expected_version,
+              events :: list(EventData.t()),
+              timeout :: timeout() | nil
+            ) ::
               :ok
               | {:error, :cannot_append_to_all_stream}
               | {:error, :stream_exists}
@@ -421,10 +397,10 @@ defmodule EventStore do
 
   """
   @callback link_to_stream(
-              String.t(),
+              stream_uuid :: String.t(),
               expected_version,
-              list(EventStore.RecordedEvent.t()) | list(non_neg_integer),
-              timeout() | nil
+              events :: list(EventStore.RecordedEvent.t()) | list(non_neg_integer),
+              timeout :: timeout() | nil
             ) ::
               :ok
               | {:error, :cannot_append_to_all_stream}
@@ -449,7 +425,12 @@ defmodule EventStore do
       Defaults to 15_000ms.
 
   """
-  @callback read_stream_forward(String.t(), non_neg_integer, non_neg_integer, timeout() | nil) ::
+  @callback read_stream_forward(
+              stream_uuid :: String.t(),
+              start_version :: non_neg_integer,
+              count :: non_neg_integer,
+              timeout :: timeout() | nil
+            ) ::
               {:ok, list(EventStore.RecordedEvent.t())}
               | {:error, reason :: term}
 
@@ -467,7 +448,11 @@ defmodule EventStore do
       Defaults to 15_000ms.
 
   """
-  @callback read_all_streams_forward(non_neg_integer, non_neg_integer, timeout() | nil) ::
+  @callback read_all_streams_forward(
+              start_event_number :: non_neg_integer,
+              count :: non_neg_integer,
+              timeout :: timeout() | nil
+            ) ::
               {:ok, list(EventStore.RecordedEvent.t())} | {:error, reason :: term}
 
   @doc """
@@ -484,7 +469,12 @@ defmodule EventStore do
       milliseconds. Defaults to 15_000ms.
 
   """
-  @callback stream_forward(String.t(), non_neg_integer, non_neg_integer, timeout() | nil) ::
+  @callback stream_forward(
+              stream_uuid :: String.t(),
+              start_version :: non_neg_integer,
+              read_batch_size :: non_neg_integer,
+              timeout :: timeout() | nil
+            ) ::
               Enumerable.t() | {:error, reason :: term}
 
   @doc """
@@ -500,7 +490,11 @@ defmodule EventStore do
     - `timeout` an optional timeout for querying the database (per batch), in
       milliseconds. Defaults to 15_000ms.
   """
-  @callback stream_all_forward(non_neg_integer, non_neg_integer) :: Enumerable.t()
+  @callback stream_all_forward(
+              start_event_number :: non_neg_integer,
+              read_batch_size :: non_neg_integer,
+              timeout :: timeout() | nil
+            ) :: Enumerable.t()
 
   @doc """
   Create a transient subscription to a given stream.
@@ -521,7 +515,7 @@ defmodule EventStore do
   each event. The subscriber process will miss any events if it is restarted
   and resubscribes. If you need a persistent subscription with guaranteed
   at-least-once event delivery and back-pressure you should use
-  `EventStore.subscribe_to_stream/4`.
+  `c:EventStore.subscribe_to_stream/4`.
 
   ## Notification message
 
@@ -540,7 +534,7 @@ defmodule EventStore do
 
   """
   @callback subscribe(
-              String.t(),
+              stream_uuid :: String.t(),
               selector: (EventStore.RecordedEvent.t() -> any()),
               mapper: (EventStore.RecordedEvent.t() -> any())
             ) :: :ok | {:error, term}
@@ -593,15 +587,15 @@ defmodule EventStore do
         stream are processed serially, but different streams are processed
         concurrently, you could use the `stream_uuid` as the partition key.
 
-            alias EventStore.RecordedEvent
+          ```
+          by_stream = fn %EventStore.RecordedEvent{stream_uuid: stream_uuid} -> stream_uuid end
 
-            by_stream = fn %RecordedEvent{stream_uuid: stream_uuid} -> stream_uuid end
-
-            {:ok, _subscription} =
-              EventStore.subscribe_to_stream(stream_uuid, "example", self(),
-                concurrency_limit: 10,
-                partition_by: by_stream
-              )
+          {:ok, _subscription} =
+            EventStore.subscribe_to_stream(stream_uuid, "example", self(),
+              concurrency_limit: 10,
+              partition_by: by_stream
+            )
+          ```
 
 
   The subscription will resume from the last acknowledged event if it already
@@ -637,7 +631,12 @@ defmodule EventStore do
       end
 
   """
-  @callback subscribe_to_stream(String.t(), String.t(), pid, keyword) ::
+  @callback subscribe_to_stream(
+              stream_uuid :: String.t(),
+              subscription_name :: String.t(),
+              subscriber :: pid,
+              opts :: keyword
+            ) ::
               {:ok, subscription :: pid}
               | {:error, :already_subscribed}
               | {:error, :subscription_already_exists}
@@ -700,7 +699,11 @@ defmodule EventStore do
       end
 
   """
-  @callback subscribe_to_all_streams(String.t(), pid, keyword) ::
+  @callback subscribe_to_all_streams(
+              subscription_name :: String.t(),
+              subscriber :: pid,
+              opts :: keyword
+            ) ::
               {:ok, subscription :: pid}
               | {:error, :already_subscribed}
               | {:error, :subscription_already_exists}
@@ -715,7 +718,7 @@ defmodule EventStore do
   the recorded event to acknowledge.
   """
   @callback ack(
-              pid,
+              subscription :: pid,
               EventStore.RecordedEvent.t()
               | list(EventStore.RecordedEvent.t())
               | non_neg_integer()
@@ -731,7 +734,8 @@ defmodule EventStore do
 
   Returns `:ok` on success.
   """
-  @callback unsubscribe_from_stream(String.t(), String.t()) :: :ok
+  @callback unsubscribe_from_stream(stream_uuid :: String.t(), subscription_name :: String.t()) ::
+              :ok
 
   @doc """
   Unsubscribe an existing subscriber from all event notifications.
@@ -741,7 +745,7 @@ defmodule EventStore do
 
   Returns `:ok` on success.
   """
-  @callback unsubscribe_from_all_streams(String.t()) :: :ok
+  @callback unsubscribe_from_all_streams(subscription_name :: String.t()) :: :ok
 
   @doc """
   Delete an existing persistent subscription.
@@ -753,19 +757,19 @@ defmodule EventStore do
 
   Returns `:ok` on success.
   """
-  @callback delete_subscription(String.t(), String.t()) :: :ok | {:error, term}
+  @callback delete_subscription(stream_uuid :: String.t(), subscription_name :: String.t()) ::
+              :ok | {:error, term}
 
   @doc """
   Delete an existing persistent subscription to all streams.
-
-    - `stream_uuid` is the stream the subscription is subscribed to.
 
     - `subscription_name` is used to identify the existing subscription to
       remove.
 
   Returns `:ok` on success.
   """
-  @callback delete_all_streams_subscription(String.t()) :: :ok | {:error, term}
+  @callback delete_all_streams_subscription(subscription_name :: String.t()) ::
+              :ok | {:error, term}
 
   @doc """
   Read a snapshot, if available, for a given source.
@@ -773,19 +777,20 @@ defmodule EventStore do
   Returns `{:ok, %EventStore.Snapshots.SnapshotData{}}` on success, or
   `{:error, :snapshot_not_found}` when unavailable.
   """
-  @callback read_snapshot(String.t()) :: {:ok, SnapshotData.t()} | {:error, :snapshot_not_found}
+  @callback read_snapshot(source_uuid :: String.t()) ::
+              {:ok, SnapshotData.t()} | {:error, :snapshot_not_found}
 
   @doc """
   Record a snapshot of the data and metadata for a given source.
 
   Returns `:ok` on success.
   """
-  @callback record_snapshot(SnapshotData.t()) :: :ok | {:error, reason :: term}
+  @callback record_snapshot(snapshot :: SnapshotData.t()) :: :ok | {:error, reason :: term}
 
   @doc """
   Delete a previously recorded snapshop for a given source.
 
   Returns `:ok` on success, or when the snapshot does not exist.
   """
-  @callback delete_snapshot(String.t()) :: :ok | {:error, reason :: term}
+  @callback delete_snapshot(source_uuid :: String.t()) :: :ok | {:error, reason :: term}
 end

@@ -60,7 +60,7 @@ new_events = [ %EventStore.EventData{..}, ... ]
 
 This is to ensure that no events have been appended to the stream by another process between your read and subsequent write.
 
-The `EventStore.append_to_stream/3` function will return `{:error, :wrong_expected_version}` when the version you provide is mismatched with the stream. You can resolve this error by reading the stream's events again, then attempt to append your new events using the latest stream version.
+The `c:EventStore.append_to_stream/4` function will return `{:error, :wrong_expected_version}` when the version you provide is mismatched with the stream. You can resolve this error by reading the stream's events again, then attempt to append your new events using the latest stream version.
 
 ### Optional concurrency check
 

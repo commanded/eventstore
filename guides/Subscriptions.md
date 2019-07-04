@@ -13,7 +13,7 @@ A single listener process will connect to the database to listen for these notif
 
 ## Transient subscriptions
 
-Use `EventStore.subscribe/1` to create a transient subscription to a single stream identified by its `stream_uuid`. Events will be received in batches as an `{:events, events}` message, where `events` is a collection of `EventStore.RecordedEvent` structs.
+Use `c:EventStore.subscribe/2` to create a transient subscription to a single stream identified by its `stream_uuid`. Events will be received in batches as an `{:events, events}` message, where `events` is a collection of `EventStore.RecordedEvent` structs.
 
 You can use `$all` as the stream identity to subscribe to events appended to all streams. With transient subscriptions you do not need to acknowledge receipt of the published events. The subscription will terminate when the subscriber process stops running.
 
@@ -94,7 +94,7 @@ By default subscriptions are created from the stream origin; they will receive a
 
 Receipt of each event by the subscriber must be acknowledged. This allows the subscription to resume on failure without missing an event.
 
-The subscriber receives an `{:events, events}` tuple containing the published events. The subscription returned when subscribing to the stream should be used to send the `ack` to. This is achieved by the `EventStore.ack/2` function:
+The subscriber receives an `{:events, events}` tuple containing the published events. The subscription returned when subscribing to the stream should be used to send the `ack` to. This is achieved by the `c:EventStore.ack/2` function:
 
  ```elixir
  EventStore.ack(subscription, events)
