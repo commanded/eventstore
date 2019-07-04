@@ -78,6 +78,46 @@ defmodule EventStore.Mixfile do
         "guides/Event Serialization.md",
         "guides/Upgrades.md",
         "CHANGELOG.md"
+      ],
+      groups_for_extras: [
+        Introduction: [
+          "guides/Getting Started.md",
+          "guides/Usage.md",
+          "guides/Subscriptions.md"
+        ],
+        Serialization: [
+          "guides/Event Serialization.md"
+        ],
+        Deployment: [
+          "guides/Cluster.md"
+        ],
+        Upgrades: [
+          "guides/Upgrades.md"
+        ]
+      ],
+      groups_for_modules: [
+        "Data types": [
+          EventStore.EventData,
+          EventStore.RecordedEvent,
+          EventStore.Snapshots.SnapshotData
+        ],
+        Serialization: [
+          EventStore.JsonSerializer,
+          EventStore.JsonbSerializer,
+          EventStore.Serializer,
+          EventStore.TermSerializer
+        ],
+        Registration: [
+          EventStore.Registration,
+          EventStore.Registration.DistributedRegistry,
+          EventStore.Registration.LocalRegistry
+        ],
+        Tasks: [
+          EventStore.Tasks.Create,
+          EventStore.Tasks.Drop,
+          EventStore.Tasks.Init,
+          EventStore.Tasks.Migrate
+        ]
       ]
     ]
   end
@@ -88,8 +128,7 @@ defmodule EventStore.Mixfile do
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => "https://github.com/commanded/eventstore",
-        "Docs" => "https://hexdocs.pm/eventstore/"
+        "GitHub" => "https://github.com/commanded/eventstore"
       }
     ]
   end

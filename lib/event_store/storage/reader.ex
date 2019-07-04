@@ -33,10 +33,11 @@ defmodule EventStore.Storage.Reader do
   end
 
   defmodule EventAdapter do
-    @moduledoc """
+    @moduledoc false
+
+    @doc """
     Map event data from the database to `RecordedEvent` struct
     """
-
     def to_event_data(rows), do: Enum.map(rows, &to_event_data_from_row/1)
 
     def to_event_data_from_row([
