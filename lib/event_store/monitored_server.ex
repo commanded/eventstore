@@ -18,8 +18,10 @@ defmodule EventStore.MonitoredServer do
     defstruct [:mfa, :name, :backoff, :pid, :shutdown, :queue, monitors: MapSet.new()]
   end
 
-  def start_link([{_module, _fun, _args} = mfa, opts]) do
+  def start_link(opts) do
     {start_opts, monitor_opts} = Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt])
+
+    {_module, _fun, _args} = mfa = Keyword.fetch!(monitor_opts, :mfa)
 
     state = %State{
       backoff: Backoff.new(backoff_type: :exp),
@@ -117,7 +119,7 @@ defmodule EventStore.MonitoredServer do
     {:noreply, state}
   end
 
-  def terminate(_, %State{pid: nil}), do: :ok
+  def terminate(_reason, %State{pid: nil}), do: :ok
 
   def terminate(reason, %State{} = state) do
     %State{pid: pid, shutdown: shutdown, mfa: {module, _fun, _args}} = state
@@ -146,7 +148,7 @@ defmodule EventStore.MonitoredServer do
 
   # Attempt to start the process, retry after a delay on failure
   defp start_process(%State{} = state) do
-    %State{mfa: {module, fun, args}, name: name, queue: queue} = state
+    %State{mfa: {module, fun, args}} = state
 
     Logger.debug(fn -> "Attempting to start #{inspect(module)}" end)
 
@@ -154,16 +156,29 @@ defmodule EventStore.MonitoredServer do
       {:ok, pid} ->
         Logger.debug(fn -> "Successfully started #{inspect(module)} (#{inspect(pid)})" end)
 
-        :ok = forward_queued_msgs(pid, queue)
-        :ok = notify_monitors({:UP, name, pid}, state)
+        on_process_start(pid, state)
 
-        %State{state | pid: pid, queue: :queue.new()}
+      {:error, {:already_started, pid}} ->
+        Logger.debug(fn ->
+          "Monitored process already started #{inspect(module)} (#{inspect(pid)})"
+        end)
+
+        on_process_start(pid, state)
 
       {:error, reason} ->
         Logger.info(fn -> "Failed to start #{inspect(module)} due to: #{inspect(reason)}" end)
 
         delayed_start(state)
     end
+  end
+
+  defp on_process_start(pid, %State{} = state) do
+    %State{name: name, queue: queue} = state
+
+    :ok = forward_queued_msgs(pid, queue)
+    :ok = notify_monitors({:UP, name, pid}, state)
+
+    %State{state | pid: pid, queue: :queue.new()}
   end
 
   defp enqueue(item, %State{queue: queue} = state) do

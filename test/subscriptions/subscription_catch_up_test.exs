@@ -3,6 +3,7 @@ defmodule EventStore.Subscriptions.SubscriptionCatchUpTest do
 
   alias EventStore.{EventFactory, RecordedEvent}
   alias EventStore.Subscriptions.Subscription
+  alias TestEventStore, as: EventStore
 
   describe "catch-up subscription" do
     test "should receive all existing events" do

@@ -4,26 +4,28 @@ defmodule EventStore.AdvisoryLocksTest do
   alias EventStore.{AdvisoryLocks, Config, ProcessHelper, Wait}
   alias EventStore.Storage
 
+  @locks TestEventStore.EventStore.AdvisoryLocks
+  @conn TestEventStore.EventStore.AdvisoryLocks.Postgrex
+
   setup do
-    postgrex_config = Config.parsed() |> Config.default_postgrex_opts()
+    postgrex_config = Config.parsed(TestEventStore, :eventstore) |> Config.default_postgrex_opts()
 
     {:ok, conn} = Postgrex.start_link(postgrex_config)
 
-    [
-      conn: conn
-    ]
+    [conn: conn]
   end
 
   describe "acquire lock" do
     test "should acquire lock when available" do
-      assert {:ok, lock} = AdvisoryLocks.try_advisory_lock(1)
+      assert {:ok, lock} = AdvisoryLocks.try_advisory_lock(@locks, 1)
+
       assert is_reference(lock)
     end
 
     test "should acquire lock when same process already has lock" do
-      assert {:ok, lock1} = AdvisoryLocks.try_advisory_lock(1)
-      assert {:ok, lock2} = AdvisoryLocks.try_advisory_lock(1)
-      assert {:ok, lock3} = AdvisoryLocks.try_advisory_lock(1)
+      assert {:ok, lock1} = AdvisoryLocks.try_advisory_lock(@locks, 1)
+      assert {:ok, lock2} = AdvisoryLocks.try_advisory_lock(@locks, 1)
+      assert {:ok, lock3} = AdvisoryLocks.try_advisory_lock(@locks, 1)
 
       assert is_reference(lock1)
       assert is_reference(lock2)
@@ -33,7 +35,7 @@ defmodule EventStore.AdvisoryLocksTest do
     test "should fail to acquire lock when already taken", %{conn: conn} do
       :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
 
-      assert {:error, :lock_already_taken} = AdvisoryLocks.try_advisory_lock(1)
+      assert {:error, :lock_already_taken} = AdvisoryLocks.try_advisory_lock(@locks, 1)
     end
   end
 
@@ -43,7 +45,7 @@ defmodule EventStore.AdvisoryLocksTest do
 
       pid =
         spawn_link(fn ->
-          assert {:ok, _lock} = AdvisoryLocks.try_advisory_lock(1)
+          assert {:ok, _lock} = AdvisoryLocks.try_advisory_lock(@locks, 1)
 
           send(reply_to, :lock_acquired)
 
@@ -65,7 +67,7 @@ defmodule EventStore.AdvisoryLocksTest do
 
   describe "disconnect" do
     test "should send `lock_released` message" do
-      assert {:ok, lock} = AdvisoryLocks.try_advisory_lock(1)
+      assert {:ok, lock} = AdvisoryLocks.try_advisory_lock(@locks, 1)
 
       connection_down()
 
@@ -74,6 +76,6 @@ defmodule EventStore.AdvisoryLocksTest do
   end
 
   defp connection_down do
-    send(AdvisoryLocks, {:DOWN, AdvisoryLocks.Postgrex, nil, :shutdown})
+    send(@locks, {:DOWN, @conn, nil, :shutdown})
   end
 end

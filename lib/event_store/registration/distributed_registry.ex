@@ -13,12 +13,12 @@ defmodule EventStore.Registration.DistributedRegistry do
   @doc """
   Return an optional supervisor spec for the registry.
   """
-  @spec child_spec() :: [:supervisor.child_spec()]
+  @spec child_spec(module) :: [:supervisor.child_spec()]
   @impl EventStore.Registration
-  def child_spec do
-    LocalRegistry.child_spec() ++
+  def child_spec(event_store) do
+    LocalRegistry.child_spec(event_store) ++
       [
-        DistributedForwarder.child_spec([])
+        DistributedForwarder.child_spec(event_store)
       ]
   end
 
@@ -26,22 +26,23 @@ defmodule EventStore.Registration.DistributedRegistry do
   Subscribes the caller to the given topic.
   """
   @spec subscribe(
+          module,
           binary,
           selector: (EventStore.RecordedEvent.t() -> any()),
           mapper: (EventStore.RecordedEvent.t() -> any())
         ) :: :ok | {:error, term}
   @impl EventStore.Registration
-  def subscribe(topic, opts) do
-    LocalRegistry.subscribe(topic, opts)
+  def subscribe(event_store, topic, opts) do
+    LocalRegistry.subscribe(event_store, topic, opts)
   end
 
   @doc """
   Broadcasts message on given topic.
   """
-  @spec broadcast(binary, term) :: :ok | {:error, term}
+  @spec broadcast(module, binary, term) :: :ok | {:error, term}
   @impl EventStore.Registration
-  def broadcast(topic, message) do
-    :ok = LocalRegistry.broadcast(topic, message)
-    :ok = DistributedForwarder.broadcast(topic, message)
+  def broadcast(event_store, topic, message) do
+    :ok = LocalRegistry.broadcast(event_store, topic, message)
+    :ok = DistributedForwarder.broadcast(event_store, topic, message)
   end
 end

@@ -16,10 +16,10 @@ PostgreSQL's [advisory locks](https://www.postgresql.org/docs/current/static/exp
 
 ## Running on a cluster
 
-1. Configure the EventStore to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
+1. Configure your EventStore module to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
 
       ```elixir
-      config :eventstore, registry: :distributed
+      config :my_app, EventStore, registry: :distributed
       ```
 
 ## Automatic cluster formation
@@ -128,7 +128,7 @@ The Erlang equivalent of the `:kernerl` mix config, as above, is:
       $ MIX_ENV=distributed iex --name node3@127.0.0.1 --erl "-config cluster/node3.sys.config" -S mix
       ```
 
-The node specific `<node>.sys.config` files ensure the cluster is formed before starting the `:eventstore` application, assuming this occurs within the 30 seconds timeout.
+The node specific `<node>.sys.config` files ensure the cluster is formed before starting your application, assuming this occurs within the 30 seconds timeout.
 
 Once the cluster has formed, you can use the EventStore API from any node.
 

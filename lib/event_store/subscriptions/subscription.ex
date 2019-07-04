@@ -20,15 +20,20 @@ defmodule EventStore.Subscriptions.Subscription do
     :retry_interval
   ]
 
-  def start_link(conn, stream_uuid, subscription_name, subscription_opts, opts \\ []) do
+  def start_link(opts \\ []) do
+    {start_opts, subscription_opts} = Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt])
+
+    stream_uuid = Keyword.fetch!(subscription_opts, :stream_uuid)
+    subscription_name = Keyword.fetch!(subscription_opts, :subscription_name)
+
     state = %Subscription{
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
-      subscription: SubscriptionFsm.new(conn, stream_uuid, subscription_name, subscription_opts),
-      retry_interval: subscription_retry_interval()
+      subscription: SubscriptionFsm.new(stream_uuid, subscription_name, subscription_opts),
+      retry_interval: Keyword.fetch!(subscription_opts, :retry_interval)
     }
 
-    GenServer.start_link(__MODULE__, state, opts)
+    GenServer.start_link(__MODULE__, state, start_opts)
   end
 
   @doc """
@@ -265,21 +270,6 @@ defmodule EventStore.Subscriptions.Subscription do
 
   # No-op for all other subscription states.
   defp handle_subscription_state(%Subscription{} = state), do: state
-
-  # Get the delay between subscription attempts, in milliseconds, from app
-  # config. The default value is one minute and minimum allowed value is one
-  # second.
-  defp subscription_retry_interval do
-    case Application.get_env(:eventstore, :subscription_retry_interval) do
-      interval when is_integer(interval) and interval > 0 ->
-        # ensure interval is no less than one second
-        max(interval, 1_000)
-
-      _ ->
-        # default to 60s
-        60_000
-    end
-  end
 
   # Prevent duplicate subscriptions from same process.
   defp ensure_not_already_subscribed(subscribers, pid) do

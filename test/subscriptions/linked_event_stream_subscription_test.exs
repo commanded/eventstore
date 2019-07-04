@@ -2,6 +2,7 @@ defmodule EventStore.Subscriptions.LinkedEventSubscriptionFsmTest do
   use EventStore.StorageCase
 
   alias EventStore.{EventFactory, ProcessHelper}
+  alias TestEventStore, as: EventStore
 
   describe "subscription to linked event stream" do
     test "should receive linked events" do

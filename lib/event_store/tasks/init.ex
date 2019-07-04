@@ -26,7 +26,7 @@ defmodule EventStore.Tasks.Init do
   - quiet: set to `true` to silence output
 
   """
-  def exec(config, opts) do
+  def exec(event_store, config, opts) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
 
     {:ok, conn} = Postgrex.start_link(config)
@@ -36,7 +36,7 @@ defmodule EventStore.Tasks.Init do
         write_info("The EventStore database has already been initialized.", opts)
 
       %{rows: [[false]]} ->
-        Initializer.run!(conn)
+        Initializer.run!(event_store, config, conn)
 
         write_info("The EventStore database has been initialized.", opts)
     end

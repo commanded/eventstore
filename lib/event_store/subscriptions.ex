@@ -4,36 +4,8 @@ defmodule EventStore.Subscriptions do
   alias EventStore.{Storage, Subscriptions}
   alias EventStore.Subscriptions.Subscription
 
-  @all_stream "$all"
-
-  def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ [])
-
-  def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts)
-  end
-
-  def subscribe_to_all_streams(subscription_name, subscriber, opts \\ [])
-
-  def subscribe_to_all_streams(subscription_name, subscriber, opts) do
-    do_subscribe_to_stream(@all_stream, subscription_name, subscriber, opts)
-  end
-
-  def unsubscribe_from_stream(stream_uuid, subscription_name) do
-    do_unsubscribe_from_stream(stream_uuid, subscription_name)
-  end
-
-  def unsubscribe_from_all_streams(subscription_name) do
-    do_unsubscribe_from_stream(@all_stream, subscription_name)
-  end
-
-  def delete_subscription(conn, stream_uuid, subscription_name, opts \\ []) do
-    :ok = Subscriptions.Supervisor.shutdown_subscription(stream_uuid, subscription_name)
-
-    Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
-  end
-
-  defp do_subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts) do
-    case Subscriptions.Supervisor.start_subscription(stream_uuid, subscription_name, opts) do
+  def subscribe_to_stream(subscriber, opts \\ []) do
+    case Subscriptions.Supervisor.start_subscription(opts) do
       {:ok, subscription} ->
         Subscription.connect(subscription, subscriber, opts)
 
@@ -48,7 +20,41 @@ defmodule EventStore.Subscriptions do
     end
   end
 
-  defp do_unsubscribe_from_stream(stream_uuid, subscription_name) do
-    Subscriptions.Supervisor.unsubscribe_from_stream(stream_uuid, subscription_name)
+  def unsubscribe_from_stream(event_store, stream_uuid, subscription_name) do
+    Subscriptions.Supervisor.unsubscribe_from_stream(event_store, stream_uuid, subscription_name)
+  end
+
+  def delete_subscription(event_store, stream_uuid, subscription_name, opts \\ []) do
+    :ok =
+      Subscriptions.Supervisor.shutdown_subscription(event_store, stream_uuid, subscription_name)
+
+    conn = Module.concat(event_store, EventStore.Postgrex)
+
+    Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
+  end
+
+  @doc """
+  Get the delay between subscription retry attempts, in milliseconds, from the
+  event store config.
+
+  The default value is one minute and the minimum allowed value is one second.
+  """
+  def retry_interval(event_store, config) do
+    case Keyword.get(config, :subscription_retry_interval) do
+      interval when is_integer(interval) and interval > 0 ->
+        # Ensure interval is no less than one second
+        max(interval, 1_000)
+
+      nil ->
+        # Default to 60 seconds when not configured
+        60_000
+
+      invalid ->
+        raise ArgumentError,
+          message:
+            "Invalid `:subscription_retry_interval` setting in " <>
+              inspect(event_store) <>
+              " config. Expected an integer in milliseconds but got: " <> inspect(invalid)
+    end
   end
 end

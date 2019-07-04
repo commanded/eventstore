@@ -6,6 +6,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
   alias EventStore.ProcessHelper
   alias EventStore.RecordedEvent
   alias EventStore.Subscriptions.Subscription
+  alias TestEventStore, as: EventStore
 
   describe "concurrent subscription" do
     test "should allow multiple subscribers" do

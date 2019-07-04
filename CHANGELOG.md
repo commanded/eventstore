@@ -1,5 +1,13 @@
 # Changelog
 
+## Next release
+
+- Support multiple event stores ([#168](https://github.com/commanded/eventstore/pull/168)).
+
+### Upgrading
+
+[Follow the upgrade guide](guides/upgrades/0.17-1.0.md) to define and use your own application specific event store].
+
 ## v0.17.0
 
 ### Enhancements
@@ -103,7 +111,7 @@ mix do event_store.drop, event_store.create, event_store.init
 - Add JSONB support ([#86](https://github.com/commanded/eventstore/pull/86)).
 - Add `:ssl` and `:ssl_opts` config params ([#88](https://github.com/commanded/eventstore/pull/88)).
 - Make `mix event_store.init` task do nothing if events table already exists ([#89](https://github.com/commanded/eventstore/pull/89)).
-- Timeout issue when using `EventStore.read_stream_forward/3` ([#92](https://github.com/commanded/eventstore/pull/92)).
+- Timeout issue when using `EventStore.read_stream_forward` ([#92](https://github.com/commanded/eventstore/pull/92)).
 - Replace `:info` level logging with `:debug` ([#90](https://github.com/commanded/eventstore/issues/90)).
 - Dealing better with Poison dependancy ([#91](https://github.com/commanded/eventstore/issues/91)).
 - Publish events directly to subscriptions ([#93](https://github.com/commanded/eventstore/pull/93)).

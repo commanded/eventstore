@@ -28,8 +28,13 @@ defmodule EventStore.AdvisoryLocks do
   alias EventStore.AdvisoryLocks.{Lock, State}
   alias EventStore.Storage
 
-  def start_link(conn) do
-    GenServer.start_link(__MODULE__, %State{conn: conn}, name: __MODULE__)
+  def start_link(opts) do
+    conn = Keyword.fetch!(opts, :conn)
+    name = Keyword.get(opts, :name, __MODULE__)
+
+    state = %State{conn: conn}
+
+    GenServer.start_link(__MODULE__, state, name: name)
   end
 
   def init(%State{} = state) do
@@ -56,10 +61,10 @@ defmodule EventStore.AdvisoryLocks do
   lost lock.
 
   """
-  @spec try_advisory_lock(key :: non_neg_integer()) ::
+  @spec try_advisory_lock(server :: GenServer.server(), key :: non_neg_integer()) ::
           {:ok, reference()} | {:error, :lock_already_taken} | {:error, term}
-  def try_advisory_lock(key) when is_integer(key) do
-    GenServer.call(__MODULE__, {:try_advisory_lock, key, self()})
+  def try_advisory_lock(server, key) when is_integer(key) do
+    GenServer.call(server, {:try_advisory_lock, key, self()})
   end
 
   def handle_call({:try_advisory_lock, key, owner}, _from, %State{} = state) do

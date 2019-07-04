@@ -7,7 +7,7 @@ defmodule EventStore.Mixfile do
     [
       app: :eventstore,
       version: @version,
-      elixir: "~> 1.5",
+      elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       description: description(),
@@ -26,17 +26,14 @@ defmodule EventStore.Mixfile do
 
   def application do
     [
-      extra_applications: [:logger, :ssl],
-      mod: {EventStore.Application, []}
+      extra_applications: [:logger, :ssl]
     ]
   end
 
-  defp elixirc_paths(:bench), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(:jsonb), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(:distributed), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(:local), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(:test), do: ["lib", "test/support", "test/subscriptions/support"]
-  defp elixirc_paths(_), do: ["lib"]
+  defp elixirc_paths(env) when env in [:bench, :distributed, :jsonb, :local, :test],
+    do: ["lib", "test/support", "test/subscriptions/support"]
+
+  defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
     [
@@ -60,7 +57,7 @@ defmodule EventStore.Mixfile do
 
   defp description do
     """
-    EventStore using PostgreSQL for persistence.
+    Event store using PostgreSQL for persistence.
     """
   end
 
@@ -71,13 +68,17 @@ defmodule EventStore.Mixfile do
       source_ref: "v#{@version}",
       extra_section: "GUIDES",
       extras: [
+        "CHANGELOG.md",
         "guides/Getting Started.md",
         "guides/Usage.md",
         "guides/Subscriptions.md",
         "guides/Cluster.md",
         "guides/Event Serialization.md",
         "guides/Upgrades.md",
-        "CHANGELOG.md"
+        "guides/upgrades/0.17-1.0.md": [
+          filename: "0.17-1.0",
+          title: "Upgrade guide v0.17.x to 1.0"
+        ]
       ],
       groups_for_extras: [
         Introduction: [
@@ -92,7 +93,8 @@ defmodule EventStore.Mixfile do
           "guides/Cluster.md"
         ],
         Upgrades: [
-          "guides/Upgrades.md"
+          "guides/Upgrades.md",
+          "guides/upgrades/0.17-1.0.md"
         ]
       ],
       groups_for_modules: [
@@ -140,7 +142,7 @@ defmodule EventStore.Mixfile do
       "event_store.setup": ["event_store.create", "event_store.init"],
       "es.reset": ["event_store.reset"],
       "es.setup": ["event_store.setup"],
-      "test.all": ["test.local", "test.jsonb", "test --only slow"],
+      "test.all": ["test.jsonb", "test --include slow"],
       "test.distributed": &test_distributed/1,
       "test.jsonb": &test_jsonb/1,
       "test.local": &test_local/1

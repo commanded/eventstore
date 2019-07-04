@@ -2,6 +2,7 @@ defmodule EventStore.Subscriptions.SingleSubscriptionFsmTest do
   use EventStore.Subscriptions.StreamSubscriptionTestCase, stream_uuid: UUID.uuid4()
 
   alias EventStore.EventFactory
+  alias TestEventStore, as: EventStore
 
   setup [:append_events_to_another_stream]
 

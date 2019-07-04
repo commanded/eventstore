@@ -3,11 +3,19 @@ defmodule EventStore.Storage.Initializer do
 
   alias EventStore.Sql.Statements
 
-  def run!(conn, opts \\ []), do: execute(conn, Statements.initializers(), opts)
+  def run!(event_store, config, conn, opts \\ []) do
+    statements = Statements.initializers(event_store, config)
 
-  def reset!(conn, opts \\ []), do: execute(conn, Statements.reset(), opts)
+    execute!(conn, statements, opts)
+  end
 
-  defp execute(conn, statements, opts) do
+  def reset!(conn, opts \\ []) do
+    statements = Statements.reset()
+
+    execute!(conn, statements, opts)
+  end
+
+  defp execute!(conn, statements, opts) do
     Postgrex.transaction(
       conn,
       fn transaction ->

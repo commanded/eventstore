@@ -7,17 +7,30 @@ config :ex_unit,
   assert_receive_timeout: 2_000,
   refute_receive_timeout: 1_000
 
-config :eventstore, EventStore.Storage,
-  serializer: EventStore.JsonbSerializer,
-  types: EventStore.PostgresTypes,
+config :eventstore, TestEventStore,
+  column_data_type: "jsonb",
   username: "postgres",
   password: "postgres",
   database: "eventstore_jsonb_test",
   hostname: "localhost",
   pool_size: 1,
-  pool_overflow: 0
-
-config :eventstore,
-  column_data_type: "jsonb",
+  pool_overflow: 0,
   registry: :local,
-  subscription_retry_interval: 1_000
+  serializer: EventStore.JsonbSerializer,
+  subscription_retry_interval: 1_000,
+  types: EventStore.PostgresTypes
+
+config :eventstore, SecondEventStore,
+  column_data_type: "jsonb",
+  username: "postgres",
+  password: "postgres",
+  database: "eventstore_jsonb_test_2",
+  hostname: "localhost",
+  pool_size: 1,
+  pool_overflow: 0,
+  registry: :local,
+  serializer: EventStore.JsonbSerializer,
+  subscription_retry_interval: 1_000,
+  types: EventStore.PostgresTypes
+
+config :eventstore, event_stores: [TestEventStore, SecondEventStore]

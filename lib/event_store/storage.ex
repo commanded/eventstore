@@ -2,7 +2,6 @@ defmodule EventStore.Storage do
   @moduledoc false
 
   alias EventStore.Snapshots.SnapshotData
-  alias EventStore.Storage
 
   alias EventStore.Storage.{
     Appender,
@@ -12,20 +11,6 @@ defmodule EventStore.Storage do
     Snapshot,
     Subscription
   }
-
-  @doc """
-  Initialise the PostgreSQL database by creating the tables and indexes.
-  """
-  def initialize_store!(conn, opts \\ []) do
-    Storage.Initializer.run!(conn, opts)
-  end
-
-  @doc """
-  Reset the PostgreSQL database by deleting all rows.
-  """
-  def reset!(conn, opts \\ []) do
-    Storage.Initializer.reset!(conn, opts)
-  end
 
   @doc """
   Create a new event stream with the given unique identifier.

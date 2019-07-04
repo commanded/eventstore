@@ -9,16 +9,18 @@ defmodule EventStore.Registration.LocalRegistry do
   @doc """
   Return the local supervisor child spec.
   """
-  @spec child_spec() :: [:supervisor.child_spec()]
+  @spec child_spec(module) :: [:supervisor.child_spec()]
   @impl EventStore.Registration
-  def child_spec do
+  def child_spec(event_store) do
+    registry_name = registry_name(event_store)
+
     [
       Supervisor.child_spec(
         {
           Registry,
-          keys: :duplicate, name: EventStore.PubSub, partitions: System.schedulers_online()
+          keys: :duplicate, name: registry_name, partitions: System.schedulers_online()
         },
-        id: EventStore.PubSub
+        id: registry_name
       )
     ]
   end
@@ -27,13 +29,16 @@ defmodule EventStore.Registration.LocalRegistry do
   Subscribes the caller to the given topic.
   """
   @spec subscribe(
+          module,
           binary,
           selector: (EventStore.RecordedEvent.t() -> any()),
           mapper: (EventStore.RecordedEvent.t() -> any())
         ) :: :ok | {:error, term}
   @impl EventStore.Registration
-  def subscribe(topic, opts) do
-    with {:ok, _} <- Registry.register(EventStore.PubSub, topic, opts) do
+  def subscribe(event_store, topic, opts) do
+    registry_name = registry_name(event_store)
+
+    with {:ok, _} <- Registry.register(registry_name, topic, opts) do
       :ok
     end
   end
@@ -41,10 +46,12 @@ defmodule EventStore.Registration.LocalRegistry do
   @doc """
   Broadcasts message on given topic.
   """
-  @spec broadcast(binary, term) :: :ok | {:error, term}
+  @spec broadcast(module, binary, term) :: :ok | {:error, term}
   @impl EventStore.Registration
-  def broadcast(topic, message) do
-    Registry.dispatch(EventStore.PubSub, topic, fn entries ->
+  def broadcast(event_store, topic, message) do
+    registry_name = registry_name(event_store)
+
+    Registry.dispatch(registry_name, topic, fn entries ->
       for {pid, opts} <- entries do
         notify_subscriber(pid, message, opts)
       end
@@ -71,4 +78,7 @@ defmodule EventStore.Registration.LocalRegistry do
 
   defp map(events, mapper) when is_function(mapper, 1), do: Enum.map(events, mapper)
   defp map(events, _mapper), do: events
+
+  defp registry_name(event_store),
+    do: Module.concat([event_store, EventStore.PubSub])
 end

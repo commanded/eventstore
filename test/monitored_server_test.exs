@@ -75,10 +75,10 @@ defmodule EventStore.MonitoredServerTest do
     reply_to = self()
 
     {:ok, pid} =
-      MonitoredServer.start_link([
-        {ObservedServer, :start_link, [[reply_to: reply_to, name: ObservedServer]]},
-        [name: MonitoredServer]
-      ])
+      MonitoredServer.start_link(
+        mfa: {ObservedServer, :start_link, [[reply_to: reply_to, name: ObservedServer]]},
+        name: MonitoredServer
+      )
 
     :ok = MonitoredServer.monitor(MonitoredServer)
 
