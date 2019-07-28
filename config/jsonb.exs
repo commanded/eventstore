@@ -5,7 +5,7 @@ config :logger, backends: []
 config :ex_unit,
   capture_log: true,
   assert_receive_timeout: 2_000,
-  refute_receive_timeout: 1_000
+  refute_receive_timeout: 100
 
 config :eventstore, TestEventStore,
   column_data_type: "jsonb",

@@ -26,15 +26,15 @@ defmodule EventStore.JsonbSerializer do
     end
   end
 
-  # See https://groups.google.com/d/msg/elixir-lang-talk/6geXOLUeIpI/L9einu4EEAAJ
   def to_struct(type, term) do
-    struct = struct(type)
-
-    Enum.reduce(Map.to_list(struct), struct, fn {k, _}, acc ->
-      case Map.fetch(term, Atom.to_string(k)) do
-        {:ok, v} -> %{acc | k => v}
-        :error -> acc
-      end
-    end)
+    struct(type, keys_to_atoms(term))
   end
+
+  defp keys_to_atoms(map) when is_map(map) do
+    for {key, value} <- map, into: %{} do
+      {String.to_existing_atom(key), keys_to_atoms(value)}
+    end
+  end
+
+  defp keys_to_atoms(value), do: value
 end
