@@ -3,7 +3,7 @@ defmodule EventStore.Config do
   Provides access to the EventStore configuration.
   """
 
-  @integer_url_query_params ["pool_size"]
+  @integer_url_query_params ["pool_size", "queue_target", "queue_interval"]
 
   @doc """
   Get the event store configuration for the environment.
