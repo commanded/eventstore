@@ -163,7 +163,9 @@ defmodule EventStore.Config do
 
     [
       pool_size: 10,
-      pool_overflow: 0
+      pool_overflow: 0,
+      queue_target: 5_000,
+      queue_interval: 10_000
     ]
     |> Keyword.merge(config)
     |> Keyword.take(
@@ -171,7 +173,9 @@ defmodule EventStore.Config do
         [
           :pool,
           :pool_size,
-          :pool_overflow
+          :pool_overflow,
+          :queue_target,
+          :queue_interval
         ]
     )
     |> Keyword.put(:backoff_type, :exp)
