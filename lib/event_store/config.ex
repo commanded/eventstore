@@ -164,8 +164,8 @@ defmodule EventStore.Config do
     [
       pool_size: 10,
       pool_overflow: 0,
-      queue_target: 5_000,
-      queue_interval: 10_000
+      queue_target: 50,
+      queue_interval: 1_000
     ]
     |> Keyword.merge(config)
     |> Keyword.take(

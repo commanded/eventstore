@@ -33,24 +33,30 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
         username: "postgres",
         password: "postgres",
         database: "eventstore",
-        hostname: "localhost",
-        # OR use a URL to connect instead
-        url: "postgres://postgres:postgres@localhost/eventstore",
+        hostname: "localhost"
+
+      # OR use a URL to connect instead
+      config :my_app, MyApp.EventStore,
+        serializer: EventStore.JsonSerializer,          
+        url: "postgres://postgres:postgres@localhost/eventstore"
+
+      # Configure optional database connection settings
+      config :my_app, MyApp.EventStore,
         pool_size: 10
         pool_overflow: 5
-        queue_target: 5_000
-        queue_interval: 10_000
+        queue_target: 50
+        queue_interval: 1_000
       ```
 
-  The database connection pool configuration options are:
+      The database connection pool configuration options are:
 
-  - `:pool_size` - The number of connections (default: `10`).
-  - `:pool_overflow` - The maximum number of overflow connections to start if all connections are checked out (default: `0`).
-  
-  Handling requests is done through a queue. When DBConnection is started, there are two relevant options to control the queue:
-  
-  - `:queue_target` - in milliseconds (default: `50`).
-  - `:queue_interval` - in milliseconds (default: `1000`).
+      - `:pool_size` - The number of connections (default: `10`).
+      - `:pool_overflow` - The maximum number of overflow connections to start if all connections are checked out (default: `0`).
+
+      Handling requests is done through a queue. When DBConnection is started, there are two relevant options to control the queue:
+
+      - `:queue_target` - in milliseconds (default: 50ms).
+      - `:queue_interval` - in milliseconds (default: 1,000ms).
 
   4. Add your event store module to the `event_stores` list for your app in mix config:
 
