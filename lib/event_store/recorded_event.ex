@@ -59,7 +59,7 @@ defmodule EventStore.RecordedEvent do
     %RecordedEvent{data: data, metadata: metadata, event_type: event_type} = recorded_event
 
     data =
-      case Application.get_env(:eventstore, :deserialize_event, true) do
+      case Application.get_env(:eventstore, :deserialize_events, true) do
         true -> serializer.deserialize(data, type: event_type)
         false -> data
       end
