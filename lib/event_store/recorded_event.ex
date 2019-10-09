@@ -60,8 +60,14 @@ defmodule EventStore.RecordedEvent do
 
     data =
       case Application.get_env(:eventstore, :deserialize_events, true) do
-        true -> serializer.deserialize(data, type: event_type)
-        false -> data
+        true ->
+          serializer.deserialize(data, type: event_type)
+
+        false ->
+          data
+
+        _ ->
+          raise ":eventstore, :deserialize_events must be a valid boolean value. (ie true or false)"
       end
 
     %RecordedEvent{
