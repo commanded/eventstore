@@ -208,6 +208,7 @@ EventStore exists thanks to the following people who have contributed.
 - [Ben Smith](https://github.com/slashdotdash)
 - [Bruce Williams](https://github.com/bruce)
 - [Chris Brodt](https://github.com/uberbrodt)
+- [Chris Martin](https://github.com/trbngr)
 - [Christian Green](https://github.com/Arthien)
 - [Craig Savolainen](https://github.com/maedhr)
 - [David Soff](https://github.com/Davidsoff)

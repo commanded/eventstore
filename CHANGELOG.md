@@ -4,6 +4,7 @@
 
 - Support multiple event stores ([#168](https://github.com/commanded/eventstore/pull/168)).
 - Add support for `queue_target` and `queue_interval` database connection settings ([#172](https://github.com/commanded/eventstore/pull/172)).
+- Add support for `created_at` values to be of type `NaiveDateTime` ([#175](https://github.com/commanded/eventstore/pull/175)).
 
 ### Upgrading
 
