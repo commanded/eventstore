@@ -71,6 +71,10 @@ defmodule EventStore.Storage.Reader do
 
     defp from_timestamp(%DateTime{} = timestamp), do: timestamp
 
+    defp from_timestamp(%NaiveDateTime{} = timestamp) do
+      timestamp |> DateTime.from_naive("Etc/UTC")
+    end
+
     if Code.ensure_loaded?(Postgrex.Timestamp) do
       defp from_timestamp(%Postgrex.Timestamp{} = timestamp) do
         %Postgrex.Timestamp{
