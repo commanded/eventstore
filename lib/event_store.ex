@@ -1,13 +1,13 @@
 defmodule EventStore do
   @moduledoc """
-  EventStore is an event store implemented in Elixir.
+  EventStore allows you to define one or more event store modules to append,
+  read, and subscribe to streams of events.
 
   It uses PostgreSQL (v9.5 or later) as the underlying storage engine.
 
-  ## Event stores
+  ## Defining an event store
 
-  `EventStore` is a wrapper around the event store database. We can define an
-  event store as follows:
+  We can define an event store in our own application as follows:
 
       defmodule MyApp.EventStore do
         use EventStore,
@@ -44,7 +44,7 @@ defmodule EventStore do
 
         def start(_type, _args) do
           children = [
-            {MyApp.EventStore, []}
+            MyApp.EventStore
           ]
 
           opts = [strategy: :one_for_one, name: MyApp.Supervisor]
@@ -320,10 +320,10 @@ defmodule EventStore do
       version. This is used to ensure you can only append to the stream if it is
       at exactly that version.
 
-      You can also provide one of the following values to affect the concurrency
+      You can also provide one of the following values to alter the concurrency
       check behaviour:
 
-      - `:any_version` - No concurrency checking; allow any stream version
+      - `:any_version` - No concurrency checking and allow any stream version
         (including no stream).
       - `:no_stream` - Ensure the stream does not exist.
       - `:stream_exists` - Ensure the stream exists.
@@ -711,11 +711,11 @@ defmodule EventStore do
               | {:error, reason :: term}
 
   @doc """
-  Acknowledge receipt of the given events received from a single stream, or all
-  streams, subscription.
+  Acknowledge receipt of the given events received from a subscription.
 
-  Accepts a `RecordedEvent`, a list of `RecordedEvent`s, or the event number of
-  the recorded event to acknowledge.
+  Accepts a single `EventStore.RecordedEvent` struct, a list of
+  `EventStore.RecordedEvent`s, or the event number of the recorded event to
+  acknowledge.
   """
   @callback ack(
               subscription :: pid,

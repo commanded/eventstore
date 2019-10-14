@@ -39,8 +39,11 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
       config :my_app, MyApp.EventStore,
         serializer: EventStore.JsonSerializer,          
         url: "postgres://postgres:postgres@localhost/eventstore"
+      ```
 
-      # Configure optional database connection settings
+      Configure optional database connection settings:
+
+      ```elixir
       config :my_app, MyApp.EventStore,
         pool_size: 10
         pool_overflow: 5
@@ -125,7 +128,7 @@ To enable native JSON support you need to configure your event store to use the 
 
 ```elixir
 # config/config.exs
-config :my_app, MyEventStore,
+config :my_app, MyApp.EventStore,
   column_data_type: "jsonb"
   serializer: EventStore.JsonbSerializer,
   types: EventStore.PostgresTypes

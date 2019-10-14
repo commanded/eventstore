@@ -16,23 +16,21 @@ PostgreSQL's [advisory locks](https://www.postgresql.org/docs/current/static/exp
 
 ## Running on a cluster
 
-1. Configure your EventStore module to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
+Configure your EventStore module to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
 
-      ```elixir
-      config :my_app, EventStore, registry: :distributed
-      ```
+```elixir
+config :my_app, MyApp.EventStore, registry: :distributed
+```
 
 ## Automatic cluster formation
 
 You can use [libcluster](https://github.com/bitwalker/libcluster) to automatically form clusters of Erlang nodes, with either static or dynamic node membership.
 
-You will need to include `libcluster` as an additional dependency:
+You will need to include `libcluster` as an additional dependency in `mix.exs`:
 
 ```elixir
 defp deps do
-  [
-    {:libcluster, "~> 2.2"},
-  ]
+  [{:libcluster, "~> 2.2"}]
 end
 ```
 
@@ -130,17 +128,31 @@ The Erlang equivalent of the `:kernerl` mix config, as above, is:
 
 The node specific `<node>.sys.config` files ensure the cluster is formed before starting your application, assuming this occurs within the 30 seconds timeout.
 
-Once the cluster has formed, you can use the EventStore API from any node.
+Once the cluster has formed, you can use your event store module from any node.
 
 ## Usage
 
-Using the EventStore when run on a cluster of nodes is identical to single node usage. You can subscribe to a stream, or all streams, on one node and append events to the stream on another. The subscription will be notified of the appended events.
+Using the event store when run on a cluster of nodes is identical to single node usage. You can subscribe to a stream, or all streams, on one node and append events to the stream on another. The subscription will be notified of the appended events.
 
 ### Append events to a stream
 
 ```elixir
+alias EventStore.EventData
+alias MyApp.EventStore
+
+defmodule ExampleEvent do
+  defstruct [:key]
+end
+
 stream_uuid = UUID.uuid4()
-events = EventStore.EventFactory.create_events(3)
+
+events = [
+  %EventData{
+    event_type: "Elixir.ExampleEvent",
+    data: %ExampleEvent{key: "value"},
+    metadata: %{user: "someuser@example.com"},
+  }
+]
 
 :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 ```
@@ -148,12 +160,16 @@ events = EventStore.EventFactory.create_events(3)
 ### Read all events
 
 ```elixir
+alias MyApp.EventStore
+
 recorded_events = EventStore.stream_all_forward() |> Enum.to_list()
 ```
 
 ### Subscribe to all Streams
 
 ```elixir
+alias MyApp.EventStore
+
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example-subscription", self(), start_from: :origin)
 
 receive do
@@ -165,6 +181,6 @@ receive do
   {:events, events} ->
     IO.puts("Received events: #{inspect(events)}")
 
-    EventStore.ack(subscription, events)
+    :ok = EventStore.ack(subscription, events)
 end
 ```

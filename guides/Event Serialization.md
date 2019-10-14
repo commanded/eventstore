@@ -47,7 +47,7 @@ end
 Configure the JSON serializer for your event store by setting the `serializer` option in the mix environment configuration file (e.g. `config/dev.exs`):
 
 ```elixir
-config :eventstore, MyEventStore, serializer: JsonSerializer
+config :eventstore, MyApp.EventStore, serializer: JsonSerializer
 ```
 
 You must set the `event_type` field to a string representing the type of event being persisted when using this serializer:

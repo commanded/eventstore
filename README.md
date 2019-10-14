@@ -62,6 +62,7 @@ end
 Append events to a stream:
 
 ```elixir
+alias EventStore.EventDat
 alias MyApp.EventStore
 
 defmodule ExampleEvent do
@@ -72,7 +73,7 @@ stream_uuid = UUID.uuid4()
 expected_version = 0
 
 events = [
-  %EventStore.EventData{
+  %EventData{
     event_type: "Elixir.ExampleEvent",
     data: %ExampleEvent{key: "value"},
     metadata: %{user: "someuser@example.com"}

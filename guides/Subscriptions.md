@@ -22,6 +22,8 @@ You can use `$all` as the stream identity to subscribe to events appended to all
 Subscribe to events appended to a *single* stream:
 
 ```elixir
+alias MyApp.EventStore
+
 :ok = EventStore.subscribe(stream_uuid)
 
 # receive first batch of events
@@ -36,13 +38,16 @@ end
 You can provide an event selector function that filters each `RecordedEvent` before sending it to the subscriber:
 
 ```elixir
+alias EventStore.RecordedEvent
+alias MyApp.EventStore
+
 EventStore.subscribe(stream_uuid, selector: fn
-  %EventStore.RecordedEvent{data: data} -> data != nil
+  %RecordedEvent{data: data} -> data != nil
 end)
 
 # receive first batch of mapped event data
 receive do
-  {:events, %EventStore.RecordedEvent{} = event_data} ->
+  {:events, %RecordedEvent{} = event_data} ->
     IO.puts("Received non nil event data: " <> inspect(event_data))
 end
 ```
@@ -53,8 +58,11 @@ end
 You can provide an event mapping function that maps each `RecordedEvent` before sending it to the subscriber:
 
 ```elixir
+alias EventStore.RecordedEvent
+alias MyApp.EventStore
+
 EventStore.subscribe(stream_uuid, mapper: fn
-  %EventStore.RecordedEvent{data: data} -> data
+  %RecordedEvent{data: data} -> data
 end)
 
 # receive first batch of mapped event data
@@ -70,7 +78,7 @@ Persistent subscriptions to a stream will guarantee *at least once* delivery of 
 
 A subscription can be created to receive events appended to a single or all streams.
 
-Subscriptions must be uniquely named and by default only support a single subscriber. Attempting to connect two subscribers to the same subscription will return `{:error, :subscription_already_exists}`. You can optionally create a [competing consumer subscription with multiple subscribers](#subscription-concurrency).
+Subscriptions must be uniquely named. By default a subscription only supports a single subscriber. Attempting to connect two subscribers to the same subscription will return `{:error, :subscription_already_exists}`. You can optionally create a [competing consumer subscription with multiple subscribers](#subscription-concurrency).
 
 ### `:subscribed` message
 
@@ -90,14 +98,16 @@ By default subscriptions are created from the stream origin; they will receive a
 - `:current` - subscribe to events from the current version.
 - `event_number` (integer) - specify an exact event number to subscribe from. This will be the same as the stream version for single stream subscriptions.
 
-### Ack received events
+### Acknowledge received events
 
-Receipt of each event by the subscriber must be acknowledged. This allows the subscription to resume on failure without missing an event.
+Receipt of each event by the subscriber must be acknowledged. This allows the subscription to resume on failure without missing an event and to indicate the subscription is ready to receive the next event.
 
-The subscriber receives an `{:events, events}` tuple containing the published events. The subscription returned when subscribing to the stream should be used to send the `ack` to. This is achieved by the `c:EventStore.ack/2` function:
+The subscriber receives an `{:events, events}` tuple containing the published events. A subscription is returned when subscribing to the stream. This should be used to send the acknowledgement to using the `c:EventStore.ack/2` function:
 
  ```elixir
- EventStore.ack(subscription, events)
+ alias MyApp.EventStore
+
+ :ok = EventStore.ack(subscription, events)
  ```
 
 A subscriber can confirm receipt of each event in a batch by sending multiple acks, one per event. The subscriber may confirm receipt of the last event in the batch in a single ack.
@@ -109,9 +119,11 @@ A subscriber will not receive further published events until it has confirmed re
 Subscribe to events appended to all streams:
 
 ```elixir
+alias MyApp.EventStore
+
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_all_subscription", self())
 
-# wait for the subscription confirmation
+# Wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
     IO.puts("Successfully subscribed to all streams")
@@ -121,14 +133,16 @@ receive do
   {:events, events} ->
     IO.puts "Received events: #{inspect events}"
 
-    # acknowledge receipt
-    EventStore.ack(subscription, events)
+    # Acknowledge receipt
+    :ok = EventStore.ack(subscription, events)
 end
 ```
 
 Unsubscribe from all streams:
 
 ```elixir
+alias MyApp.EventStore
+
 :ok = EventStore.unsubscribe_from_all_streams("example_all_subscription")
 ```
 
@@ -137,10 +151,12 @@ Unsubscribe from all streams:
 Subscribe to events appended to a *single* stream:
 
 ```elixir
+alias MyApp.EventStore
+
 stream_uuid = UUID.uuid4()
 {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, "example_single_subscription", self())
 
-# wait for the subscription confirmation
+# Wait for the subscription confirmation
 receive do
   {:subscribed, ^subscription} ->
     IO.puts("Successfully subscribed to single stream")
@@ -148,14 +164,16 @@ end
 
 receive do
   {:events, events} ->
-    # ... process events & acknowledge receipt
-    EventStore.ack(subscription, events)
+    # Process events & acknowledge receipt
+    :ok = EventStore.ack(subscription, events)
 end
 ```
 
 Unsubscribe from a single stream:
 
 ```elixir
+alias MyApp.EventStore
+
 :ok = EventStore.unsubscribe_from_stream(stream_uuid, "example_single_subscription")
 ```
 
@@ -172,6 +190,8 @@ The supported options are:
 Example all stream subscription that will receive new events appended after the subscription has been created:
 
 ```elixir
+alias MyApp.EventStore
+
 {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self(), start_from: :current)
 ```
 
@@ -182,7 +202,10 @@ You can provide an event selector function that run in the subscription process,
 Subscribe to all streams and provide a `selector` function that only sends data that the selector function returns `true` for.
 
 ```elixir
-selector = fn %EventStore.RecordedEvent{event_number: event_number} ->
+alias EventStore.RecordedEvent
+alias MyApp.EventStore
+
+selector = fn %RecordedEvent{event_number: event_number} ->
   rem(event_number) == 0
 end
 
@@ -199,7 +222,7 @@ receive do
     # ... process events & ack receipt using last `event_number`
     RecordedEvent{event_number: event_number} = List.last(filtered_events)
 
-    EventStore.ack(subscription, event_number)
+    :ok = EventStore.ack(subscription, event_number)
 end
 ```
 
@@ -210,7 +233,10 @@ You can provide an event mapping function that runs in the subscription process,
 Subscribe to all streams and provide a `mapper` function that sends only the event data:
 
 ```elixir
-mapper = fn %EventStore.RecordedEvent{event_number: event_number, data: data} ->
+alias EventStore.RecordedEvent
+alias MyApp.EventStore
+
+mapper = fn %RecordedEvent{event_number: event_number, data: data} ->
   {event_number, data}
 end
 
@@ -227,7 +253,7 @@ receive do
     # ... process events & ack receipt using last `event_number`
     {event_number, _data} = List.last(mapped_events)
 
-    EventStore.ack(subscription, event_number)
+    :ok = EventStore.ack(subscription, event_number)
 end
 ```
 
@@ -259,6 +285,7 @@ Partitioning gives you the benefits of competing consumers but still allows even
 
 ```elixir
 alias EventStore.RecordedEvent
+alias MyApp.EventStore
 
 by_stream = fn %RecordedEvent{stream_uuid: stream_uuid} -> stream_uuid end
 
@@ -280,6 +307,8 @@ Use a `GenServer` process to subscribe to the event store and track all notified
 defmodule Subscriber do
   use GenServer
 
+  alias MyApp.EventStore
+
   def start_link do
     GenServer.start_link(__MODULE__, [])
   end
@@ -289,7 +318,7 @@ defmodule Subscriber do
   end
 
   def init(events) do
-    # subscribe to events from all streams
+    # Subscribe to events from all streams
     {:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self())
 
     {:ok, %{events: events, subscription: subscription}}
@@ -304,8 +333,8 @@ defmodule Subscriber do
   def handle_info({:events, events}, state) do
     %{events: existing_events, subscription: subscription} = state
 
-    # confirm receipt of received events
-    EventStore.ack(subscription, events)
+    # Confirm receipt of received events
+    :ok = EventStore.ack(subscription, events)
 
     {:noreply, %{state | events: existing_events ++ events}}
   end
@@ -327,6 +356,8 @@ Start your subscriber process, which subscribes to all streams in the event stor
 You can delete a single stream or all stream subscription without requiring an active subscriber:
 
 ```elixir
+alias MyApp.EventStore
+
 :ok = EventStore.delete_subscription(stream_uuid, subscription_name)
 :ok = EventStore.delete_all_streams_subscription(subscription_name)
 ```
