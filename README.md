@@ -54,41 +54,40 @@ MIT License
 Define an event store module:
 
 ```elixir
-defmodule MyApp.EventStore do
+defmodule MyEventStore do
   use EventStore, otp_app: :my_app
+end
+```
+
+Create one or more event structs to be persisted (serialized to JSON by default):
+
+```elixir
+defmodule ExampleEvent do
+  defstruct [:key]
 end
 ```
 
 Append events to a stream:
 
 ```elixir
-alias EventStore.EventDat
-alias MyApp.EventStore
-
-defmodule ExampleEvent do
-  defstruct [:key]
-end
-
 stream_uuid = UUID.uuid4()
 expected_version = 0
 
 events = [
-  %EventData{
+  %EventStore.EventData{
     event_type: "Elixir.ExampleEvent",
     data: %ExampleEvent{key: "value"},
     metadata: %{user: "someuser@example.com"}
   }
 ]
 
-:ok = EventStore.append_to_stream(stream_uuid, expected_version, events)
+:ok = MyEventStore.append_to_stream(stream_uuid, expected_version, events)
 ```
 
 Read all events from a single stream, starting at the stream's first event:
 
 ```elixir
-alias MyApp.EventStore
-
-{:ok, events} = EventStore.read_stream_forward(stream_uuid)
+{:ok, events} = MyEventStore.read_stream_forward(stream_uuid)
 ```
 
 More: [Using the EventStore](guides/Usage.md)
@@ -96,9 +95,7 @@ More: [Using the EventStore](guides/Usage.md)
 Subscribe to events appended to all streams:
 
 ```elixir
-alias MyApp.EventStore
-
-{:ok, subscription} = EventStore.subscribe_to_all_streams("example_subscription", self())
+{:ok, subscription} = MyEventStore.subscribe_to_all_streams("example_subscription", self())
 
 # Wait for the subscription confirmation
 receive do
@@ -106,21 +103,14 @@ receive do
     IO.puts("Successfully subscribed to all streams")
 end
 
-receive_loop = fn loop ->
-  # Receive a batch of events appended to the event store
-  receive do
-    {:events, events} ->
-      IO.puts("Received events: #{inspect events}")
+# Receive a batch of events appended to the event store
+receive do
+  {:events, events} ->
+    IO.puts("Received events: #{inspect events}")
 
-      # Acknowledge successful receipt of events
-      EventStore.ack(subscription, events)
-  end
-
-  loop.(loop)
+    # Acknowledge successful receipt of events
+    :ok = MyEventStore.ack(subscription, events)
 end
-
-# Infinite receive loop
-receive_loop.(receive_loop)
 ```
 
 In production use you would use a [`GenServer` subscriber process](guides/Subscriptions.md#example-subscriber) and the `handle_info/2` callback to receive events.
