@@ -125,7 +125,7 @@ defmodule EventStore.Mixfile do
 
   defp package do
     [
-      files: ["lib", "priv", "guides", "mix.exs", "README*", "LICENSE*"],
+      files: ["lib", "priv/event_store", "guides", "mix.exs", "README*", "LICENSE*"],
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
       links: %{
