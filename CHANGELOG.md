@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## 1.0.0-rc.0
 
 - Support multiple event stores ([#168](https://github.com/commanded/eventstore/pull/168)).
 - Add support for `queue_target` and `queue_interval` database connection settings ([#172](https://github.com/commanded/eventstore/pull/172)).
