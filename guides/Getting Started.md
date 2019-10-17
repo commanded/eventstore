@@ -111,6 +111,37 @@ $ mix do event_store.drop, event_store.create, event_store.init
 
 *Warning* this will delete all EventStore data.
 
+## Initialize a database using a Elixir releases
+
+If you're using an Elixir release build by the task [mix release](https://hexdocs.pm/mix/Mix.Tasks.Release.html) you won't have `mix` available therefore you won't be able to run the following command in order to initialize a new database.
+
+```console
+$ mix do event_store.create, event_store.init
+```
+
+To do that you can use task modules defined inside EventStore (in `lib/mix/tasks`):
+
+* [Tasks.EventStore.Create](https://github.com/commanded/eventstore/blob/v1.0.0-rc.0/lib/event_store/tasks/create.ex)
+* [Tasks.EventStore.Init](https://github.com/commanded/eventstore/blob/v1.0.0-rc.0/lib/event_store/tasks/init.ex)
+
+ So you can take advantage of the [running one-off commands](https://hexdocs.pm/mix/Mix.Tasks.Release.html#module-one-off-commands-eval-and-rpc) supported by Mix release, using a helper module defined like this:
+
+```elixir
+defmodule MyApp.ReleaseTasks do
+  def init_event_store do
+    {:ok, _} = Application.ensure_all_started(:postgrex)
+    {:ok, _} = Application.ensure_all_started(:ssl)
+    
+    :ok = Application.load(:eventstore)
+
+    config = EventStore.Config.parsed()
+
+    :ok = EventStore.Tasks.Create.exec(config, [])
+    :ok = EventStore.Tasks.Init.exec(config, [])
+  end
+end
+```
+
 ## Event data and metadata data type
 
 EventStore has support for persisting event data and metadata as either:
