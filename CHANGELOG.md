@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Bug fixes
+
+- Fix function clause error on `DBConnection.ConnectionError` ([#167](https://github.com/commanded/eventstore/issues/167)).
+
 ## 1.0.0-rc.0
 
 - Support multiple event stores ([#168](https://github.com/commanded/eventstore/pull/168)).
