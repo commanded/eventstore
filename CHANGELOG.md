@@ -1,16 +1,16 @@
 # Changelog
 
-## Next release
+## v1.0.0
 
-### Bug fixes
-
-- Fix function clause error on `DBConnection.ConnectionError` ([#167](https://github.com/commanded/eventstore/issues/167)).
-
-## 1.0.0-rc.0
+### Enhancements
 
 - Support multiple event stores ([#168](https://github.com/commanded/eventstore/pull/168)).
 - Add support for `queue_target` and `queue_interval` database connection settings ([#172](https://github.com/commanded/eventstore/pull/172)).
 - Add support for `created_at` values to be of type `NaiveDateTime` ([#175](https://github.com/commanded/eventstore/pull/175)).
+
+### Bug fixes
+
+- Fix function clause error on `DBConnection.ConnectionError` ([#167](https://github.com/commanded/eventstore/issues/167)).
 
 ### Upgrading
 

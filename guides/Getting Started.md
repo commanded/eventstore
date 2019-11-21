@@ -6,7 +6,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       ```elixir
       def deps do
-        [{:eventstore, "~> 1.0.0-rc.0"}]
+        [{:eventstore, "~> 1.0.0"}]
       end
       ```
 
@@ -131,7 +131,7 @@ defmodule MyApp.ReleaseTasks do
   def init_event_store do
     {:ok, _} = Application.ensure_all_started(:postgrex)
     {:ok, _} = Application.ensure_all_started(:ssl)
-    
+
     :ok = Application.load(:eventstore)
 
     config = EventStore.Config.parsed()
