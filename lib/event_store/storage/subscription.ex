@@ -70,6 +70,8 @@ defmodule EventStore.Storage.Subscription do
 
     defp handle_response({:ok, %Postgrex.Result{rows: rows}}),
       do: {:ok, Subscription.Adapter.to_subscriptions(rows)}
+
+    defp handle_response({:error, error}), do: {:error, error}
   end
 
   defmodule Query do
@@ -90,6 +92,8 @@ defmodule EventStore.Storage.Subscription do
 
     defp handle_response({:ok, %Postgrex.Result{rows: rows}}),
       do: {:ok, Subscription.Adapter.to_subscription(rows)}
+
+    defp handle_response({:error, error}), do: {:error, error}
   end
 
   defmodule Subscribe do

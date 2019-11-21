@@ -43,7 +43,8 @@ defmodule EventStore.Storage.Appender do
             |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
           with :ok <- insert_stream_events(transaction, parameters, stream_id, event_count, opts),
-               :ok <- insert_link_events(transaction, parameters, @all_stream_id, event_count, opts) do
+               :ok <-
+                 insert_link_events(transaction, parameters, @all_stream_id, event_count, opts) do
             :ok
           else
             {:error, reason} -> Postgrex.rollback(transaction, reason)
@@ -176,12 +177,8 @@ defmodule EventStore.Storage.Appender do
   defp uuid(nil), do: nil
   defp uuid(uuid), do: UUID.string_to_binary!(uuid)
 
-  defp handle_response({:ok, %Postgrex.Result{num_rows: rows}}) do
-    case rows do
-      0 -> {:error, :not_found}
-      _ -> :ok
-    end
-  end
+  defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}), do: {:error, :not_found}
+  defp handle_response({:ok, %Postgrex.Result{}}), do: :ok
 
   defp handle_response({:error, %Postgrex.Error{} = error}) do
     %Postgrex.Error{
@@ -197,10 +194,10 @@ defmodule EventStore.Storage.Appender do
     end)
 
     case {error_code, constraint} do
-      {:foreign_key_violation, _} -> {:error, :not_found}
+      {:foreign_key_violation, _constraint} -> {:error, :not_found}
       {:unique_violation, "stream_events_pkey"} -> {:error, :duplicate_event}
-      {:unique_violation, _} -> {:error, :wrong_expected_version}
-      {reason, _} -> {:error, reason}
+      {:unique_violation, _constraint} -> {:error, :wrong_expected_version}
+      {error_code, _constraint} -> {:error, error_code}
     end
   end
 
