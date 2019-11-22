@@ -148,6 +148,7 @@ defmodule EventStore.Sql.Statements do
     CREATE OR REPLACE FUNCTION notify_events()
       RETURNS trigger AS $$
     DECLARE
+      channel text;
       payload text;
     BEGIN
         -- Payload text contains:
@@ -157,10 +158,11 @@ defmodule EventStore.Sql.Statements do
         --  * last `stream_version`
         -- Each separated by a comma (e.g. 'stream-12345,1,1,5')
 
+        channel := TG_TABLE_SCHEMA || '.events';
         payload := NEW.stream_uuid || ',' || NEW.stream_id || ',' || (OLD.stream_version + 1) || ',' || NEW.stream_version;
 
         -- Notify events to listeners
-        PERFORM pg_notify('events', payload);
+        PERFORM pg_notify(channel, payload);
 
         RETURN NULL;
     END;
