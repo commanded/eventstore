@@ -138,7 +138,7 @@ defmodule EventStore.Config do
     end
   end
 
-  @default_postgrex_opts [
+  @postgrex_connection_opts [
     :username,
     :password,
     :database,
@@ -152,7 +152,9 @@ defmodule EventStore.Config do
   ]
 
   def default_postgrex_opts(config) do
-    Keyword.take(config, @default_postgrex_opts)
+    config
+    |> Keyword.take(@postgrex_connection_opts)
+    |> Keyword.put(:after_connect, set_schema_search_path(config))
   end
 
   def postgrex_opts(config) do
@@ -166,7 +168,7 @@ defmodule EventStore.Config do
     ]
     |> Keyword.merge(config)
     |> Keyword.take(
-      @default_postgrex_opts ++
+      @postgrex_connection_opts ++
         [
           :pool,
           :pool_size,
@@ -177,6 +179,7 @@ defmodule EventStore.Config do
     )
     |> Keyword.put(:backoff_type, :exp)
     |> Keyword.put(:name, Module.concat([event_store, EventStore.Postgrex]))
+    |> Keyword.put(:after_connect, set_schema_search_path(config))
   end
 
   def sync_connect_postgrex_opts(config) do
@@ -220,5 +223,13 @@ defmodule EventStore.Config do
           :error -> default
         end
     end
+  end
+
+  # Set the Postgres connection's `search_path` to include only the configured
+  # schema. This will be `public` by default.
+  defp set_schema_search_path(config) do
+    schema = Keyword.fetch!(config, :schema)
+
+    {Postgrex, :query!, ["SET search_path TO #{schema};", []]}
   end
 end

@@ -4,16 +4,9 @@ defmodule EventStore.Tasks.Init do
   """
 
   import EventStore.Tasks.Output
-  alias EventStore.Storage.Initializer
 
-  @is_events_table_exists """
-    SELECT EXISTS (
-      SELECT 1
-      FROM   information_schema.tables
-      WHERE  table_schema = 'public'
-      AND    table_name = 'events'
-    )
-  """
+  alias EventStore.Config
+  alias EventStore.Storage.Initializer
 
   @doc """
   Runs task
@@ -29,10 +22,23 @@ defmodule EventStore.Tasks.Init do
   """
   def exec(event_store, config, opts) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
+    schema = Keyword.fetch!(config, :schema)
 
-    {:ok, conn} = Postgrex.start_link(config)
+    {:ok, conn} =
+      config
+      |> Config.default_postgrex_opts()
+      |> Postgrex.start_link()
 
-    case run_query!(conn, @is_events_table_exists) do
+    query = """
+      SELECT EXISTS (
+        SELECT 1
+        FROM   information_schema.tables
+        WHERE  table_schema = $1
+        AND    table_name = 'events'
+      )
+    """
+
+    case run_query!(conn, query, [schema]) do
       %{rows: [[true]]} ->
         write_info("The EventStore database has already been initialized.", opts)
 
@@ -48,7 +54,7 @@ defmodule EventStore.Tasks.Init do
     :ok
   end
 
-  defp run_query!(conn, query) do
-    Postgrex.query!(conn, query, [])
+  defp run_query!(conn, query, params) do
+    Postgrex.query!(conn, query, params)
   end
 end

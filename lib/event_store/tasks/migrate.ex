@@ -1,6 +1,6 @@
 defmodule EventStore.Tasks.Migrate do
   @moduledoc """
-    Task to migrate EventStore
+  Task to migrate EventStore
   """
 
   alias EventStore.Storage.Database
@@ -56,13 +56,15 @@ defmodule EventStore.Tasks.Migrate do
       path = Application.app_dir(:eventstore, "priv/event_store/migrations/v#{migration}.sql")
       script = File.read!(path)
 
-      case Database.migrate(config, script) do
+      case Database.execute(script, config) do
         :ok ->
           :ok
 
-        {:error, term} ->
+        {:error, error} ->
           raise_msg(
-            "The EventStore database couldn't be migrated, reason given: #{inspect(term)}.",
+            "The EventStore database couldn't be migrated, reason given: #{
+              inspect(Exception.message(error))
+            }.",
             opts
           )
       end
