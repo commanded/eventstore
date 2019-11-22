@@ -2,7 +2,7 @@ DO $$
 BEGIN
 
   CREATE OR REPLACE FUNCTION notify_events()
-    RETURNS trigger AS $$
+    RETURNS trigger AS $func$
   DECLARE
     channel text;
     payload text;
@@ -22,7 +22,7 @@ BEGIN
 
       RETURN NULL;
   END;
-  $$ LANGUAGE plpgsql;
+  $func$ LANGUAGE plpgsql;
 
   -- Record schema migration
   INSERT INTO schema_migrations (major_version, minor_version, patch_version) VALUES (1, 1, 0);
