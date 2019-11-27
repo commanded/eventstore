@@ -32,6 +32,12 @@ defmodule EventStore do
         url: "postgres://postgres:postgres@localhost/eventstore",
         pool_size: 1
 
+  **Note:** To use an EventStore with Commanded you should configure the event
+  store to use Commanded's JSON serializer which provides additional support for
+  JSON decoding:
+
+      config :my_app, MyApp.EventStore, serializer: Commanded.Serialization.JsonSerializer
+
   The event store module defines a `start_link/1` function that needs to be
   invoked before using the event store. In general, this function is not
   called directly, but included as part of your application supervision tree.

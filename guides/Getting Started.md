@@ -41,6 +41,14 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
         url: "postgres://postgres:postgres@localhost/eventstore"
       ```
 
+      **Note:** To use an EventStore with Commanded you should configure the event
+      store to use Commanded's JSON serializer which provides additional support for
+      JSON decoding:
+
+      ```elixir
+      config :my_app, MyApp.EventStore, serializer: Commanded.Serialization.JsonSerializer
+      ```
+
       Configure optional database connection settings:
 
       ```elixir
