@@ -142,10 +142,10 @@ defmodule MyApp.ReleaseTasks do
 
     :ok = Application.load(:eventstore)
 
-    config = EventStore.Config.parsed()
+    config = EventStore.Config.parsed(MyApp.EventStore, :my_app)
 
     :ok = EventStore.Tasks.Create.exec(config, [])
-    :ok = EventStore.Tasks.Init.exec(config, [])
+    :ok = EventStore.Tasks.Init.exec(MyApp.EventStore, config, [])
   end
 end
 ```
