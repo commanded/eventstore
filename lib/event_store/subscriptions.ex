@@ -28,7 +28,7 @@ defmodule EventStore.Subscriptions do
     :ok =
       Subscriptions.Supervisor.shutdown_subscription(event_store, stream_uuid, subscription_name)
 
-    conn = Module.concat(event_store, EventStore.Postgrex)
+    conn = Module.concat(event_store, Postgrex)
 
     Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
   end

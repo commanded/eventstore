@@ -13,8 +13,6 @@ defmodule EventStore.Streams.Stream do
     with {:ok, stream} <- stream_info(conn, stream_uuid, opts),
          {:ok, stream} <- prepare_stream(conn, expected_version, stream, opts) do
       do_append_to_storage(conn, events, stream, serializer, opts)
-    else
-      reply -> reply
     end
   end
 
@@ -24,24 +22,18 @@ defmodule EventStore.Streams.Stream do
     with {:ok, stream} <- stream_info(conn, stream_uuid, opts),
          {:ok, stream} <- prepare_stream(conn, expected_version, stream, opts) do
       do_link_to_storage(conn, events_or_event_ids, stream, opts)
-    else
-      reply -> reply
     end
   end
 
   def read_stream_forward(conn, stream_uuid, start_version, count, opts \\ []) do
-    {serializer, opts} = Keyword.pop(opts, :serializer)
-
-    with {:ok, stream} <- stream_info(conn, stream_uuid, opts) do
-      read_storage_forward(conn, start_version, count, stream, serializer, opts)
+    with {:ok, stream_id} <- stream_id(conn, stream_uuid, opts) do
+      read_storage_forward(conn, stream_id, start_version, count, opts)
     end
   end
 
-  def stream_forward(conn, stream_uuid, start_version, read_batch_size, opts \\ []) do
-    {serializer, opts} = Keyword.pop(opts, :serializer)
-
-    with {:ok, stream} <- stream_info(conn, stream_uuid, opts) do
-      stream_storage_forward(conn, start_version, read_batch_size, stream, serializer, opts)
+  def stream_forward(conn, stream_uuid, start_version, opts \\ []) do
+    with {:ok, stream_id} <- stream_id(conn, stream_uuid, opts) do
+      stream_storage_forward(conn, stream_id, start_version, opts)
     end
   end
 
@@ -59,13 +51,25 @@ defmodule EventStore.Streams.Stream do
   def start_from(_conn, _stream_uuid, _start_from, _opts),
     do: {:error, :invalid_start_from}
 
+  def stream_id(conn, stream_uuid, opts \\ []) do
+    opts = Keyword.take(opts, [:timeout])
+
+    with {:ok, stream_id, _stream_version} <- Storage.stream_info(conn, stream_uuid, opts) do
+      {:ok, stream_id}
+    end
+  end
+
   def stream_version(conn, stream_uuid, opts \\ []) do
+    opts = Keyword.take(opts, [:timeout])
+
     with {:ok, _stream_id, stream_version} <- Storage.stream_info(conn, stream_uuid, opts) do
       {:ok, stream_version}
     end
   end
 
   defp stream_info(conn, stream_uuid, opts) do
+    opts = Keyword.take(opts, [:timeout])
+
     with {:ok, stream_id, stream_version} <- Storage.stream_info(conn, stream_uuid, opts) do
       stream = %Stream{
         stream_uuid: stream_uuid,
@@ -213,17 +217,16 @@ defmodule EventStore.Streams.Stream do
 
   defp read_storage_forward(
          _conn,
+         stream_id,
          _start_version,
          _count,
-         %Stream{stream_id: stream_id},
-         _serializer,
          _opts
        )
        when is_nil(stream_id),
        do: {:error, :stream_not_found}
 
-  defp read_storage_forward(conn, start_version, count, %Stream{} = stream, serializer, opts) do
-    %Stream{stream_id: stream_id} = stream
+  defp read_storage_forward(conn, stream_id, start_version, count, opts) do
+    {serializer, opts} = Keyword.pop(opts, :serializer)
 
     case Storage.read_stream_forward(conn, stream_id, start_version, count, opts) do
       {:ok, recorded_events} ->
@@ -236,32 +239,20 @@ defmodule EventStore.Streams.Stream do
     end
   end
 
-  defp stream_storage_forward(
-         _conn,
-         _start_version,
-         _read_batch_size,
-         %Stream{stream_id: stream_id},
-         _serializer,
-         _opts
-       )
+  defp stream_storage_forward(_conn, stream_id, _start_version, _opts)
        when is_nil(stream_id),
        do: {:error, :stream_not_found}
 
-  defp stream_storage_forward(conn, 0, read_batch_size, stream, serializer, opts),
-    do: stream_storage_forward(conn, 1, read_batch_size, stream, serializer, opts)
+  defp stream_storage_forward(conn, stream_id, 0, opts),
+    do: stream_storage_forward(conn, stream_id, 1, opts)
 
-  defp stream_storage_forward(
-         conn,
-         start_version,
-         read_batch_size,
-         %Stream{} = stream,
-         serializer,
-         opts
-       ) do
+  defp stream_storage_forward(conn, stream_id, start_version, opts) do
+    read_batch_size = Keyword.fetch!(opts, :read_batch_size)
+
     Elixir.Stream.resource(
       fn -> start_version end,
       fn next_version ->
-        case read_storage_forward(conn, next_version, read_batch_size, stream, serializer, opts) do
+        case read_storage_forward(conn, stream_id, next_version, read_batch_size, opts) do
           {:ok, []} -> {:halt, next_version}
           {:ok, events} -> {events, next_version + length(events)}
         end

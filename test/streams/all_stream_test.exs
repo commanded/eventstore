@@ -28,7 +28,8 @@ defmodule EventStore.Streams.AllStreamTest do
       serializer: serializer
     } do
       read_events =
-        Stream.stream_forward(conn, @all_stream, 0, 1, serializer: serializer) |> Enum.to_list()
+        Stream.stream_forward(conn, @all_stream, 0, read_batch_size: 1, serializer: serializer)
+        |> Enum.to_list()
 
       assert length(read_events) == 6
     end
@@ -38,7 +39,8 @@ defmodule EventStore.Streams.AllStreamTest do
       serializer: serializer
     } do
       read_events =
-        Stream.stream_forward(conn, @all_stream, 0, 2, serializer: serializer) |> Enum.to_list()
+        Stream.stream_forward(conn, @all_stream, 0, read_batch_size: 2, serializer: serializer)
+        |> Enum.to_list()
 
       assert length(read_events) == 6
     end
@@ -48,7 +50,7 @@ defmodule EventStore.Streams.AllStreamTest do
       serializer: serializer
     } do
       read_events =
-        Stream.stream_forward(conn, @all_stream, 0, 1_000, serializer: serializer)
+        Stream.stream_forward(conn, @all_stream, 0, read_batch_size: 1_000, serializer: serializer)
         |> Enum.to_list()
 
       assert length(read_events) == 6

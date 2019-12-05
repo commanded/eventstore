@@ -157,9 +157,7 @@ defmodule EventStore.Config do
     |> Keyword.put(:after_connect, set_schema_search_path(config))
   end
 
-  def postgrex_opts(config) do
-    event_store = Keyword.fetch!(config, :event_store)
-
+  def postgrex_opts(config, name) do
     [
       pool_size: 10,
       pool_overflow: 0,
@@ -178,7 +176,7 @@ defmodule EventStore.Config do
         ]
     )
     |> Keyword.put(:backoff_type, :exp)
-    |> Keyword.put(:name, Module.concat([event_store, EventStore.Postgrex]))
+    |> Keyword.put(:name, Module.concat([name, Postgrex]))
     |> Keyword.put(:after_connect, set_schema_search_path(config))
   end
 
