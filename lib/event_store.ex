@@ -106,7 +106,8 @@ defmodule EventStore do
       @conn Module.concat([__MODULE__, EventStore.Postgrex])
 
       def config do
-        with {:ok, config} <- EventStore.Supervisor.runtime_config(__MODULE__, @otp_app, []) do
+        with {:ok, config} <-
+               EventStore.Supervisor.runtime_config(__MODULE__, @otp_app, unquote(opts)) do
           config
         end
       end
@@ -120,6 +121,7 @@ defmodule EventStore do
       end
 
       def start_link(opts \\ []) do
+        opts = Keyword.merge(unquote(opts), opts)
         EventStore.Supervisor.start_link(__MODULE__, @otp_app, @serializer, @registry, opts)
       end
 

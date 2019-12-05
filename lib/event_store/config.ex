@@ -39,21 +39,18 @@ defmodule EventStore.Config do
     |> Enum.reduce([], fn
       {:url, value}, config -> Keyword.merge(config, value |> get_config_value() |> parse_url())
       {:port, value}, config -> Keyword.put(config, :port, get_config_integer(value))
-      {:socket, value}, config -> Keyword.put(config, :socket, get_config_value(value))
-      {:socket_dir, value}, config -> Keyword.put(config, :socket_dir, get_config_value(value))
       {key, value}, config -> Keyword.put(config, key, get_config_value(value))
     end)
     |> Keyword.merge(pool: EventStore.Config.get_pool())
+    |> Keyword.put_new(:schema, "public")
   end
 
-  @doc """
-  Converts a database url into a Keyword list
-  """
-  def parse_url(url)
+  # Converts a database url into a Keyword list
+  defp parse_url(url)
 
-  def parse_url(""), do: []
+  defp parse_url(""), do: []
 
-  def parse_url(url) do
+  defp parse_url(url) do
     info = url |> URI.decode() |> URI.parse()
 
     if is_nil(info.host) do
@@ -94,13 +91,13 @@ defmodule EventStore.Config do
     |> URI.query_decoder()
     |> Enum.reduce([], fn
       {"ssl", "true"}, acc ->
-        [{:ssl, true}] ++ acc
+        [{:ssl, true} | acc]
 
       {"ssl", "false"}, acc ->
-        [{:ssl, false}] ++ acc
+        [{:ssl, false} | acc]
 
       {key, value}, acc when key in @integer_url_query_params ->
-        [{String.to_atom(key), parse_integer!(key, value)}] ++ acc
+        [{String.to_atom(key), parse_integer!(key, value)} | acc]
 
       {key, _value}, _acc ->
         raise ArgumentError, message: "unsupported query parameter `#{key}`"
@@ -126,7 +123,7 @@ defmodule EventStore.Config do
     - "bytea" - Allows storage of binary strings.
     - "jsonb" - Native JSON type, data is stored in a decomposed binary format
       that makes it slightly slower to input due to added conversion overhead,
-      but significantly faster to process, since no reparsing is needed
+      but significantly faster to process, since no reparsing is needed.
   """
   def column_data_type(event_store, config) do
     case Keyword.get(config, :column_data_type, "bytea") do
@@ -141,7 +138,7 @@ defmodule EventStore.Config do
     end
   end
 
-  @default_postgrex_opts [
+  @postgrex_connection_opts [
     :username,
     :password,
     :database,
@@ -155,7 +152,9 @@ defmodule EventStore.Config do
   ]
 
   def default_postgrex_opts(config) do
-    Keyword.take(config, @default_postgrex_opts)
+    config
+    |> Keyword.take(@postgrex_connection_opts)
+    |> Keyword.put(:after_connect, set_schema_search_path(config))
   end
 
   def postgrex_opts(config) do
@@ -169,7 +168,7 @@ defmodule EventStore.Config do
     ]
     |> Keyword.merge(config)
     |> Keyword.take(
-      @default_postgrex_opts ++
+      @postgrex_connection_opts ++
         [
           :pool,
           :pool_size,
@@ -180,6 +179,7 @@ defmodule EventStore.Config do
     )
     |> Keyword.put(:backoff_type, :exp)
     |> Keyword.put(:name, Module.concat([event_store, EventStore.Postgrex]))
+    |> Keyword.put(:after_connect, set_schema_search_path(config))
   end
 
   def sync_connect_postgrex_opts(config) do
@@ -223,5 +223,13 @@ defmodule EventStore.Config do
           :error -> default
         end
     end
+  end
+
+  # Set the Postgres connection's `search_path` to include only the configured
+  # schema. This will be `public` by default.
+  defp set_schema_search_path(config) do
+    schema = Keyword.fetch!(config, :schema)
+
+    {Postgrex, :query!, ["SET search_path TO #{schema};", []]}
   end
 end

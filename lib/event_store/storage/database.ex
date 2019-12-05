@@ -7,15 +7,12 @@ defmodule EventStore.Storage.Database do
 
   def drop(config), do: storage_down(config)
 
-  def migrate(opts, migration) do
+  def execute(sql, opts) do
     opts = Keyword.put(opts, :timeout, :infinity)
 
-    case run_query(migration, opts) do
-      {:ok, _} ->
-        :ok
-
-      {:error, error} ->
-        {:error, Exception.message(error)}
+    case run_query(sql, opts) do
+      {:ok, _} -> :ok
+      {:error, _error} = reply -> reply
     end
   end
 
@@ -72,7 +69,8 @@ defmodule EventStore.Storage.Database do
   # Taken from ecto/adapters/postgres.ex
   defp storage_up(opts) do
     database =
-      Keyword.fetch!(opts, :database) || raise ":database is nil in repository configuration"
+      Keyword.fetch!(opts, :database) ||
+        raise ":database is nil in repository configuration"
 
     encoding = opts[:encoding] || "UTF8"
     opts = Keyword.put(opts, :database, "postgres")

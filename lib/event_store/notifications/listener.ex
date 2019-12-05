@@ -14,13 +14,15 @@ defmodule EventStore.Notifications.Listener do
   alias EventStore.MonitoredServer
   alias EventStore.Notifications.Listener
 
-  defstruct [:listen_to, :ref, demand: 0, queue: :queue.new()]
+  defstruct [:listen_to, :schema, :ref, demand: 0, queue: :queue.new()]
 
   def start_link(opts \\ []) do
     listen_to = Keyword.fetch!(opts, :listen_to)
+    schema = Keyword.fetch!(opts, :schema)
+
     start_opts = Keyword.take(opts, [:name, :timeout, :debug, :spawn_opt])
 
-    state = %Listener{listen_to: listen_to}
+    state = %Listener{listen_to: listen_to, schema: schema}
 
     GenStage.start_link(__MODULE__, state, start_opts)
   end
@@ -86,9 +88,11 @@ defmodule EventStore.Notifications.Listener do
   end
 
   defp listen_for_events(%Listener{} = state) do
-    %Listener{listen_to: listen_to} = state
+    %Listener{listen_to: listen_to, schema: schema} = state
 
-    {:ok, ref} = Postgrex.Notifications.listen(listen_to, "events")
+    channel = schema <> ".events"
+
+    {:ok, ref} = Postgrex.Notifications.listen(listen_to, channel)
 
     %Listener{state | ref: ref}
   end

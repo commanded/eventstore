@@ -45,6 +45,8 @@ defmodule EventStore.Notifications.Supervisor do
 
   @impl Supervisor
   def init({event_store, registry, serializer, config}) do
+    schema = Keyword.fetch!(config, :schema)
+
     postgrex_config = Config.sync_connect_postgrex_opts(config)
 
     listener_name = Module.concat([event_store, Listener])
@@ -66,7 +68,7 @@ defmodule EventStore.Notifications.Supervisor do
            mfa: {Postgrex, :start_link, [postgrex_config]}, name: postgrex_reader_name},
           id: Module.concat([postgrex_reader_name, MonitoredServer])
         ),
-        {Listener, listen_to: postgrex_listener_name, name: listener_name},
+        {Listener, listen_to: postgrex_listener_name, schema: schema, name: listener_name},
         {Reader,
          conn: postgrex_reader_name,
          serializer: serializer,

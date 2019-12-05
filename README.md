@@ -183,6 +183,20 @@ The purpose of the benchmark suite is to measure the performance impact of propo
 
 The benchmark suite is configured to use Erlang's [external term format](http://erlang.org/doc/apps/erts/erl_ext_dist.html) serialization. Using another serialization format, such as JSON, will likely have a negative impact on performance.
 
+## Testing
+
+Create and initialize the test event store databases:
+
+```
+MIX_ENV=test mix event_store.setup
+```
+
+Run the test suite:
+
+```
+mix test
+```
+
 ## Contributing
 
 Pull requests to contribute new or improved features, and extend documentation are most welcome.

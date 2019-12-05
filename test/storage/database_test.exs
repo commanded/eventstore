@@ -6,8 +6,7 @@ defmodule EventStore.Storage.DatabaseTest do
 
   setup do
     config =
-      TestEventStore
-      |> Config.parsed(:eventstore)
+      TestEventStore.config()
       |> Config.default_postgrex_opts()
       |> Keyword.update!(:database, fn database -> database <> "_temp" end)
 

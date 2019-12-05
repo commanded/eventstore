@@ -148,6 +148,7 @@ defmodule EventStore.Sql.Statements do
     CREATE OR REPLACE FUNCTION notify_events()
       RETURNS trigger AS $$
     DECLARE
+      channel text;
       payload text;
     BEGIN
         -- Payload text contains:
@@ -157,10 +158,11 @@ defmodule EventStore.Sql.Statements do
         --  * last `stream_version`
         -- Each separated by a comma (e.g. 'stream-12345,1,1,5')
 
+        channel := TG_TABLE_SCHEMA || '.events';
         payload := NEW.stream_uuid || ',' || NEW.stream_id || ',' || (OLD.stream_version + 1) || ',' || NEW.stream_version;
 
         -- Notify events to listeners
-        PERFORM pg_notify('events', payload);
+        PERFORM pg_notify(channel, payload);
 
         RETURN NULL;
     END;
@@ -227,7 +229,7 @@ defmodule EventStore.Sql.Statements do
   defp record_event_store_schema_version do
     """
     INSERT INTO schema_migrations (major_version, minor_version, patch_version)
-    VALUES (0, 17, 0);
+    VALUES (1, 1, 0);
     """
   end
 
@@ -400,15 +402,33 @@ defmodule EventStore.Sql.Statements do
     """
   end
 
+  @doc """
+  Use two 32-bit key values for advisory locks where the first key acts as the
+  namespace.
+
+  The namespace key is derived from the unique `oid` value for the `subscriptions`
+  table. The `oid` is unique within a database and differs for identically named
+  tables defined in different schemas and on repeat table definitions.
+
+  This change aims to prevent lock collision with application level
+  advisory lock usage and other libraries using Postgres advisory locks. Now
+  there is a 1 in 2,147,483,647 chance of colliding with other locks.
+  """
   def try_advisory_lock do
     """
-    SELECT pg_try_advisory_lock($1);
+    SELECT pg_try_advisory_lock(
+      'subscriptions'::regclass::oid::int,
+      (CASE WHEN $1 > 2147483647 THEN mod($1, 2147483647) ELSE $1 END)::int
+    );
     """
   end
 
   def advisory_unlock do
     """
-    SELECT pg_advisory_unlock($1);
+    SELECT pg_advisory_unlock(
+      'subscriptions'::regclass::oid::int,
+      (CASE WHEN $1 > 2147483647 THEN mod($1, 2147483647) ELSE $1 END)::int
+    );
     """
   end
 

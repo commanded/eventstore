@@ -150,6 +150,29 @@ defmodule MyApp.ReleaseTasks do
 end
 ```
 
+## Using Postgres schemas
+
+A Postgres database contains one or more [named schemas](https://www.postgresql.org/docs/current/ddl-schemas.html), which in turn contain tables. By default tables are defined in a schema named "public".
+
+An EventStore an be configured to use a different schema name. Specify the schema when using the `EventStore` macro in your event store module:
+
+```elixir
+defmodule MyApp.EventStore do
+  use EventStore, otp_app: :my_app, schema: "example"
+end
+```
+
+Or define it in environment config when configuring the database connection settings:
+
+```elixir
+# config/config.exs
+config :my_app, MyApp.EventStore, schema: "example"
+```
+
+This feature allows you to define and start multiple event stores sharing a single Postgres database, but with their data isolated and segregated by schema.
+
+Note the `mix event_store.<task>` tasks to create, initialize, and drop an event store database will also handle creating and/or dropping the schema.
+
 ## Event data and metadata data type
 
 EventStore has support for persisting event data and metadata as either:
