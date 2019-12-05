@@ -81,10 +81,10 @@ defmodule EventStore.AppendToStreamTest do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(8_001)
 
-    assert :ok = EventStore.append_to_stream(stream_uuid, 0, events, :infinity)
+    assert :ok = EventStore.append_to_stream(stream_uuid, 0, events, timeout: :infinity)
 
-    assert 1..8_001 |> Enum.to_list() ==
-             EventStore.stream_all_forward() |> Stream.map(& &1.event_number) |> Enum.to_list()
+    assert EventStore.stream_all_forward() |> Stream.map(& &1.event_number) |> Enum.to_list() ==
+             Enum.to_list(1..8_001)
   end
 
   defp append_events_to_stream(_context) do
