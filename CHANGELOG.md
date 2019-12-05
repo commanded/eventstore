@@ -1,5 +1,25 @@
 # Changelog
 
+## Next release
+
+### Enhancements
+
+- Support Postgres schemas ([#182](https://github.com/commanded/eventstore/pull/182)).
+
+### Upgrading
+
+Upgrade an existing EventStore database by running:
+
+```console
+mix event_store.migrate
+```
+
+You can drop and recreate an EventStore database by running:
+
+```console
+mix do event_store.drop, event_store.create, event_store.init
+```
+
 ## v1.0.0
 
 ### Enhancements
