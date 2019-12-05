@@ -83,6 +83,29 @@ defmodule SchemaTest do
     end
   end
 
+  test "should support subscriptions to different schemas" do
+    stream_uuid = UUID.uuid4()
+
+    {:ok, subscription1} = SchemaEventStore.subscribe_to_stream(stream_uuid, "test", self())
+    {:ok, subscription2} = TestEventStore.subscribe_to_stream(stream_uuid, "test", self())
+
+    assert_receive {:subscribed, ^subscription1}
+    assert_receive {:subscribed, ^subscription2}
+
+    events = EventFactory.create_events(1)
+
+    :ok = SchemaEventStore.append_to_stream(stream_uuid, 0, events)
+    :ok = TestEventStore.append_to_stream(stream_uuid, 0, events)
+
+    assert_receive {:events, received_events}
+    assert_events(events, received_events)
+
+    assert_receive {:events, received_events}
+    assert_events(events, received_events)
+
+    refute_receive {:events, _received_events}
+  end
+
   defp append_events_to_stream(_context) do
     stream_uuid = UUID.uuid4()
 
