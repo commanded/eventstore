@@ -15,12 +15,10 @@ defmodule EventStore.Supervisor do
   @doc """
   Starts the event store supervisor.
   """
-  def start_link(event_store, otp_app, serializer, registry, opts) do
-    name = Keyword.get(opts, :name, event_store)
-
+  def start_link(event_store, otp_app, serializer, registry, name, opts) do
     Supervisor.start_link(
       __MODULE__,
-      {event_store, otp_app, serializer, registry, opts, name},
+      {event_store, otp_app, serializer, registry, name, opts},
       name: name
     )
   end
@@ -58,7 +56,7 @@ defmodule EventStore.Supervisor do
   ## Supervisor callbacks
 
   @doc false
-  def init({event_store, otp_app, serializer, registry, opts, name}) do
+  def init({event_store, otp_app, serializer, registry, name, opts}) do
     case runtime_config(event_store, otp_app, opts) do
       {:ok, config} ->
         advisory_locks_name = Module.concat([name, AdvisoryLocks])

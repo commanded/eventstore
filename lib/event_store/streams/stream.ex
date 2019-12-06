@@ -52,7 +52,7 @@ defmodule EventStore.Streams.Stream do
     do: {:error, :invalid_start_from}
 
   def stream_id(conn, stream_uuid, opts \\ []) do
-    opts = Keyword.take(opts, [:timeout])
+    opts = query_opts(opts)
 
     with {:ok, stream_id, _stream_version} <- Storage.stream_info(conn, stream_uuid, opts) do
       {:ok, stream_id}
@@ -60,7 +60,7 @@ defmodule EventStore.Streams.Stream do
   end
 
   def stream_version(conn, stream_uuid, opts \\ []) do
-    opts = Keyword.take(opts, [:timeout])
+    opts = query_opts(opts)
 
     with {:ok, _stream_id, stream_version} <- Storage.stream_info(conn, stream_uuid, opts) do
       {:ok, stream_version}
@@ -68,7 +68,7 @@ defmodule EventStore.Streams.Stream do
   end
 
   defp stream_info(conn, stream_uuid, opts) do
-    opts = Keyword.take(opts, [:timeout])
+    opts = query_opts(opts)
 
     with {:ok, stream_id, stream_version} <- Storage.stream_info(conn, stream_uuid, opts) do
       stream = %Stream{
@@ -88,6 +88,8 @@ defmodule EventStore.Streams.Stream do
          opts
        )
        when is_nil(stream_id) and expected_version in [0, :any_version, :no_stream] do
+    opts = query_opts(opts)
+
     with {:ok, stream_id} <- Storage.create_stream(conn, stream_uuid, opts) do
       {:ok, %Stream{state | stream_id: stream_id}}
     end
@@ -191,16 +193,13 @@ defmodule EventStore.Streams.Stream do
   end
 
   defp do_link_to_storage(conn, events_or_event_ids, %Stream{stream_id: stream_id}, opts) do
-    Storage.link_to_stream(
-      conn,
-      stream_id,
-      Enum.map(events_or_event_ids, &extract_event_id/1),
-      opts
-    )
+    event_ids = Enum.map(events_or_event_ids, &extract_event_id/1)
+
+    Storage.link_to_stream(conn, stream_id, event_ids, opts)
   end
 
   defp extract_event_id(%RecordedEvent{event_id: event_id}), do: event_id
-  defp extract_event_id(event_id) when is_bitstring(event_id), do: event_id
+  defp extract_event_id(event_id) when is_binary(event_id), do: event_id
 
   defp extract_event_id(invalid) do
     raise ArgumentError, message: "Invalid event id, expected a UUID but got: #{inspect(invalid)}"
@@ -215,13 +214,7 @@ defmodule EventStore.Streams.Stream do
     Storage.append_to_stream(conn, stream_id, prepared_events, opts)
   end
 
-  defp read_storage_forward(
-         _conn,
-         stream_id,
-         _start_version,
-         _count,
-         _opts
-       )
+  defp read_storage_forward(_conn, stream_id, _start_version, _count, _opts)
        when is_nil(stream_id),
        do: {:error, :stream_not_found}
 
@@ -263,4 +256,6 @@ defmodule EventStore.Streams.Stream do
 
   defp deserialize_recorded_events(recorded_events, serializer),
     do: Enum.map(recorded_events, &RecordedEvent.deserialize(&1, serializer))
+
+  defp query_opts(opts), do: Keyword.take(opts, [:timeout])
 end

@@ -12,6 +12,12 @@ defmodule DynamicEventStoreTest do
       :ok
     end
 
+    test "should ensure name is an atom" do
+      assert_raise ArgumentError,
+                   "expected :name option to be an atom but got: \"invalid\"",
+                   fn -> {:ok, _pid} = EventStore.start_link(name: "invalid") end
+    end
+
     test "should append and read events" do
       stream_uuid = UUID.uuid4()
 
@@ -22,6 +28,35 @@ defmodule DynamicEventStoreTest do
 
       assert EventStore.stream_forward(stream_uuid, 0, name: :schema_eventstore) ==
                {:error, :stream_not_found}
+    end
+
+    test "should support subscriptions to named event stores" do
+      stream_uuid = UUID.uuid4()
+
+      {:ok, subscription1} =
+        EventStore.subscribe_to_stream(stream_uuid, "test1", self(), name: :eventstore1)
+
+      {:ok, subscription2} =
+        EventStore.subscribe_to_stream(stream_uuid, "test2", self(), name: :eventstore2)
+
+      {:ok, subscription3} =
+        EventStore.subscribe_to_stream(stream_uuid, "test3", self(), name: :schema_eventstore)
+
+      assert [subscription1, subscription2, subscription3] |> Enum.uniq() |> length()
+
+      assert_receive {:subscribed, ^subscription1}
+      assert_receive {:subscribed, ^subscription2}
+      assert_receive {:subscribed, ^subscription3}
+
+      {:ok, events} = append_events_to_stream(:eventstore1, stream_uuid, 1)
+
+      assert_receive {:events, received_events}
+      assert_events(events, received_events)
+
+      assert_receive {:events, received_events}
+      assert_events(events, received_events)
+
+      refute_receive {:events, _received_events}
     end
   end
 

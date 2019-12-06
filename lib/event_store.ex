@@ -117,8 +117,6 @@ defmodule EventStore do
       @default_count 1_000
       @default_timeout 15_000
 
-      @default_conn Module.concat([__MODULE__, Postgrex])
-
       def config do
         with {:ok, config} <-
                EventStore.Supervisor.runtime_config(__MODULE__, @otp_app, unquote(opts)) do
@@ -127,8 +125,10 @@ defmodule EventStore do
       end
 
       def child_spec(opts) do
+        name = name(opts)
+
         %{
-          id: Keyword.get(opts, :name, __MODULE__),
+          id: name,
           start: {__MODULE__, :start_link, [opts]},
           type: :supervisor
         }
@@ -136,12 +136,13 @@ defmodule EventStore do
 
       def start_link(opts \\ []) do
         opts = Keyword.merge(unquote(opts), opts)
+        name = name(opts)
 
-        EventStore.Supervisor.start_link(__MODULE__, @otp_app, @serializer, @registry, opts)
+        EventStore.Supervisor.start_link(__MODULE__, @otp_app, @serializer, @registry, name, opts)
       end
 
-      def stop(pid, timeout \\ 5000) do
-        Supervisor.stop(pid, :normal, timeout)
+      def stop(supervisor, timeout \\ 5000) do
+        Supervisor.stop(supervisor, :normal, timeout)
       end
 
       def append_to_stream(stream_uuid, expected_version, events, opts \\ [])
@@ -212,7 +213,7 @@ defmodule EventStore do
         do: stream_forward(@all_stream, start_version, opts)
 
       def subscribe(stream_uuid, opts \\ []) do
-        name = Keyword.get(opts, :name, __MODULE__)
+        name = name(opts)
 
         Registration.subscribe(name, @registry, stream_uuid, opts)
       end
@@ -222,7 +223,7 @@ defmodule EventStore do
 
         with {start_from, opts} <- Keyword.pop(opts, :start_from, :origin),
              {:ok, start_from} <- Stream.start_from(conn, stream_uuid, start_from) do
-          name = Keyword.get(opts, :name, __MODULE__)
+          name = name(opts)
 
           opts =
             Keyword.merge(opts,
@@ -249,25 +250,25 @@ defmodule EventStore do
       end
 
       def unsubscribe_from_stream(stream_uuid, subscription_name, opts \\ []) do
-        name = Keyword.get(opts, :name, __MODULE__)
+        name = name(opts)
 
         Subscriptions.unsubscribe_from_stream(name, stream_uuid, subscription_name)
       end
 
       def unsubscribe_from_all_streams(subscription_name, opts \\ []) do
-        name = Keyword.get(opts, :name, __MODULE__)
+        name = name(opts)
 
         Subscriptions.unsubscribe_from_stream(name, @all_stream, subscription_name)
       end
 
       def delete_subscription(stream_uuid, subscription_name, opts \\ []) do
-        name = Keyword.get(opts, :name, __MODULE__)
+        name = name(opts)
 
         Subscriptions.delete_subscription(__MODULE__, stream_uuid, subscription_name)
       end
 
       def delete_all_streams_subscription(subscription_name, opts \\ []) do
-        name = Keyword.get(opts, :name, __MODULE__)
+        name = name(opts)
 
         Subscriptions.delete_subscription(__MODULE__, @all_stream, subscription_name)
       end
@@ -291,15 +292,27 @@ defmodule EventStore do
       end
 
       defp opts(opts) do
-        conn =
-          case Keyword.get(opts, :name) do
-            nil -> @default_conn
-            name -> Module.concat([name, Postgrex])
-          end
-
+        name = name(opts)
         timeout = timeout(opts)
+        conn = Module.concat([name, Postgrex])
 
         {conn, [timeout: timeout, serializer: @serializer]}
+      end
+
+      defp name(opts) do
+        case Keyword.get(opts, :name) do
+          nil ->
+            __MODULE__
+
+          name when is_atom(name) ->
+            name
+
+          invalid ->
+            raise ArgumentError,
+              message:
+                "expected :name option to be an atom but got: " <>
+                  inspect(invalid)
+        end
       end
 
       defp timeout(opts) do
@@ -316,7 +329,7 @@ defmodule EventStore do
           invalid ->
             raise ArgumentError,
               message:
-                "Invalid timeout provided, expected an integer or :infinity but got: " <>
+                "expected :name option to be an integer or :infinity but got: " <>
                   inspect(invalid)
         end
       end
@@ -356,7 +369,7 @@ defmodule EventStore do
   @doc """
   Shuts down the event store.
   """
-  @callback stop(pid, timeout) :: :ok
+  @callback stop(Supervisor.supervisor(), timeout) :: :ok
 
   @doc """
   Append one or more events to a stream atomically.
