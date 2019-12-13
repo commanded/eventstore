@@ -24,8 +24,8 @@ defmodule EventStore.Registration.DistributedForwarder do
     :ok
   end
 
-  def init(_args) do
-    {:ok, []}
+  def init(event_store) do
+    {:ok, event_store}
   end
 
   def handle_info({:broadcast, topic, message}, event_store) do
