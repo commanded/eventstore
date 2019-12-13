@@ -6,6 +6,10 @@
 
 - Support Postgres schemas ([#182](https://github.com/commanded/eventstore/pull/182)).
 
+### Bug fixes
+
+- Fix `EventStore.Registration.DistributedForwarder` state when running multiple nodes ([#186](https://github.com/commanded/eventstore/pull/186)).
+
 ### Upgrading
 
 Upgrade an existing EventStore database by running:

@@ -217,6 +217,7 @@ EventStore exists thanks to the following people who have contributed.
 - [Christian Green](https://github.com/Arthien)
 - [Craig Savolainen](https://github.com/maedhr)
 - [David Soff](https://github.com/Davidsoff)
+- [Diogo Scudelletti](https://github.com/scudelletti)
 - [Dominik Guzei](https://github.com/DominikGuzei)
 - [Douglas Vought](https://github.com/voughtdq)
 - [Eamon Taaffe](https://github.com/eamontaaffe)
