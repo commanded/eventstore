@@ -42,7 +42,7 @@ defmodule DynamicEventStoreTest do
       {:ok, subscription3} =
         EventStore.subscribe_to_stream(stream_uuid, "test3", self(), name: :schema_eventstore)
 
-      assert [subscription1, subscription2, subscription3] |> Enum.uniq() |> length()
+      assert [subscription1, subscription2, subscription3] |> Enum.uniq() |> length() == 3
 
       assert_receive {:subscribed, ^subscription1}
       assert_receive {:subscribed, ^subscription2}
@@ -53,6 +53,42 @@ defmodule DynamicEventStoreTest do
       assert_receive {:events, received_events}
       assert_events(events, received_events)
 
+      assert_receive {:events, received_events}
+      assert_events(events, received_events)
+
+      refute_receive {:events, _received_events}
+    end
+
+    test "should unsubscribe and delete subscription from named event store" do
+      stream_uuid = UUID.uuid4()
+
+      {:ok, subscription1} =
+        EventStore.subscribe_to_stream(stream_uuid, "test1", self(), name: :eventstore1)
+
+      {:ok, subscription2} =
+        EventStore.subscribe_to_stream(stream_uuid, "test2", self(), name: :eventstore2)
+
+      assert_receive {:subscribed, ^subscription1}
+      assert_receive {:subscribed, ^subscription2}
+
+      {:ok, events} = append_events_to_stream(:eventstore1, stream_uuid, 1)
+
+      assert_receive {:events, received_events}
+      assert_events(events, received_events)
+
+      assert_receive {:events, received_events}
+      assert_events(events, received_events)
+
+      refute_receive {:events, _received_events}
+
+      assert :ok = EventStore.unsubscribe_from_stream(stream_uuid, "test1", name: :eventstore1)
+      assert :ok = EventStore.delete_subscription(stream_uuid, "test1", name: :eventstore1)
+
+      # Recreate subscription from `:origin` should receive all events again
+      {:ok, subscription1} =
+        EventStore.subscribe_to_stream(stream_uuid, "test1", self(), name: :eventstore1)
+
+      assert_receive {:subscribed, ^subscription1}
       assert_receive {:events, received_events}
       assert_events(events, received_events)
 

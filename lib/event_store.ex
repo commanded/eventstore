@@ -264,13 +264,13 @@ defmodule EventStore do
       def delete_subscription(stream_uuid, subscription_name, opts \\ []) do
         name = name(opts)
 
-        Subscriptions.delete_subscription(__MODULE__, stream_uuid, subscription_name)
+        Subscriptions.delete_subscription(name, stream_uuid, subscription_name)
       end
 
       def delete_all_streams_subscription(subscription_name, opts \\ []) do
         name = name(opts)
 
-        Subscriptions.delete_subscription(__MODULE__, @all_stream, subscription_name)
+        Subscriptions.delete_subscription(name, @all_stream, subscription_name)
       end
 
       def read_snapshot(source_uuid, opts \\ []) do
@@ -293,8 +293,9 @@ defmodule EventStore do
 
       defp opts(opts) do
         name = name(opts)
-        timeout = timeout(opts)
         conn = Module.concat([name, Postgrex])
+
+        timeout = timeout(opts)
 
         {conn, [timeout: timeout, serializer: @serializer]}
       end
