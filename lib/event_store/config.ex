@@ -3,7 +3,8 @@ defmodule EventStore.Config do
   Provides access to the EventStore configuration.
   """
 
-  @integer_url_query_params ["pool_size", "queue_target", "queue_interval"]
+  @integer_url_query_params ["pool_size", "queue_target", "queue_interval", "timeout"]
+  @integer_config_keys [:port, :timeout]
 
   @doc """
   Get the event store configuration for the environment.
@@ -37,9 +38,14 @@ defmodule EventStore.Config do
   def parse(config) do
     config
     |> Enum.reduce([], fn
-      {:url, value}, config -> Keyword.merge(config, value |> get_config_value() |> parse_url())
-      {:port, value}, config -> Keyword.put(config, :port, get_config_integer(value))
-      {key, value}, config -> Keyword.put(config, key, get_config_value(value))
+      {:url, value}, config ->
+        Keyword.merge(config, value |> get_config_value() |> parse_url())
+
+      {key, value}, config when key in @integer_config_keys ->
+        Keyword.put(config, key, get_config_integer(value))
+
+      {key, value}, config ->
+        Keyword.put(config, key, get_config_value(value))
     end)
     |> Keyword.merge(pool: EventStore.Config.get_pool())
     |> Keyword.put_new(:schema, "public")
@@ -148,7 +154,8 @@ defmodule EventStore.Config do
     :socket,
     :socket_dir,
     :ssl,
-    :ssl_opts
+    :ssl_opts,
+    :timeout
   ]
 
   def default_postgrex_opts(config) do

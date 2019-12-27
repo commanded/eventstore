@@ -10,11 +10,13 @@ defmodule EventStore.ConfigTest do
       database: "eventstore_test",
       password: "postgres",
       schema: "example",
+      timeout: 120_000,
       pool: EventStore.Config.get_pool()
     ]
 
     assert Config.parse(config) ==
              [
+               timeout: 120_000,
                schema: "example",
                password: "postgres",
                database: "eventstore_test",
@@ -30,12 +32,14 @@ defmodule EventStore.ConfigTest do
       socket: "/path/to/socket",
       database: "eventstore_test",
       password: "postgres",
+      timeout: 120_000,
       pool: EventStore.Config.get_pool()
     ]
 
     assert Config.parse(config) ==
              [
                schema: "public",
+               timeout: 120_000,
                password: "postgres",
                database: "eventstore_test",
                socket: "/path/to/socket",
@@ -50,12 +54,14 @@ defmodule EventStore.ConfigTest do
       socket_dir: "/path/to/socket_dir",
       database: "eventstore_test",
       password: "postgres",
+      timeout: 120_000,
       pool: EventStore.Config.get_pool()
     ]
 
     assert Config.parse(config) ==
              [
                schema: "public",
+               timeout: 120_000,
                password: "postgres",
                database: "eventstore_test",
                socket_dir: "/path/to/socket_dir",
@@ -79,7 +85,9 @@ defmodule EventStore.ConfigTest do
   end
 
   test "parse url with query parameters" do
-    config = [url: "postgres://username:password@localhost/database?ssl=true&pool_size=5"]
+    config = [
+      url: "postgres://username:password@localhost/database?ssl=true&pool_size=5&timeout=120000"
+    ]
 
     assert Config.parse(config) ==
              [
@@ -88,6 +96,7 @@ defmodule EventStore.ConfigTest do
                password: "password",
                database: "database",
                hostname: "localhost",
+               timeout: 120_000,
                pool_size: 5,
                ssl: true,
                pool: EventStore.Config.get_pool()
@@ -116,7 +125,8 @@ defmodule EventStore.ConfigTest do
       "ES_PASSWORD" => "password",
       "ES_DATABASE" => "database",
       "ES_HOSTNAME" => "hostname",
-      "ES_PORT" => "5432"
+      "ES_PORT" => "5432",
+      "ES_TIMEOUT" => "120000"
     })
 
     config = [
@@ -124,12 +134,14 @@ defmodule EventStore.ConfigTest do
       password: {:system, "ES_PASSWORD"},
       database: {:system, "ES_DATABASE"},
       hostname: {:system, "ES_HOSTNAME"},
-      port: {:system, "ES_PORT"}
+      port: {:system, "ES_PORT"},
+      timeout: {:system, "ES_TIMEOUT"}
     ]
 
     assert Config.parse(config) ==
              [
                schema: "public",
+               timeout: 120_000,
                port: 5432,
                hostname: "hostname",
                database: "database",
