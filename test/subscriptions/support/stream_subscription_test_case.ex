@@ -7,7 +7,7 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
     alias EventStore.Subscriptions.SubscriptionFsm
 
     @event_store TestEventStore
-    @conn TestEventStore.EventStore.Postgrex
+    @conn TestEventStore.Postgrex
     @subscription_name "test_subscription"
 
     setup [:start_subscriber]

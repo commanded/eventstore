@@ -8,12 +8,10 @@ defmodule EventStore.Snapshots.Snapshotter do
   Read a snapshot, if available, for a given source.
   """
   def read_snapshot(conn, source_uuid, serializer, opts \\ []) do
-    case Snapshot.read_snapshot(conn, source_uuid, opts) do
-      {:ok, snapshot} ->
-        {:ok, SnapshotData.deserialize(snapshot, serializer)}
+    with {:ok, snapshot} <- Snapshot.read_snapshot(conn, source_uuid, opts) do
+      deserialized = SnapshotData.deserialize(snapshot, serializer)
 
-      reply ->
-        reply
+      {:ok, deserialized}
     end
   end
 
@@ -23,9 +21,9 @@ defmodule EventStore.Snapshots.Snapshotter do
   Returns `:ok` on success.
   """
   def record_snapshot(conn, %SnapshotData{} = snapshot, serializer, opts \\ []) do
-    snapshot_data = SnapshotData.serialize(snapshot, serializer)
+    serialized = SnapshotData.serialize(snapshot, serializer)
 
-    Snapshot.record_snapshot(conn, snapshot_data, opts)
+    Snapshot.record_snapshot(conn, serialized, opts)
   end
 
   @doc """
@@ -33,6 +31,7 @@ defmodule EventStore.Snapshots.Snapshotter do
 
   Returns `:ok` on success.
   """
-  def delete_snapshot(conn, source_uuid, opts \\ []),
-    do: Snapshot.delete_snapshot(conn, source_uuid, opts)
+  def delete_snapshot(conn, source_uuid, opts \\ []) do
+    Snapshot.delete_snapshot(conn, source_uuid, opts)
+  end
 end

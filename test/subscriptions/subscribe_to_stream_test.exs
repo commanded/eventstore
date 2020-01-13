@@ -7,7 +7,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   alias TestEventStore, as: EventStore
 
   @event_store TestEventStore
-  @conn TestEventStore.EventStore.Postgrex
+  @conn TestEventStore.Postgrex
 
   setup do
     subscription_name = UUID.uuid4()

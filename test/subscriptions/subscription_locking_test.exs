@@ -4,7 +4,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   alias EventStore.{Config, EventFactory, ProcessHelper, Storage}
   alias EventStore.Subscriptions.Subscription
 
-  @conn TestEventStore.EventStore.Postgrex
+  @conn TestEventStore.Postgrex
 
   setup do
     subscription_name = UUID.uuid4()

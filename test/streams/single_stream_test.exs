@@ -177,7 +177,10 @@ defmodule EventStore.Streams.SingleStreamTest do
     unknown_stream_uuid = UUID.uuid4()
 
     assert {:error, :stream_not_found} =
-             Stream.stream_forward(conn, unknown_stream_uuid, 0, 1, serializer: serializer)
+             Stream.stream_forward(conn, unknown_stream_uuid, 0,
+               read_batch_size: 1,
+               serializer: serializer
+             )
   end
 
   describe "read stream forward" do
@@ -204,7 +207,8 @@ defmodule EventStore.Streams.SingleStreamTest do
       stream_uuid: stream_uuid
     } do
       read_events =
-        Stream.stream_forward(conn, stream_uuid, 0, 1, serializer: serializer) |> Enum.to_list()
+        Stream.stream_forward(conn, stream_uuid, 0, read_batch_size: 1, serializer: serializer)
+        |> Enum.to_list()
 
       assert length(read_events) == 3
       assert pluck(read_events, :event_number) == [1, 2, 3]
@@ -217,7 +221,8 @@ defmodule EventStore.Streams.SingleStreamTest do
       stream_uuid: stream_uuid
     } do
       read_events =
-        Stream.stream_forward(conn, stream_uuid, 0, 2, serializer: serializer) |> Enum.to_list()
+        Stream.stream_forward(conn, stream_uuid, 0, read_batch_size: 2, serializer: serializer)
+        |> Enum.to_list()
 
       assert length(read_events) == 3
     end
@@ -228,7 +233,7 @@ defmodule EventStore.Streams.SingleStreamTest do
       stream_uuid: stream_uuid
     } do
       read_events =
-        Stream.stream_forward(conn, stream_uuid, 0, 1_000, serializer: serializer)
+        Stream.stream_forward(conn, stream_uuid, 0, read_batch_size: 1_000, serializer: serializer)
         |> Enum.to_list()
 
       assert length(read_events) == 3
@@ -240,7 +245,8 @@ defmodule EventStore.Streams.SingleStreamTest do
       stream_uuid: stream_uuid
     } do
       read_events =
-        Stream.stream_forward(conn, stream_uuid, 2, 1, serializer: serializer) |> Enum.to_list()
+        Stream.stream_forward(conn, stream_uuid, 2, read_batch_size: 1, serializer: serializer)
+        |> Enum.to_list()
 
       assert length(read_events) == 2
       assert pluck(read_events, :event_number) == [2, 3]
@@ -250,7 +256,8 @@ defmodule EventStore.Streams.SingleStreamTest do
     test "should stream events from single stream with starting version offset outside range",
          %{conn: conn, serializer: serializer, stream_uuid: stream_uuid} do
       read_events =
-        Stream.stream_forward(conn, stream_uuid, 4, 1, serializer: serializer) |> Enum.to_list()
+        Stream.stream_forward(conn, stream_uuid, 4, read_batch_size: 1, serializer: serializer)
+        |> Enum.to_list()
 
       assert length(read_events) == 0
     end

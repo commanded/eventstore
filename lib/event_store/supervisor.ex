@@ -15,13 +15,11 @@ defmodule EventStore.Supervisor do
   @doc """
   Starts the event store supervisor.
   """
-  def start_link(event_store, otp_app, serializer, registry, opts) do
-    sup_opts = if name = Keyword.get(opts, :name, event_store), do: [name: name], else: []
-
+  def start_link(event_store, otp_app, serializer, registry, name, opts) do
     Supervisor.start_link(
       __MODULE__,
-      {event_store, otp_app, serializer, registry, opts},
-      sup_opts
+      {event_store, otp_app, serializer, registry, name, opts},
+      name: name
     )
   end
 
@@ -42,7 +40,7 @@ defmodule EventStore.Supervisor do
     config =
       Application.get_env(otp_app, event_store, [])
       |> Keyword.merge(opts)
-      |> Keyword.merge(otp_app: otp_app, event_store: event_store)
+      |> Keyword.put(:otp_app, otp_app)
 
     case event_store_init(event_store, config) do
       {:ok, config} ->
@@ -58,17 +56,17 @@ defmodule EventStore.Supervisor do
   ## Supervisor callbacks
 
   @doc false
-  def init({event_store, otp_app, serializer, registry, opts}) do
+  def init({event_store, otp_app, serializer, registry, name, opts}) do
     case runtime_config(event_store, otp_app, opts) do
       {:ok, config} ->
-        advisory_locks_name = Module.concat([event_store, AdvisoryLocks])
+        advisory_locks_name = Module.concat([name, AdvisoryLocks])
         advisory_locks_postgrex_name = Module.concat([advisory_locks_name, Postgrex])
-        subscriptions_name = Module.concat([event_store, Subscriptions.Supervisor])
-        subscriptions_registry_name = Module.concat([event_store, Subscriptions.Registry])
+        subscriptions_name = Module.concat([name, Subscriptions.Supervisor])
+        subscriptions_registry_name = Module.concat([name, Subscriptions.Registry])
 
         children =
           [
-            {Postgrex, Config.postgrex_opts(config)},
+            {Postgrex, Config.postgrex_opts(config, name)},
             MonitoredServer.child_spec(
               mfa: {Postgrex, :start_link, [Config.sync_connect_postgrex_opts(config)]},
               name: advisory_locks_postgrex_name
@@ -79,8 +77,8 @@ defmodule EventStore.Supervisor do
               {Registry, keys: :unique, name: subscriptions_registry_name},
               id: subscriptions_registry_name
             ),
-            {Notifications.Supervisor, {event_store, registry, serializer, config}}
-          ] ++ Registration.child_spec(event_store, registry)
+            {Notifications.Supervisor, {name, registry, serializer, config}}
+          ] ++ Registration.child_spec(name, registry)
 
         Supervisor.init(children, strategy: :one_for_all)
 
