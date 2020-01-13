@@ -469,7 +469,7 @@ defmodule EventStore do
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
       - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15_000ms.
+        milliseconds. Defaults to 15,000ms.
 
   Returns `:ok` on success, or an `{:error, reason}` tagged tuple. The returned
   error may be due to one of the following reasons:
@@ -522,7 +522,7 @@ defmodule EventStore do
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
       - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15_000ms.
+        milliseconds. Defaults to 15,000ms.
 
   Returns `:ok` on success, or an `{:error, reason}` tagged tuple. The returned
   error may be due to one of the following reasons:
@@ -562,7 +562,7 @@ defmodule EventStore do
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
       - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15_000ms.
+        milliseconds. Defaults to 15,000ms.
   """
   @callback read_stream_forward(
               stream_uuid :: String.t(),
@@ -584,7 +584,7 @@ defmodule EventStore do
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
       - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15_000ms.
+        milliseconds. Defaults to 15,000ms.
   """
   @callback read_all_streams_forward(
               start_event_number :: non_neg_integer,
@@ -602,7 +602,7 @@ defmodule EventStore do
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
       - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15_000ms.
+        milliseconds. Defaults to 15,000ms.
       - `read_batch_size` optionally, the number of events to read at a time
         from storage. Defaults to reading 1,000 events per batch.
   """
@@ -622,7 +622,7 @@ defmodule EventStore do
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
       - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15_000ms.
+        milliseconds. Defaults to 15,000ms.
       - `read_batch_size` optionally, the number of events to read at a time from
         storage. Defaults to reading 1,000 events per batch.
   """
