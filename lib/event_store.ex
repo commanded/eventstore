@@ -189,7 +189,7 @@ defmodule EventStore do
       @all_stream "$all"
       @default_batch_size 1_000
       @default_count 1_000
-      @default_timeout 15_000
+      @default_timeout config[:timeout] || 15_000
 
       def config do
         with {:ok, config} <-
