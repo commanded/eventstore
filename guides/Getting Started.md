@@ -122,7 +122,7 @@ $ mix do event_store.drop, event_store.create, event_store.init
 
 *Warning* this will delete all EventStore data.
 
-## Initialize a database using a Elixir releases
+## Initialize a database using an Elixir release
 
 If you're using an Elixir release build by the task [mix release](https://hexdocs.pm/mix/Mix.Tasks.Release.html) you won't have `mix` available therefore you won't be able to run the following command in order to initialize a new database.
 
