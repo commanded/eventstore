@@ -66,6 +66,12 @@ defmodule MyEventStore do
 end
 ```
 
+Start the event store:
+
+```elixir
+{:ok, _pid} = MyEventStore.start_link()
+```
+
 Create one or more event structs to be persisted (serialized to JSON by default):
 
 ```elixir
@@ -97,7 +103,7 @@ Read all events from a single stream, starting at the stream's first event:
 {:ok, events} = MyEventStore.read_stream_forward(stream_uuid)
 ```
 
-More: [Using the EventStore](guides/Usage.md)
+More: [Usage guide](guides/Usage.md)
 
 Subscribe to events appended to all streams:
 
@@ -122,7 +128,7 @@ end
 
 In production use you would use a [`GenServer` subscriber process](guides/Subscriptions.md#example-subscriber) and the `handle_info/2` callback to receive events.
 
-More: [Subscribe to streams](guides/Subscriptions.md)
+More: [Subscriptions guide](guides/Subscriptions.md)
 
 ## Used in production?
 
