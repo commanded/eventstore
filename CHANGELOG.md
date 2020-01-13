@@ -5,6 +5,7 @@
 ### Enhancements
 
 - Support Postgres schemas ([#182](https://github.com/commanded/eventstore/pull/182)).
+- Dynamic event store ([#184](https://github.com/commanded/eventstore/pull/184)).
 
 ### Bug fixes
 
