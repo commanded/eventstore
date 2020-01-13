@@ -27,10 +27,13 @@ defmodule EventStore do
         username: "postgres",
         password: "postgres",
         database: "eventstore",
-        hostname: "localhost",
-        # OR use a URL to connect instead
-        url: "postgres://postgres:postgres@localhost/eventstore",
-        pool_size: 1
+        hostname: "localhost"
+
+  Or use a URL to connect instead:
+
+      config :my_app, MyApp.EventStore,
+        serializer: EventStore.JsonSerializer,
+        url: "postgres://postgres:postgres@localhost/eventstore"
 
   **Note:** To use an EventStore with Commanded you should configure the event
   store to use Commanded's JSON serializer which provides additional support for
@@ -60,6 +63,77 @@ defmodule EventStore do
   Each event store module (e.g. `MyApp.EventStore`) provides a public API to
   read events from and write events to an event stream, and subscribe to event
   notifications.
+
+  ## Postgres schema
+
+  By default the `public` schema will be used for event store tables. An event
+  store can be configured to use an alternate Postgres schema:
+
+      defmodule MyApp.EventStore do
+        use EventStore, otp_app: :my_app, schema: "schema_name"
+      end
+
+  Or define it in environment config when configuring the database connection
+  settings:
+
+      # config/config.exs
+      config :my_app, MyApp.EventStore, schema: "example"
+
+  This feature allows you to define and start multiple event stores sharing a
+  single Postgres database, but with their data isolated and segregated by
+  schema.
+
+  Note the `mix event_store.<task>` tasks to create, initialize, and drop an
+  event store database will also handle creating and/or dropping the schema.
+
+  ## Dynamic named event store
+
+  An event store can be started multiple times by providing a name when
+  starting. The name must be provided as an option to all event store operations
+  to identify the correct instance.
+
+  ### Example
+
+  Define an event store:
+
+      defmodule MyApp.EventStore do
+        use EventStore, otp_app: :eventstore
+      end
+
+  Start multiple instances of the event store, each with a unique name:
+
+      {:ok, _pid} = EventStore.start_link(name: :eventstore1)
+      {:ok, _pid} = EventStore.start_link(name: :eventstore2)
+      {:ok, _pid} = EventStore.start_link(name: :eventstore3)
+
+  Use an event store by providing a name:
+
+      :ok = EventStore.append_to_stream(stream_uuid, expected_version, events, name: :eventstore1)
+
+      {:ok, events} = EventStore.read_stream_forward(stream_uuid, 0, 1_000, name: :eventstore1)
+
+  ## Dynamic schemas
+
+  This feature also allows you to start each event store instance using a
+  different schema:
+
+      {:ok, _pid} = EventStore.start_link(name: :tenant1, schema: "tenant1")
+      {:ok, _pid} = EventStore.start_link(name: :tenant2, schema: "tenant2")
+
+  Or start supervised:
+
+      children =
+        for tenant <- [:tenant1, :tenant2, :tenant3] do
+          {MyApp.EventStore, name: :tenant1, schema: Atom.to_string("tenant1")}
+        end
+
+      opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+      Supervisor.start_link(children, opts)
+
+  The above can be used for multi-tenancy where the data for each tenant is
+  stored in a separate schema.
+
+  ## Guides
 
   Please refer to the following guides to learn more:
 

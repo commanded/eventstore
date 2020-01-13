@@ -56,7 +56,8 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
         pool_size: 10
         pool_overflow: 5
         queue_target: 50
-        queue_interval: 1_000
+        queue_interval: 1_000,
+        schema: "schema_name"
       ```
 
       The database connection pool configuration options are:
@@ -68,6 +69,8 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       - `:queue_target` - in milliseconds (default: 50ms).
       - `:queue_interval` - in milliseconds (default: 1,000ms).
+
+      A Postgres schema can be defined using the `:schema` option. By default the `public` schema is used.
 
   4. Add your event store module to the `event_stores` list for your app in mix config:
 
