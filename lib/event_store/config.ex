@@ -3,9 +3,6 @@ defmodule EventStore.Config do
   Provides access to the EventStore configuration.
   """
 
-  @integer_url_query_params ["pool_size", "queue_target", "queue_interval", "timeout"]
-  @integer_config_keys [:port, :timeout]
-
   @doc """
   Get the event store configuration for the environment.
   """
@@ -41,7 +38,7 @@ defmodule EventStore.Config do
       {:url, value}, config ->
         Keyword.merge(config, value |> get_config_value() |> parse_url())
 
-      {key, value}, config when key in @integer_config_keys ->
+      {key, value}, config when key in [:port, :timeout] ->
         Keyword.put(config, key, get_config_integer(value))
 
       {key, value}, config ->
@@ -89,8 +86,7 @@ defmodule EventStore.Config do
         do: {k, if(is_binary(v), do: URI.decode(v), else: v)}
   end
 
-  defp parse_uri_query(%URI{query: nil}),
-    do: []
+  defp parse_uri_query(%URI{query: nil}), do: []
 
   defp parse_uri_query(%URI{query: query}) do
     query
@@ -102,7 +98,7 @@ defmodule EventStore.Config do
       {"ssl", "false"}, acc ->
         [{:ssl, false} | acc]
 
-      {key, value}, acc when key in @integer_url_query_params ->
+      {key, value}, acc when key in ["pool_size", "queue_target", "queue_interval", "timeout"] ->
         [{String.to_atom(key), parse_integer!(key, value)} | acc]
 
       {key, _value}, _acc ->

@@ -6,6 +6,7 @@
 
 - Support Postgres schemas ([#182](https://github.com/commanded/eventstore/pull/182)).
 - Dynamic event store ([#184](https://github.com/commanded/eventstore/pull/184)).
+- Add `timeout` option to config ([#189](https://github.com/commanded/eventstore/pull/189)).
 
 ### Bug fixes
 

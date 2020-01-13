@@ -70,7 +70,10 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
       - `:queue_target` - in milliseconds (default: 50ms).
       - `:queue_interval` - in milliseconds (default: 1,000ms).
 
-      A Postgres schema can be defined using the `:schema` option. By default the `public` schema is used.
+      Additional options:
+
+      - `:schema` - define the Postgres schema to use (default: `public` schema).
+      - `:timeout` - set the default database query timeout in milliseconds (default: 15,000ms).
 
   4. Add your event store module to the `event_stores` list for your app in mix config:
 
