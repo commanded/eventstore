@@ -3,8 +3,10 @@ defmodule EventStore.Tasks.Migrate do
   Task to migrate EventStore
   """
 
-  alias EventStore.Storage.Database
   import EventStore.Tasks.Output
+
+  alias EventStore.Config
+  alias EventStore.Storage.Database
 
   @available_migrations [
     "0.13.0",
@@ -28,6 +30,8 @@ defmodule EventStore.Tasks.Migrate do
   """
   def exec(config, opts) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
+
+    config = Config.default_postgrex_opts(config)
 
     migrations =
       case event_store_schema_version(config) do

@@ -38,7 +38,7 @@ defmodule EventStore.Tasks.Init do
       )
     """
 
-    case run_query!(conn, query, [schema]) do
+    case Postgrex.query!(conn, query, [schema]) do
       %{rows: [[true]]} ->
         write_info("The EventStore database has already been initialized.", opts)
 
@@ -52,9 +52,5 @@ defmodule EventStore.Tasks.Init do
     true = Process.exit(conn, :shutdown)
 
     :ok
-  end
-
-  defp run_query!(conn, query, params) do
-    Postgrex.query!(conn, query, params)
   end
 end
