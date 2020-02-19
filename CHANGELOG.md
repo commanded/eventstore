@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Bug fixes
+
+- Fix `EventStore.Registration.DistributedForwarder` state when running multiple nodes ([#186](https://github.com/commanded/eventstore/pull/186)).
+
 ## v1.0.0
 
 ### Enhancements
