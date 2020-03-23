@@ -15,32 +15,8 @@ defmodule EventStore.Notifications.Supervisor do
   alias EventStore.MonitoredServer
   alias EventStore.Notifications.{Listener, Reader, Broadcaster}
 
-  @doc """
-  Starts a globally named supervisor process.
-
-  This is to ensure only a single instance of the supervisor, and its
-  supervised children, is kept running on a cluster of nodes.
-  """
-  def start_link({event_store, _registry, _serializer, _config} = args) do
-    name = {:global, Module.concat([event_store, __MODULE__])}
-
-    case Supervisor.start_link(__MODULE__, args, name: name) do
-      {:ok, pid} ->
-        {:ok, pid}
-
-      {:error, :killed} ->
-        # Process may be killed due to `:global` name registation when another node connects.
-        # Attempting to start again should link to the other named existing process.
-        start_link(args)
-
-      {:error, {:already_started, pid}} ->
-        true = Process.link(pid)
-
-        {:ok, pid}
-
-      reply ->
-        reply
-    end
+  def start_link(arg) do
+    Supervisor.start_link(__MODULE__, arg)
   end
 
   @impl Supervisor

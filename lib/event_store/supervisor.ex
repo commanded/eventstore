@@ -79,7 +79,8 @@ defmodule EventStore.Supervisor do
               {Registry, keys: :unique, name: subscriptions_registry_name},
               id: subscriptions_registry_name
             ),
-            {Notifications.Supervisor, {event_store, registry, serializer, config}}
+            {EventStore.Notifications.GlobalRunner,
+             {Notifications.Supervisor, {event_store, registry, serializer, config}}}
           ] ++ Registration.child_spec(event_store, registry)
 
         Supervisor.init(children, strategy: :one_for_all)

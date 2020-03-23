@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+#### Enhancements
+
+- Prevent double supervision by starting / stopping supervisor manually ([#194](https://github.com/commanded/eventstore/pull/194)).
+
 ## v1.0.1
 
 ### Bug fixes

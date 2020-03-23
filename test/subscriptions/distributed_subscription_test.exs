@@ -1,6 +1,8 @@
 defmodule EventStore.Subscriptions.DistributedSubscriptionTest do
   use ExUnit.Case
 
+  @moduletag :distributed
+
   setup do
     :ok = LocalCluster.start()
 
@@ -13,7 +15,8 @@ defmodule EventStore.Subscriptions.DistributedSubscriptionTest do
     test "can be terminated on host node" do
       {nodes, pids} = start_distributed_event_store_on_nodes(3)
 
-      supervisor = :global.whereis_name(DistributedEventStore.EventStore.Notifications.Supervisor)
+      supervisor =
+        :global.whereis_name(DistributedEventStore.EventStore.Notifications.GlobalRunner)
 
       {node, pid} =
         [nodes, pids]
@@ -27,7 +30,8 @@ defmodule EventStore.Subscriptions.DistributedSubscriptionTest do
     test "can be terminated on remote node" do
       {nodes, pids} = start_distributed_event_store_on_nodes(3)
 
-      supervisor = :global.whereis_name(DistributedEventStore.EventStore.Notifications.Supervisor)
+      supervisor =
+        :global.whereis_name(DistributedEventStore.EventStore.Notifications.GlobalRunner)
 
       {node, pid} =
         [nodes, pids]
