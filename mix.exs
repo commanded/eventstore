@@ -50,6 +50,7 @@ defmodule EventStore.Mixfile do
       {:benchfella, "~> 0.3", only: :bench},
       {:dialyxir, "~> 0.5", only: [:dev, :test]},
       {:ex_doc, "~> 0.21", only: :dev},
+      {:local_cluster, "~> 1.1", only: [:test]},
       {:mix_test_watch, "~> 1.0", only: :dev}
     ]
   end
