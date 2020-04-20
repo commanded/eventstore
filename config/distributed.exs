@@ -8,6 +8,7 @@ config :logger,
 
 config :ex_unit,
   capture_log: true,
+  include: [:distributed],
   assert_receive_timeout: 10_000,
   refute_receive_timeout: 2_000
 
@@ -22,4 +23,26 @@ config :eventstore, TestEventStore,
   serializer: EventStore.JsonSerializer,
   subscription_retry_interval: 1_000
 
-config :eventstore, event_stores: [TestEventStore]
+config :eventstore, SecondEventStore,
+  username: "postgres",
+  password: "postgres",
+  database: "eventstore_test_2",
+  hostname: "localhost",
+  pool_size: 1,
+  pool_overflow: 0,
+  registry: :distributed,
+  serializer: EventStore.JsonSerializer,
+  subscription_retry_interval: 1_000
+
+config :eventstore, DistributedEventStore,
+  username: "postgres",
+  password: "postgres",
+  database: "eventstore_test",
+  hostname: "localhost",
+  pool_size: 1,
+  pool_overflow: 0,
+  registry: :distributed,
+  serializer: EventStore.JsonSerializer,
+  subscription_retry_interval: 1_000
+
+config :eventstore, event_stores: [DistributedEventStore]

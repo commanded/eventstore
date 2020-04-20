@@ -33,4 +33,15 @@ config :eventstore, SecondEventStore,
   subscription_retry_interval: 1_000,
   types: EventStore.PostgresTypes
 
+config :eventstore, DistributedEventStore,
+  username: "postgres",
+  password: "postgres",
+  database: "eventstore_test",
+  hostname: "localhost",
+  pool_size: 1,
+  pool_overflow: 0,
+  registry: :distributed,
+  serializer: EventStore.JsonSerializer,
+  subscription_retry_interval: 1_000
+
 config :eventstore, event_stores: [TestEventStore, SecondEventStore]
