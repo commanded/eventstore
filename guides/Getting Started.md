@@ -146,7 +146,7 @@ defmodule MyApp.ReleaseTasks do
     {:ok, _} = Application.ensure_all_started(:postgrex)
     {:ok, _} = Application.ensure_all_started(:ssl)
 
-    :ok = Application.load(:eventstore)
+    :ok = Application.load(:my_app)
 
     config = EventStore.Config.parsed(MyApp.EventStore, :my_app)
 
