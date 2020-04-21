@@ -39,16 +39,16 @@ defmodule EventStore.Mixfile do
     [
       {:elixir_uuid, "~> 1.2"},
       {:fsm, "~> 0.3"},
-      {:gen_stage, "~> 0.14"},
+      {:gen_stage, "~> 1.0"},
       {:postgrex, "~> 0.15"},
 
       # Optional dependencies
-      {:jason, "~> 1.1", optional: true},
+      {:jason, "~> 1.2", optional: true},
       {:poolboy, "~> 1.5", optional: true},
 
       # Development and test tooling
       {:benchfella, "~> 0.3", only: :bench},
-      {:dialyxir, "~> 0.5", only: [:dev, :test]},
+      {:dialyxir, "~> 1.0", only: :dev, runtime: false},
       {:ex_doc, "~> 0.21", only: :dev},
       {:local_cluster, "~> 1.1", only: [:distributed]},
       {:mix_test_watch, "~> 1.0", only: :dev}
@@ -161,7 +161,7 @@ defmodule EventStore.Mixfile do
 
   defp dialyzer do
     [
-      plt_add_apps: [:jason, :ex_unit],
+      plt_add_apps: [:ex_unit, :jason, :mix],
       plt_add_deps: :app_tree,
       plt_file: {:no_warn, "priv/plts/eventstore.plt"}
     ]

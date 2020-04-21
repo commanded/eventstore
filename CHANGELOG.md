@@ -5,6 +5,7 @@
 #### Enhancements
 
 - Prevent double supervision by starting / stopping supervisor manually ([#194](https://github.com/commanded/eventstore/pull/194)).
+- Use `DynamicSupervisor` for subscriptions.
 
 ## v1.0.1
 

@@ -6,7 +6,7 @@ cache:
   - deps
 
 elixir:
-  - 1.9.4
+  - 1.10.2
 
 otp_release:
   - 22.0
@@ -21,7 +21,7 @@ before_script:
 
 script:
   - mix test.all
-  - travis_wait 30 mix dialyzer --halt-exit-status
+  - travis_wait 30 mix dialyzer
 
 sudo: required
 dist: trusty
