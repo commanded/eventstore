@@ -28,6 +28,6 @@ config :eventstore,
        Keyword.put(default_config, :database, "eventstore_jsonb_test_2")
 
 config :eventstore, SchemaEventStore, default_config
-config :eventstore, DistributedEventStore,  Keyword.put(default_config, :registry, :distributed)
+config :eventstore, DistributedEventStore, Keyword.put(default_config, :registry, :distributed)
 
 config :eventstore, event_stores: [TestEventStore, SecondEventStore, SchemaEventStore]
