@@ -41,6 +41,7 @@ defmodule EventStore.Mixfile do
       {:fsm, "~> 0.3"},
       {:gen_stage, "~> 1.0"},
       {:postgrex, "~> 0.15"},
+      {:highlander, "~> 0.1.0"},
 
       # Optional dependencies
       {:jason, "~> 1.2", optional: true},

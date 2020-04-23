@@ -15,6 +15,10 @@ defmodule EventStore.Notifications.Supervisor do
   alias EventStore.MonitoredServer
   alias EventStore.Notifications.{Listener, Reader, Broadcaster}
 
+  def child_spec({name, _registry, _serializer, _config} = init_arg) do
+    %{id: Module.concat(__MODULE__, name), start: {__MODULE__, :start_link, [init_arg]}}
+  end
+
   def start_link(arg) do
     Supervisor.start_link(__MODULE__, arg)
   end
