@@ -8,10 +8,6 @@
 - Dynamic event store ([#184](https://github.com/commanded/eventstore/pull/184)).
 - Add `timeout` option to config ([#189](https://github.com/commanded/eventstore/pull/189)).
 
-### Bug fixes
-
-- Fix `EventStore.Registration.DistributedForwarder` state when running multiple nodes ([#186](https://github.com/commanded/eventstore/pull/186)).
-
 ### Upgrading
 
 Upgrade an existing EventStore database by running:
@@ -25,6 +21,19 @@ You can drop and recreate an EventStore database by running:
 ```console
 mix do event_store.drop, event_store.create, event_store.init
 ```
+
+## v1.0.2
+
+#### Enhancements
+
+- Prevent double supervision by starting / stopping supervisor manually ([#194](https://github.com/commanded/eventstore/pull/194)).
+- Use `DynamicSupervisor` for subscriptions.
+
+## v1.0.1
+
+### Bug fixes
+
+- Fix `EventStore.Registration.DistributedForwarder` state when running multiple nodes ([#186](https://github.com/commanded/eventstore/pull/186)).
 
 ## v1.0.0
 

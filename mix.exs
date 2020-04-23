@@ -1,7 +1,7 @@
 defmodule EventStore.Mixfile do
   use Mix.Project
 
-  @version "1.0.0"
+  @version "1.0.2"
 
   def project do
     [
@@ -43,13 +43,14 @@ defmodule EventStore.Mixfile do
       {:postgrex, "~> 0.15"},
 
       # Optional dependencies
-      {:jason, "~> 1.1", optional: true},
+      {:jason, "~> 1.2", optional: true},
       {:poolboy, "~> 1.5", optional: true},
 
       # Development and test tooling
       {:benchfella, "~> 0.3", only: :bench},
-      {:dialyxir, "~> 1.0", only: [:dev, :test]},
+      {:dialyxir, "~> 1.0", only: :dev, runtime: false},
       {:ex_doc, "~> 0.21", only: :dev},
+      {:local_cluster, "~> 1.1", only: [:distributed]},
       {:mix_test_watch, "~> 1.0", only: :dev}
     ]
   end
@@ -141,7 +142,7 @@ defmodule EventStore.Mixfile do
       "event_store.setup": ["event_store.create", "event_store.init"],
       "es.reset": ["event_store.reset"],
       "es.setup": ["event_store.setup"],
-      "test.all": ["test.jsonb", "test --include slow"],
+      "test.all": ["test", "test.jsonb", "test.distributed", "test --only slow"],
       "test.distributed": &test_distributed/1,
       "test.jsonb": &test_jsonb/1,
       "test.local": &test_local/1
@@ -160,13 +161,13 @@ defmodule EventStore.Mixfile do
 
   defp dialyzer do
     [
-      plt_add_apps: [:jason, :ex_unit],
+      plt_add_apps: [:ex_unit, :jason, :mix],
       plt_add_deps: :app_tree,
       plt_file: {:no_warn, "priv/plts/eventstore.plt"}
     ]
   end
 
-  defp test_distributed(args), do: test_env(:distributed, args)
+  defp test_distributed(args), do: test_env(:distributed, ["--only", "distributed"] ++ args)
   defp test_jsonb(args), do: test_env(:jsonb, args)
   defp test_local(args), do: test_env(:local, args)
 

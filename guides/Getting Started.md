@@ -6,7 +6,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       ```elixir
       def deps do
-        [{:eventstore, "~> 1.0.0"}]
+        [{:eventstore, "~> 1.0"}]
       end
       ```
 
@@ -135,8 +135,8 @@ $ mix do event_store.create, event_store.init
 
 To do that you can use task modules defined inside EventStore (in `lib/mix/tasks`):
 
-* [Tasks.EventStore.Create](https://github.com/commanded/eventstore/blob/v1.0.0-rc.0/lib/event_store/tasks/create.ex)
-* [Tasks.EventStore.Init](https://github.com/commanded/eventstore/blob/v1.0.0-rc.0/lib/event_store/tasks/init.ex)
+* [Tasks.EventStore.Create](https://github.com/commanded/eventstore/blob/master/lib/event_store/tasks/create.ex)
+* [Tasks.EventStore.Init](https://github.com/commanded/eventstore/blob/master/lib/event_store/tasks/init.ex)
 
  So you can take advantage of the [running one-off commands](https://hexdocs.pm/mix/Mix.Tasks.Release.html#module-one-off-commands-eval-and-rpc) supported by Mix release, using a helper module defined like this:
 

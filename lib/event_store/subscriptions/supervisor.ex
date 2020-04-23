@@ -3,13 +3,13 @@ defmodule EventStore.Subscriptions.Supervisor do
 
   # Supervise zero, one or more subscriptions to an event stream.
 
-  use Supervisor
+  use DynamicSupervisor
 
   alias EventStore.Subscriptions
   alias EventStore.Subscriptions.Subscription
 
   def start_link(opts) do
-    Supervisor.start_link(__MODULE__, [], opts)
+    DynamicSupervisor.start_link(__MODULE__, [], opts)
   end
 
   def start_subscription(opts) do
@@ -21,8 +21,9 @@ defmodule EventStore.Subscriptions.Supervisor do
 
     name = {:via, Registry, registry_name(event_store, stream_uuid, subscription_name)}
     opts = Keyword.put(opts, :name, name)
+    spec = {Subscription, opts}
 
-    Supervisor.start_child(supervisor, [opts])
+    DynamicSupervisor.start_child(supervisor, spec)
   end
 
   def unsubscribe_from_stream(event_store, stream_uuid, subscription_name) do
@@ -45,18 +46,15 @@ defmodule EventStore.Subscriptions.Supervisor do
         :ok
 
       subscription ->
-        Process.exit(subscription, :shutdown)
+        supervisor = Module.concat(event_store, __MODULE__)
 
-        :ok
+        DynamicSupervisor.terminate_child(supervisor, subscription)
     end
   end
 
-  def init(args) do
-    children = [
-      worker(Subscription, args, restart: :temporary)
-    ]
-
-    supervise(children, strategy: :simple_one_for_one)
+  @impl DynamicSupervisor
+  def init(_init_arg) do
+    DynamicSupervisor.init(strategy: :one_for_one)
   end
 
   defp registry_name(event_store, stream_uuid, subscription_name) do

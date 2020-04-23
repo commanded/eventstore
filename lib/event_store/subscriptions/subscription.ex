@@ -7,7 +7,8 @@ defmodule EventStore.Subscriptions.Subscription do
   # from the last acknowledged event. This guarantees at least once delivery of
   # every event appended to storage.
 
-  use GenServer
+  use GenServer, restart: :temporary
+
   require Logger
 
   alias EventStore.RecordedEvent
