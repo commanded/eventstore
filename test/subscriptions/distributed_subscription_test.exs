@@ -17,7 +17,9 @@ if Code.ensure_loaded?(LocalCluster) do
         {nodes, pids} = start_distributed_event_store_on_nodes(3)
 
         supervisor =
-          :global.whereis_name(DistributedEventStore.EventStore.Notifications.GlobalRunner)
+          :global.whereis_name(
+            {Highlander, DistributedEventStore.EventStore.Notifications.Supervisor}
+          )
 
         {node, pid} =
           [nodes, pids]
@@ -32,7 +34,9 @@ if Code.ensure_loaded?(LocalCluster) do
         {nodes, pids} = start_distributed_event_store_on_nodes(3)
 
         supervisor =
-          :global.whereis_name(DistributedEventStore.EventStore.Notifications.GlobalRunner)
+          :global.whereis_name(
+            {Highlander, DistributedEventStore.EventStore.Notifications.Supervisor}
+          )
 
         {node, pid} =
           [nodes, pids]
