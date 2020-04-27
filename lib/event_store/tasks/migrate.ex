@@ -56,7 +56,7 @@ defmodule EventStore.Tasks.Migrate do
       path = Application.app_dir(:eventstore, "priv/event_store/migrations/v#{migration}.sql")
       script = File.read!(path)
 
-      case Database.migrate(config, script) do
+      case Database.execute(config, script) do
         :ok ->
           :ok
 
