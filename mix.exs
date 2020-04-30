@@ -30,7 +30,7 @@ defmodule EventStore.Mixfile do
     ]
   end
 
-  defp elixirc_paths(env) when env in [:bench, :distributed, :jsonb, :local, :test],
+  defp elixirc_paths(env) when env in [:bench, :distributed, :jsonb, :migration, :test],
     do: ["lib", "test/support", "test/subscriptions/support"]
 
   defp elixirc_paths(_env), do: ["lib"]
@@ -143,20 +143,19 @@ defmodule EventStore.Mixfile do
       "event_store.setup": ["event_store.create", "event_store.init"],
       "es.reset": ["event_store.reset"],
       "es.setup": ["event_store.setup"],
-      "test.all": ["test", "test.jsonb", "test.distributed", "test --only slow"],
+      "test.all": ["test", "test.jsonb", "test.distributed", "test.migration", "test --only slow"],
       "test.distributed": &test_distributed/1,
       "test.jsonb": &test_jsonb/1,
-      "test.local": &test_local/1
+      "test.migration": &test_migration/1
     ]
   end
 
   defp preferred_cli_env do
     [
       "test.all": :test,
-      "test.jsonb": :test,
-      "test.registries": :test,
       "test.distributed": :test,
-      "test.local": :test
+      "test.jsonb": :test,
+      "test.migration": :test
     ]
   end
 
@@ -169,8 +168,8 @@ defmodule EventStore.Mixfile do
   end
 
   defp test_distributed(args), do: test_env(:distributed, ["--only", "distributed"] ++ args)
+  defp test_migration(args), do: test_env(:migration, ["--include", "migration"] ++ args)
   defp test_jsonb(args), do: test_env(:jsonb, args)
-  defp test_local(args), do: test_env(:local, args)
 
   defp test_env(env, args) do
     test_args = if IO.ANSI.enabled?(), do: ["--color" | args], else: ["--no-color" | args]

@@ -14,6 +14,11 @@ defmodule EventStore.StorageCase do
     serializer = Serializer.serializer(@event_store, config)
     postgrex_config = Config.default_postgrex_opts(config)
 
+    if Mix.env() == :migration do
+      restore_migration_database_dump(config)
+      migrate_eventstore(config)
+    end
+
     {:ok, conn} = Postgrex.start_link(postgrex_config)
 
     [
@@ -32,5 +37,18 @@ defmodule EventStore.StorageCase do
     start_supervised!({@event_store, name: @event_store})
 
     :ok
+  end
+
+  # Restore a dump of pre-migration database schema to run the test suite using
+  # a migrated database.
+  defp restore_migration_database_dump(config) do
+    :ok = EventStore.Storage.Database.drop(config)
+    :ok = EventStore.Storage.Database.create(config)
+
+    {_, 0} = EventStore.Storage.Database.restore(config, "test/fixture/eventstore.dump")
+  end
+
+  defp migrate_eventstore(config) do
+    EventStore.Tasks.Migrate.exec(config, quiet: true)
   end
 end

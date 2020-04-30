@@ -7,10 +7,10 @@ defmodule EventStore.Storage.Database do
 
   def drop(config), do: storage_down(config)
 
-  def execute(sql, opts) do
-    opts = Keyword.put(opts, :timeout, :infinity)
+  def execute(config, script) do
+    opts = Keyword.put(config, :timeout, :infinity)
 
-    case run_query(sql, opts) do
+    case run_query(script, opts) do
       {:ok, _} -> :ok
       {:error, _error} = reply -> reply
     end
@@ -24,10 +24,24 @@ defmodule EventStore.Storage.Database do
               "please guarantee it is available before running event_store mix commands"
     end
 
-    args = [database | parse_default_args(config)]
+    args = include_default_args([database], config)
     env = parse_env(config)
 
     System.cmd("pg_dump", args, env: env, into: File.stream!(target_path))
+  end
+
+  def restore(config, dump_path) do
+    database = Keyword.fetch!(config, :database)
+
+    unless System.find_executable("pg_restore") do
+      raise "could not find executable `pg_restore` in path, " <>
+              "please guarantee it is available before running event_store mix commands"
+    end
+
+    args = include_default_args([dump_path, "-d", database], config)
+    env = parse_env(config)
+
+    System.cmd("pg_restore", args, env: env)
   end
 
   defp parse_env(config) do
@@ -41,9 +55,7 @@ defmodule EventStore.Storage.Database do
     [{"PGCONNECT_TIMEOUT", "10"} | env]
   end
 
-  defp parse_default_args(config) do
-    args = []
-
+  defp include_default_args(args, config) do
     args =
       case config[:username] do
         nil -> args

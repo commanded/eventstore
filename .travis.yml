@@ -25,7 +25,7 @@ script:
   - travis_wait 30 mix dialyzer
 
 sudo: required
-dist: trusty
+dist: bionic
 
 addons:
-  postgresql: "9.6"
+  postgresql: 10

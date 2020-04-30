@@ -8,6 +8,5 @@
 /priv/plts/*.plt.hash
 erl_crash.dump
 *.ez
-*.dump
 .tool-versions
 .elixir_ls
