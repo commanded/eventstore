@@ -17,6 +17,7 @@ defmodule EventStore.StorageCase do
     if Mix.env() == :migration do
       restore_migration_database_dump(config)
       migrate_eventstore(config)
+      init_eventstores()
     end
 
     {:ok, conn} = Postgrex.start_link(postgrex_config)
@@ -50,5 +51,18 @@ defmodule EventStore.StorageCase do
 
   defp migrate_eventstore(config) do
     EventStore.Tasks.Migrate.exec(config, quiet: true)
+  end
+
+  defp init_eventstores do
+    for event_store <- event_stores() do
+      config = event_store.config()
+
+      EventStore.Tasks.Create.exec(config, quiet: true)
+      EventStore.Tasks.Init.exec(event_store, config, quiet: true)
+    end
+  end
+
+  defp event_stores do
+    Application.fetch_env!(:eventstore, :event_stores)
   end
 end
