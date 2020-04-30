@@ -2,7 +2,7 @@ defmodule EventStore.Storage.AppendEventsTest do
   use EventStore.StorageCase
 
   alias EventStore.EventFactory
-  alias EventStore.Storage.{Appender,CreateStream}
+  alias EventStore.Storage.{Appender, CreateStream}
 
   test "append single event to new stream", %{conn: conn} do
     {:ok, stream_uuid, stream_id} = create_stream(conn)
@@ -21,33 +21,81 @@ defmodule EventStore.Storage.AppendEventsTest do
   test "append single event to existing stream, in separate writes", %{conn: conn} do
     {:ok, stream_uuid, stream_id} = create_stream(conn)
 
-    assert :ok = Appender.append(conn, stream_id, EventFactory.create_recorded_events(1, stream_uuid))
-    assert :ok = Appender.append(conn, stream_id, EventFactory.create_recorded_events(1, stream_uuid, 2, 2))
+    assert :ok =
+             Appender.append(conn, stream_id, EventFactory.create_recorded_events(1, stream_uuid))
+
+    assert :ok =
+             Appender.append(
+               conn,
+               stream_id,
+               EventFactory.create_recorded_events(1, stream_uuid, 2, 2)
+             )
   end
 
   test "append multiple events to existing stream, in separate writes", %{conn: conn} do
     {:ok, stream_uuid, stream_id} = create_stream(conn)
 
-    assert :ok = Appender.append(conn, stream_id, EventFactory.create_recorded_events(3, stream_uuid))
-    assert :ok = Appender.append(conn, stream_id, EventFactory.create_recorded_events(3, stream_uuid, 4, 4))
+    assert :ok =
+             Appender.append(conn, stream_id, EventFactory.create_recorded_events(3, stream_uuid))
+
+    assert :ok =
+             Appender.append(
+               conn,
+               stream_id,
+               EventFactory.create_recorded_events(3, stream_uuid, 4, 4)
+             )
   end
 
   test "append events to different, new streams", %{conn: conn} do
     {:ok, stream1_uuid, stream1_id} = create_stream(conn)
     {:ok, stream2_uuid, stream2_id} = create_stream(conn)
 
-    assert :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(2, stream1_uuid))
-    assert :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(2, stream2_uuid, 3))
+    assert :ok =
+             Appender.append(
+               conn,
+               stream1_id,
+               EventFactory.create_recorded_events(2, stream1_uuid)
+             )
+
+    assert :ok =
+             Appender.append(
+               conn,
+               stream2_id,
+               EventFactory.create_recorded_events(2, stream2_uuid, 3)
+             )
   end
 
   test "append events to different, existing streams", %{conn: conn} do
     {:ok, stream1_uuid, stream1_id} = create_stream(conn)
     {:ok, stream2_uuid, stream2_id} = create_stream(conn)
 
-    assert :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(2, stream1_uuid))
-    assert :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(2, stream2_uuid, 3))
-    assert :ok = Appender.append(conn, stream1_id, EventFactory.create_recorded_events(2, stream1_uuid, 5, 3))
-    assert :ok = Appender.append(conn, stream2_id, EventFactory.create_recorded_events(2, stream2_uuid, 7, 3))
+    assert :ok =
+             Appender.append(
+               conn,
+               stream1_id,
+               EventFactory.create_recorded_events(2, stream1_uuid)
+             )
+
+    assert :ok =
+             Appender.append(
+               conn,
+               stream2_id,
+               EventFactory.create_recorded_events(2, stream2_uuid, 3)
+             )
+
+    assert :ok =
+             Appender.append(
+               conn,
+               stream1_id,
+               EventFactory.create_recorded_events(2, stream1_uuid, 5, 3)
+             )
+
+    assert :ok =
+             Appender.append(
+               conn,
+               stream2_id,
+               EventFactory.create_recorded_events(2, stream2_uuid, 7, 3)
+             )
   end
 
   test "append to new stream, but stream already exists", %{conn: conn} do
@@ -87,13 +135,14 @@ defmodule EventStore.Storage.AppendEventsTest do
       end)
       |> Enum.map(&Task.await/1)
 
-    assert results -- [
-      :ok,
-      {:error, :wrong_expected_version},
-      {:error, :wrong_expected_version},
-      {:error, :wrong_expected_version},
-      {:error, :wrong_expected_version}
-    ] == []
+    assert results --
+             [
+               :ok,
+               {:error, :wrong_expected_version},
+               {:error, :wrong_expected_version},
+               {:error, :wrong_expected_version},
+               {:error, :wrong_expected_version}
+             ] == []
   end
 
   defp create_stream(conn) do
