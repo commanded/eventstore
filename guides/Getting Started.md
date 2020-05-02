@@ -197,7 +197,7 @@ To enable native JSON support you need to configure your event store to use the 
 ```elixir
 # config/config.exs
 config :my_app, MyApp.EventStore,
-  column_data_type: "jsonb"
+  column_data_type: "jsonb",
   serializer: EventStore.JsonbSerializer,
   types: EventStore.PostgresTypes
 ```
