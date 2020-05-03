@@ -29,7 +29,7 @@ defmodule MigrateStoreTest do
   end
 
   defp recreate_database(config) do
-    :ok = EventStore.Storage.Database.drop(config)
+    EventStore.Storage.Database.drop(config)
     :ok = EventStore.Storage.Database.create(config)
 
     {_, 0} = EventStore.Storage.Database.restore(config, "test/fixture/eventstore_seed.dump")
