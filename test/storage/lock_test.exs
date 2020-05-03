@@ -3,6 +3,7 @@ defmodule EventStore.Storage.LockTest do
 
   alias EventStore.ProcessHelper
   alias EventStore.Storage.Lock
+  alias EventStore.Wait
 
   test "acquire exclusive subscription lock", %{postgrex_config: postgrex_config} do
     {:ok, conn} = Postgrex.start_link(postgrex_config)
@@ -31,7 +32,9 @@ defmodule EventStore.Storage.LockTest do
     ProcessHelper.shutdown(conn1)
 
     # conn2 can now acquire lock
-    assert :ok = Lock.try_acquire_exclusive_lock(conn2, key)
+    Wait.until(fn ->
+      assert :ok = Lock.try_acquire_exclusive_lock(conn2, key)
+    end)
 
     ProcessHelper.shutdown(conn2)
   end
