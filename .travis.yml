@@ -24,7 +24,7 @@ script:
   - mix test.all
   - travis_wait 30 mix dialyzer
 
-sudo: required
+os: linux
 dist: bionic
 
 addons:
