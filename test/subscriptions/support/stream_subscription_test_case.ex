@@ -5,6 +5,7 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
     alias EventStore.{EventFactory, ProcessHelper, RecordedEvent, SubscriptionHelpers}
     alias EventStore.Storage.{Appender, CreateStream}
     alias EventStore.Subscriptions.SubscriptionFsm
+    alias EventStore.Wait
 
     @event_store TestEventStore
     @conn TestEventStore.Postgrex
@@ -414,7 +415,9 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
         # Attempt to resubscribe should now succeed
         subscription = SubscriptionFsm.subscribe(subscription)
 
-        assert subscription.state == :request_catch_up
+        Wait.until(fn ->
+          assert subscription.state == :request_catch_up
+        end)
       end
     end
 
