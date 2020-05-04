@@ -404,7 +404,7 @@ defmodule EventStore do
           invalid ->
             raise ArgumentError,
               message:
-                "expected :name option to be an integer or :infinity but got: " <>
+                "expected :timeout option to be an integer or :infinity but got: " <>
                   inspect(invalid)
         end
       end
