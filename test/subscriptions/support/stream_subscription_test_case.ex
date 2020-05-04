@@ -413,9 +413,9 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
         ProcessHelper.shutdown(conn2)
 
         # Attempt to resubscribe should now succeed
-        subscription = SubscriptionFsm.subscribe(subscription)
-
         Wait.until(fn ->
+          subscription = SubscriptionFsm.subscribe(subscription)
+
           assert subscription.state == :request_catch_up
         end)
       end

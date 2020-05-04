@@ -273,6 +273,11 @@ defmodule EventStore do
 
       def stream_forward(stream_uuid, start_version \\ 0, opts \\ [])
 
+      def stream_forward(stream_uuid, start_version, read_batch_size)
+          when is_integer(start_version) and is_integer(read_batch_size) do
+        stream_forward(stream_uuid, start_version, read_batch_size: read_batch_size)
+      end
+
       def stream_forward(stream_uuid, start_version, opts) do
         {conn, opts} = opts(opts)
 
