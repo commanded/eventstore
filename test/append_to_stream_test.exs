@@ -75,6 +75,57 @@ defmodule EventStore.AppendToStreamTest do
     end
   end
 
+  describe "append to existing stream using an expected stream version" do
+    setup [:append_events_to_stream]
+
+    test "should persist events with correct stream version", %{stream_uuid: stream_uuid} do
+      events = EventFactory.create_events(1)
+
+      assert :ok = EventStore.append_to_stream(stream_uuid, 3, events)
+
+      assert {:ok, events} = EventStore.read_stream_forward(stream_uuid)
+      assert length(events) == 4
+    end
+
+    test "should return `{:error, :wrong_expected_version}` with incorrect stream version" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
+
+      assert {:error, :wrong_expected_version} =
+               EventStore.append_to_stream(stream_uuid, 1, events)
+
+      assert {:error, :wrong_expected_version} =
+               EventStore.append_to_stream(stream_uuid, 2, events)
+
+      assert {:error, :wrong_expected_version} =
+               EventStore.append_to_stream(stream_uuid, 4, events)
+    end
+
+    test "should fail to persist events with same expected version concurrently",
+         %{stream_uuid: stream_uuid} do
+      events = EventFactory.create_events(1)
+
+      results =
+        1..4
+        |> Enum.map(fn _ ->
+          Task.async(fn -> EventStore.append_to_stream(stream_uuid, 3, events) end)
+        end)
+        |> Enum.map(&Task.await/1)
+        |> Enum.sort()
+
+      # One write should succeed and three should fail due to wrong expected version
+      assert results == [
+               :ok,
+               {:error, :wrong_expected_version},
+               {:error, :wrong_expected_version},
+               {:error, :wrong_expected_version}
+             ]
+
+      assert {:ok, events} = EventStore.read_stream_forward(stream_uuid)
+      assert length(events) == 4
+    end
+  end
+
   @tag :slow
   @tag timeout: 180_000
   test "should append many events to a stream" do

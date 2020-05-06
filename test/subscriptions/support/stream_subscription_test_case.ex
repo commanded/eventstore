@@ -5,6 +5,7 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
     alias EventStore.{EventFactory, ProcessHelper, RecordedEvent, SubscriptionHelpers}
     alias EventStore.Storage.{Appender, CreateStream}
     alias EventStore.Subscriptions.SubscriptionFsm
+    alias EventStore.Wait
 
     @event_store TestEventStore
     @conn TestEventStore.EventStore.Postgrex
@@ -411,10 +412,12 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
         # Stop connection holding lock to release it
         ProcessHelper.shutdown(conn2)
 
-        # Attempt to resubscribe should now succeed
-        subscription = SubscriptionFsm.subscribe(subscription)
+        Wait.until(fn ->
+          # Attempt to resubscribe should now succeed
+          subscription = SubscriptionFsm.subscribe(subscription)
 
-        assert subscription.state == :request_catch_up
+          assert subscription.state == :request_catch_up
+        end)
       end
     end
 
