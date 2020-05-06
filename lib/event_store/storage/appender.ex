@@ -28,23 +28,28 @@ defmodule EventStore.Storage.Appender do
         events
         |> Stream.map(&encode_uuids/1)
         |> Stream.chunk_every(1_000)
-        |> Enum.map(fn batch ->
-          case insert_event_batch(transaction, batch, opts) do
-            :ok -> Enum.map(batch, & &1.event_id)
-            {:error, reason} -> Postgrex.rollback(transaction, reason)
-          end
-        end)
-        |> Enum.each(fn event_ids ->
-          event_count = length(event_ids)
+        |> Enum.each(fn batch ->
+          event_count = length(batch)
 
-          parameters =
-            event_ids
+          stream_params =
+            Enum.flat_map(batch, fn
+              %RecordedEvent{event_id: event_id, stream_version: stream_version} ->
+                [event_id, stream_version]
+            end)
+
+          all_stream_params =
+            batch
             |> Stream.with_index(1)
-            |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
+            |> Enum.flat_map(fn {%RecordedEvent{event_id: event_id}, index} ->
+              [index, event_id]
+            end)
 
-          with :ok <- insert_stream_events(transaction, parameters, stream_id, event_count, opts),
-               :ok <-
-                 insert_link_events(transaction, parameters, @all_stream_id, event_count, opts) do
+          stream_params = [stream_id | [event_count | stream_params]]
+          all_stream_params = [@all_stream_id | [event_count | all_stream_params]]
+
+          with :ok <- insert_event_batch(transaction, batch, opts),
+               :ok <- insert_stream_events(transaction, stream_params, event_count, opts),
+               :ok <- insert_link_events(transaction, all_stream_params, event_count, opts) do
             :ok
           else
             {:error, reason} -> Postgrex.rollback(transaction, reason)
@@ -85,14 +90,16 @@ defmodule EventStore.Storage.Appender do
         |> Stream.map(&encode_uuid/1)
         |> Stream.chunk_every(1_000)
         |> Enum.each(fn batch ->
-          count = length(batch)
+          event_count = length(batch)
 
           parameters =
             batch
             |> Stream.with_index(1)
             |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
-          with :ok <- insert_link_events(transaction, parameters, stream_id, count, opts) do
+          params = [stream_id | [event_count | parameters]]
+
+          with :ok <- insert_link_events(transaction, params, event_count, opts) do
             :ok
           else
             {:error, reason} -> Postgrex.rollback(transaction, reason)
@@ -156,18 +163,16 @@ defmodule EventStore.Storage.Appender do
     end)
   end
 
-  defp insert_stream_events(conn, parameters, stream_id, event_count, opts) do
+  defp insert_stream_events(conn, params, event_count, opts) do
     statement = Statements.create_stream_events(event_count)
-    params = [stream_id | [event_count | parameters]]
 
     conn
     |> Postgrex.query(statement, params, opts)
     |> handle_response()
   end
 
-  defp insert_link_events(conn, parameters, stream_id, event_count, opts) do
+  defp insert_link_events(conn, params, event_count, opts) do
     statement = Statements.create_link_events(event_count)
-    params = [stream_id | [event_count | parameters]]
 
     conn
     |> Postgrex.query(statement, params, opts)

@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Bug fixes
+
+- Use event's stream version when appending events to a stream ([#202](https://github.com/commanded/eventstore/pull/202)).
+
 ## v1.0.2
 
 #### Enhancements
