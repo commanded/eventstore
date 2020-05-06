@@ -35,7 +35,7 @@ defmodule EventStore.StorageCase do
   setup %{conn: conn} do
     Storage.Initializer.reset!(conn)
 
-    start_supervised!({@event_store, name: @event_store})
+    start_supervised!(@event_store)
 
     :ok
   end

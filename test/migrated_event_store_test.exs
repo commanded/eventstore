@@ -22,7 +22,7 @@ defmodule MigratedEventStoreTest do
     recreate_database(config)
     migrate_eventstore(config)
 
-    {:ok, _pid} = TestEventStore.start_link()
+    start_supervised!(TestEventStore)
 
     :ok
   end

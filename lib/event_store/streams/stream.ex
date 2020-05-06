@@ -2,38 +2,35 @@ defmodule EventStore.Streams.Stream do
   @moduledoc false
 
   alias EventStore.{EventData, RecordedEvent, Storage}
-
-  alias EventStore.Streams.Stream
-
-  defstruct [:stream_uuid, :stream_id, stream_version: 0]
+  alias EventStore.Streams.StreamInfo
 
   def append_to_stream(conn, stream_uuid, expected_version, events, opts \\ []) do
     {serializer, opts} = Keyword.pop(opts, :serializer)
 
-    with {:ok, stream} <- stream_info(conn, stream_uuid, opts),
-         {:ok, stream} <- prepare_stream(conn, expected_version, stream, opts) do
-      do_append_to_storage(conn, events, stream, serializer, opts)
+    with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, opts),
+         {:ok, stream} <- prepare_stream(conn, stream, opts) do
+      do_append_to_storage(conn, stream, events, serializer, opts)
     end
   end
 
   def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts \\ []) do
     {_serializer, opts} = Keyword.pop(opts, :serializer)
 
-    with {:ok, stream} <- stream_info(conn, stream_uuid, opts),
-         {:ok, stream} <- prepare_stream(conn, expected_version, stream, opts) do
-      do_link_to_storage(conn, events_or_event_ids, stream, opts)
+    with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, opts),
+         {:ok, stream} <- prepare_stream(conn, stream, opts) do
+      do_link_to_storage(conn, stream, events_or_event_ids, opts)
     end
   end
 
   def read_stream_forward(conn, stream_uuid, start_version, count, opts \\ []) do
-    with {:ok, stream_id} <- stream_id(conn, stream_uuid, opts) do
-      read_storage_forward(conn, stream_id, start_version, count, opts)
+    with {:ok, stream} <- stream_info(conn, stream_uuid, :stream_exists, opts) do
+      read_storage_forward(conn, stream, start_version, count, opts)
     end
   end
 
   def stream_forward(conn, stream_uuid, start_version, opts \\ []) do
-    with {:ok, stream_id} <- stream_id(conn, stream_uuid, opts) do
-      stream_storage_forward(conn, stream_id, start_version, opts)
+    with {:ok, stream} <- stream_info(conn, stream_uuid, :stream_exists, opts) do
+      stream_storage_forward(conn, stream, start_version, opts)
     end
   end
 
@@ -51,102 +48,55 @@ defmodule EventStore.Streams.Stream do
   def start_from(_conn, _stream_uuid, _start_from, _opts),
     do: {:error, :invalid_start_from}
 
-  def stream_id(conn, stream_uuid, opts \\ []) do
-    opts = query_opts(opts)
-
-    with {:ok, stream_id, _stream_version} <- Storage.stream_info(conn, stream_uuid, opts) do
-      {:ok, stream_id}
-    end
-  end
-
   def stream_version(conn, stream_uuid, opts \\ []) do
-    opts = query_opts(opts)
-
-    with {:ok, _stream_id, stream_version} <- Storage.stream_info(conn, stream_uuid, opts) do
+    with {:ok, %StreamInfo{stream_version: stream_version}} <-
+           stream_info(conn, stream_uuid, :any_version, opts) do
       {:ok, stream_version}
     end
   end
 
-  defp stream_info(conn, stream_uuid, opts) do
-    opts = query_opts(opts)
+  def delete(conn, stream_uuid, expected_version, type, opts \\ [])
 
-    with {:ok, stream_id, stream_version} <- Storage.stream_info(conn, stream_uuid, opts) do
-      stream = %Stream{
-        stream_uuid: stream_uuid,
-        stream_id: stream_id,
-        stream_version: stream_version
-      }
-
-      {:ok, stream}
+  def delete(conn, stream_uuid, expected_version, :soft, opts) do
+    with {:ok, %StreamInfo{} = stream} <- stream_info(conn, stream_uuid, expected_version, opts) do
+      soft_delete_stream(conn, stream, opts)
     end
   end
 
-  defp prepare_stream(
-         conn,
-         expected_version,
-         %Stream{stream_uuid: stream_uuid, stream_id: stream_id, stream_version: 0} = state,
-         opts
-       )
-       when is_nil(stream_id) and expected_version in [0, :any_version, :no_stream] do
+  def delete(conn, stream_uuid, expected_version, :hard, opts) do
+    with {:ok, %StreamInfo{} = stream} <- stream_info(conn, stream_uuid, expected_version, opts) do
+      hard_delete_stream(conn, stream, opts)
+    end
+  end
+
+  defp stream_info(conn, stream_uuid, expected_version, opts) do
+    opts = query_opts(opts)
+
+    StreamInfo.read(conn, stream_uuid, expected_version, opts)
+  end
+
+  # Create stream when it doesn't yet exist.
+  defp prepare_stream(conn, %StreamInfo{stream_id: nil} = stream, opts) do
+    %StreamInfo{stream_uuid: stream_uuid} = stream
+
     opts = query_opts(opts)
 
     with {:ok, stream_id} <- Storage.create_stream(conn, stream_uuid, opts) do
-      {:ok, %Stream{state | stream_id: stream_id}}
+      {:ok, %StreamInfo{stream | stream_id: stream_id}}
     end
   end
 
-  defp prepare_stream(
-         _conn,
-         expected_version,
-         %Stream{stream_id: stream_id, stream_version: stream_version} = stream,
-         _opts
-       )
-       when not is_nil(stream_id) and
-              expected_version in [stream_version, :any_version, :stream_exists] do
-    {:ok, stream}
-  end
+  # Stream already exists, nothing to do.
+  defp prepare_stream(_conn, %StreamInfo{} = stream, _opts), do: {:ok, stream}
 
-  defp prepare_stream(
-         _conn,
-         expected_version,
-         %Stream{stream_id: stream_id, stream_version: 0} = stream,
-         _opts
-       )
-       when not is_nil(stream_id) and expected_version == :no_stream do
-    {:ok, stream}
-  end
-
-  defp prepare_stream(
-         _conn,
-         expected_version,
-         %Stream{stream_id: stream_id, stream_version: 0},
-         _opts
-       )
-       when is_nil(stream_id) and expected_version == :stream_exists do
-    {:error, :stream_does_not_exist}
-  end
-
-  defp prepare_stream(
-         _conn,
-         expected_version,
-         %Stream{stream_id: stream_id, stream_version: stream_version},
-         _opts
-       )
-       when not is_nil(stream_id) and stream_version != 0 and expected_version == :no_stream do
-    {:error, :stream_exists}
-  end
-
-  defp prepare_stream(_conn, _expected_version, _state, _opts),
-    do: {:error, :wrong_expected_version}
-
-  defp do_append_to_storage(conn, events, %Stream{} = stream, serializer, opts) do
+  defp do_append_to_storage(conn, %StreamInfo{} = stream, events, serializer, opts) do
     prepared_events = prepare_events(events, stream, serializer)
 
     write_to_stream(conn, prepared_events, stream, opts)
   end
 
-  defp prepare_events(events, %Stream{} = stream, serializer) do
-    %Stream{stream_uuid: stream_uuid, stream_version: stream_version} = stream
+  defp prepare_events(events, %StreamInfo{} = stream, serializer) do
+    %StreamInfo{stream_uuid: stream_uuid, stream_version: stream_version} = stream
 
     events
     |> Enum.map(&map_to_recorded_event(&1, utc_now(), serializer))
@@ -161,10 +111,7 @@ defmodule EventStore.Streams.Stream do
   end
 
   defp map_to_recorded_event(
-         %EventData{
-           data: %{__struct__: event_type},
-           event_type: nil
-         } = event,
+         %EventData{data: %{__struct__: event_type}, event_type: nil} = event,
          created_at,
          serializer
        ) do
@@ -192,7 +139,9 @@ defmodule EventStore.Streams.Stream do
     }
   end
 
-  defp do_link_to_storage(conn, events_or_event_ids, %Stream{stream_id: stream_id}, opts) do
+  defp do_link_to_storage(conn, %StreamInfo{} = stream, events_or_event_ids, opts) do
+    %StreamInfo{stream_id: stream_id} = stream
+
     event_ids = Enum.map(events_or_event_ids, &extract_event_id/1)
 
     Storage.link_to_stream(conn, stream_id, event_ids, opts)
@@ -205,20 +154,15 @@ defmodule EventStore.Streams.Stream do
     raise ArgumentError, message: "Invalid event id, expected a UUID but got: #{inspect(invalid)}"
   end
 
-  # Returns the current date time in UTC.
-  defp utc_now, do: DateTime.utc_now()
-
-  defp write_to_stream(conn, prepared_events, %Stream{} = stream, opts) do
-    %Stream{stream_id: stream_id} = stream
+  defp write_to_stream(conn, prepared_events, %StreamInfo{} = stream, opts) do
+    %StreamInfo{stream_id: stream_id} = stream
 
     Storage.append_to_stream(conn, stream_id, prepared_events, opts)
   end
 
-  defp read_storage_forward(_conn, stream_id, _start_version, _count, _opts)
-       when is_nil(stream_id),
-       do: {:error, :stream_not_found}
+  defp read_storage_forward(conn, %StreamInfo{} = stream, start_version, count, opts) do
+    %StreamInfo{stream_id: stream_id} = stream
 
-  defp read_storage_forward(conn, stream_id, start_version, count, opts) do
     {serializer, opts} = Keyword.pop(opts, :serializer)
 
     case Storage.read_stream_forward(conn, stream_id, start_version, count, opts) do
@@ -232,20 +176,16 @@ defmodule EventStore.Streams.Stream do
     end
   end
 
-  defp stream_storage_forward(_conn, stream_id, _start_version, _opts)
-       when is_nil(stream_id),
-       do: {:error, :stream_not_found}
+  defp stream_storage_forward(conn, stream, 0, opts),
+    do: stream_storage_forward(conn, stream, 1, opts)
 
-  defp stream_storage_forward(conn, stream_id, 0, opts),
-    do: stream_storage_forward(conn, stream_id, 1, opts)
-
-  defp stream_storage_forward(conn, stream_id, start_version, opts) do
+  defp stream_storage_forward(conn, stream, start_version, opts) do
     read_batch_size = Keyword.fetch!(opts, :read_batch_size)
 
     Elixir.Stream.resource(
       fn -> start_version end,
       fn next_version ->
-        case read_storage_forward(conn, stream_id, next_version, read_batch_size, opts) do
+        case read_storage_forward(conn, stream, next_version, read_batch_size, opts) do
           {:ok, []} -> {:halt, next_version}
           {:ok, events} -> {events, next_version + length(events)}
         end
@@ -257,5 +197,24 @@ defmodule EventStore.Streams.Stream do
   defp deserialize_recorded_events(recorded_events, serializer),
     do: Enum.map(recorded_events, &RecordedEvent.deserialize(&1, serializer))
 
+  defp soft_delete_stream(conn, stream, opts) do
+    %StreamInfo{stream_id: stream_id} = stream
+
+    opts = query_opts(opts)
+
+    Storage.soft_delete_stream(conn, stream_id, opts)
+  end
+
+  defp hard_delete_stream(conn, stream, opts) do
+    %StreamInfo{stream_id: stream_id} = stream
+
+    opts = query_opts(opts)
+
+    Storage.hard_delete_stream(conn, stream_id, opts)
+  end
+
   defp query_opts(opts), do: Keyword.take(opts, [:timeout])
+
+  # Returns the current date time in UTC.
+  defp utc_now, do: DateTime.utc_now()
 end

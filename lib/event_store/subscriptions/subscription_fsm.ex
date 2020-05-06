@@ -40,7 +40,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         data
         | queue_size: 0,
           partitions: %{},
-          processed_event_ids: MapSet.new()
+          processed_event_numbers: MapSet.new()
       }
 
       with {:ok, subscription} <- create_subscription(data),
@@ -114,16 +114,19 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
             describe(data) <> " received unexpected event(s), requesting catch up"
           end)
 
-          # Missed events, go back and catch-up with unseen
+          # Missed event(s), request catch-up with any unseen events from storage
           next_state(:request_catch_up, data)
 
-        _ ->
+        ^expected_event ->
           Logger.debug(fn ->
             describe(data) <> " is enqueueing #{length(events)} event(s)"
           end)
 
           # Subscriber is up-to-date, so enqueue events to send
-          data = data |> enqueue_events(events) |> notify_subscribers()
+          data =
+            data
+            |> enqueue_events(events)
+            |> notify_subscribers()
 
           if over_capacity?(data) do
             # Too many pending events, must wait for these to be processed.
@@ -216,9 +219,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     next_state(state, data)
   end
 
-  defevent subscribe,
-    data: %SubscriptionState{} = data,
-    state: state do
+  defevent subscribe, data: %SubscriptionState{} = data, state: state do
     next_state(state, data)
   end
 
@@ -238,7 +239,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         | lock_ref: nil,
           queue_size: 0,
           partitions: %{},
-          processed_event_ids: MapSet.new()
+          processed_event_numbers: MapSet.new()
       }
       |> purge_in_flight_events()
 
@@ -292,8 +293,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     Registration.subscribe(event_store, registry, stream_uuid)
   end
 
-  defp monitor_subscriber(%SubscriptionState{} = data, pid, opts)
-       when is_pid(pid) do
+  defp monitor_subscriber(%SubscriptionState{} = data, pid, opts) when is_pid(pid) do
     %SubscriptionState{subscribers: subscribers, buffer_size: buffer_size} = data
 
     subscriber = %Subscriber{
@@ -389,7 +389,12 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           next_state(:catching_up, data)
         end
 
+      {:error, :stream_deleted} ->
+        # Don't allow subscriptions to deleted streams to receive any events
+        next_state(:unsubscribed, data)
+
       {:error, :stream_not_found} ->
+        # Allow subscriptions to streams which don't yet exist, but might be created later
         next_state(:subscribed, data)
     end
   end
@@ -413,7 +418,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp enqueue_events(%SubscriptionState{} = data, []), do: data
 
   defp enqueue_events(%SubscriptionState{} = data, [event | events]) do
-    %SubscriptionState{processed_event_ids: processed_event_ids} = data
+    %SubscriptionState{processed_event_numbers: processed_event_numbers} = data
     %RecordedEvent{event_number: event_number} = event
 
     data =
@@ -426,7 +431,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           # Filtered event, don't send to subscriber, but track it as processed.
           %SubscriptionState{
             data
-            | processed_event_ids: MapSet.put(processed_event_ids, event_number)
+            | processed_event_numbers: MapSet.put(processed_event_numbers, event_number)
           }
           |> track_last_sent(event_number)
       end
@@ -568,20 +573,21 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp map(events, _mapper), do: events
 
   defp ack_events(%SubscriptionState{} = data, ack, subscriber_pid) do
-    %SubscriptionState{subscribers: subscribers, processed_event_ids: processed_event_ids} = data
+    %SubscriptionState{subscribers: subscribers, processed_event_numbers: processed_event_numbers} =
+      data
 
     with {:ok, subscriber} <- subscriber_by_pid(subscribers, subscriber_pid),
          {:ok, subscriber, acknowledged_events} <- Subscriber.acknowledge(subscriber, ack) do
-      processed_event_ids =
+      processed_event_numbers =
         acknowledged_events
         |> Enum.map(& &1.event_number)
-        |> Enum.reduce(processed_event_ids, &MapSet.put(&2, &1))
+        |> Enum.reduce(processed_event_numbers, &MapSet.put(&2, &1))
 
       data =
         %SubscriptionState{
           data
           | subscribers: Map.put(subscribers, subscriber_pid, subscriber),
-            processed_event_ids: processed_event_ids
+            processed_event_numbers: processed_event_numbers
         }
         |> notify_subscribers()
 
@@ -601,17 +607,17 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       conn: conn,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
-      processed_event_ids: processed_event_ids,
+      processed_event_numbers: processed_event_numbers,
       last_ack: last_ack
     } = data
 
     ack = last_ack + 1
 
     cond do
-      MapSet.member?(processed_event_ids, ack) ->
+      MapSet.member?(processed_event_numbers, ack) ->
         %SubscriptionState{
           data
-          | processed_event_ids: MapSet.delete(processed_event_ids, ack),
+          | processed_event_numbers: MapSet.delete(processed_event_numbers, ack),
             last_ack: ack
         }
         |> checkpoint_last_seen(true)

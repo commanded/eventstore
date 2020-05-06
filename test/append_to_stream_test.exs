@@ -53,11 +53,11 @@ defmodule EventStore.AppendToStreamTest do
   end
 
   describe "append to new stream using `:stream_exists`" do
-    test "should return `{:error, :stream_does_not_exist}`" do
+    test "should return `{:error, :stream_not_found}`" do
       stream_uuid = UUID.uuid4()
       events = EventFactory.create_events(3)
 
-      assert {:error, :stream_does_not_exist} =
+      assert {:error, :stream_not_found} =
                EventStore.append_to_stream(stream_uuid, :stream_exists, events)
     end
   end
