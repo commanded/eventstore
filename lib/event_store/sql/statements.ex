@@ -268,16 +268,16 @@ defmodule EventStore.Sql.Statements do
         1 ->
           # first row of values define their types
           [
-            "($3::bigint, $4::uuid)"
+            "($3::uuid, $4::bigint)"
           ]
 
         event_number ->
           index = (event_number - 1) * 2 + 2
 
           params = [
-            # index
-            Integer.to_string(index + 1),
             # event_id
+            Integer.to_string(index + 1),
+            # stream version
             Integer.to_string(index + 2)
           ]
 
@@ -293,11 +293,12 @@ defmodule EventStore.Sql.Statements do
       """
       WITH
         stream AS (
-          UPDATE streams SET stream_version = stream_version + $2
-          WHERE stream_id = $1
-          RETURNING stream_version - $2 as initial_stream_version
+          UPDATE streams
+          SET stream_version = stream_version + $2::bigint
+          WHERE stream_id = $1::bigint
+          RETURNING stream_id
         ),
-        events (index, event_id) AS (
+        events (event_id, stream_version) AS (
           VALUES
       """,
       params,
@@ -313,10 +314,10 @@ defmodule EventStore.Sql.Statements do
         )
       SELECT
         events.event_id,
-        $1,
-        stream.initial_stream_version + events.index,
-        $1,
-        stream.initial_stream_version + events.index
+        stream.stream_id,
+        events.stream_version,
+        stream.stream_id,
+        events.stream_version
       FROM events, stream;
       """
     ]

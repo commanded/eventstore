@@ -412,8 +412,8 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
         # Stop connection holding lock to release it
         ProcessHelper.shutdown(conn2)
 
-        # Attempt to resubscribe should now succeed
         Wait.until(fn ->
+          # Attempt to resubscribe should now succeed
           subscription = SubscriptionFsm.subscribe(subscription)
 
           assert subscription.state == :request_catch_up

@@ -22,6 +22,12 @@ You can drop and recreate an EventStore database by running:
 mix do event_store.drop, event_store.create, event_store.init
 ```
 
+## v1.0.3
+
+### Bug fixes
+
+- Use event's stream version when appending events to a stream ([#202](https://github.com/commanded/eventstore/pull/202)).
+
 ## v1.0.2
 
 #### Enhancements
