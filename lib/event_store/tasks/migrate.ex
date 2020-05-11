@@ -5,6 +5,7 @@ defmodule EventStore.Tasks.Migrate do
 
   import EventStore.Tasks.Output
 
+  alias EventStore.Storage
   alias EventStore.Config
   alias EventStore.Storage.Database
 
@@ -30,24 +31,50 @@ defmodule EventStore.Tasks.Migrate do
   """
   def exec(config, opts) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
-
     config = Config.default_postgrex_opts(config)
 
-    migrations =
-      case event_store_schema_version(config) do
-        [] ->
-          # run all migrations
-          @available_migrations
+    {:ok, conn} = Postgrex.start_link(config)
 
-        [event_store_version | _] ->
-          # only run newer migrations
-          @available_migrations
-          |> Enum.filter(fn migration_version ->
-            migration_version |> Version.parse!() |> Version.compare(event_store_version) == :gt
-          end)
-      end
+    with :ok <- acquire_migration_lock(conn) do
+      migrations = available_migrations(config)
 
-    migrate(config, opts, migrations)
+      migrate(config, opts, migrations)
+
+      GenServer.stop(conn)
+    else
+      {:error, :lock_already_taken} ->
+        GenServer.stop(conn)
+
+        write_info("EventStore database migration already in progress.", opts)
+
+      {:error, %Postgrex.Error{} = error} ->
+        GenServer.stop(conn)
+
+        raise_msg(
+          "The EventStore database could not be migrated. Could not acquire migration lock due to: " <>
+            inspect(error),
+          opts
+        )
+    end
+  end
+
+  # Prevent database migrations from running concurrently.
+  defp acquire_migration_lock(conn) do
+    Storage.Lock.try_acquire_exclusive_lock(conn, -1)
+  end
+
+  defp available_migrations(config) do
+    case event_store_schema_version(config) do
+      %Version{} = event_store_version ->
+        # Only run newer migrations
+        Enum.filter(@available_migrations, fn migration_version ->
+          migration_version |> Version.parse!() |> Version.compare(event_store_version) == :gt
+        end)
+
+      nil ->
+        # Run all migrations
+        @available_migrations
+    end
   end
 
   defp migrate(_config, opts, []) do
@@ -87,6 +114,7 @@ defmodule EventStore.Tasks.Migrate do
         _ -> false
       end
     end)
+    |> Enum.at(0)
   end
 
   defp query_schema_migrations(config) do

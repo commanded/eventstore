@@ -8,7 +8,7 @@ defmodule Snapshot do
   defstruct [:data, version: "1"]
 end
 
-defmodule MigratedStoreTest do
+defmodule MigratedEventStoreTest do
   use ExUnit.Case
 
   alias EventStore.RecordedEvent

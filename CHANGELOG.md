@@ -7,6 +7,7 @@
 - Support Postgres schemas ([#182](https://github.com/commanded/eventstore/pull/182)).
 - Dynamic event store ([#184](https://github.com/commanded/eventstore/pull/184)).
 - Add `timeout` option to config ([#189](https://github.com/commanded/eventstore/pull/189)).
+- Use database lock to prevent migrations from running concurrently ([#204](https://github.com/commanded/eventstore/pull/204)).
 
 ### Upgrading
 

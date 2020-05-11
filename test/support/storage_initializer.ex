@@ -8,6 +8,8 @@ defmodule EventStore.StorageInitializer do
     with {:ok, conn} <- Postgrex.start_link(config) do
       Initializer.reset!(conn)
 
+      :ok = GenServer.stop(conn)
+
       :ok
     end
   end
