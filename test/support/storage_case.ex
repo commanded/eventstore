@@ -20,7 +20,7 @@ defmodule EventStore.StorageCase do
       init_eventstores()
     end
 
-    {:ok, conn} = Postgrex.start_link(postgrex_config)
+    conn = start_supervised!({Postgrex, postgrex_config})
 
     [
       conn: conn,

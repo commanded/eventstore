@@ -9,7 +9,7 @@ defmodule SchemaTest do
     config = SchemaEventStore.config()
     postgrex_config = Config.default_postgrex_opts(config)
 
-    {:ok, conn} = Postgrex.start_link(postgrex_config)
+    conn = start_supervised!({Postgrex, postgrex_config}, id: :schema_conn)
 
     [schema_conn: conn]
   end

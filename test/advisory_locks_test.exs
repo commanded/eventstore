@@ -1,7 +1,7 @@
 defmodule EventStore.AdvisoryLocksTest do
   use EventStore.StorageCase
 
-  alias EventStore.{AdvisoryLocks, Config, ProcessHelper, Wait}
+  alias EventStore.{AdvisoryLocks, Config, Wait}
   alias EventStore.Storage
 
   @locks TestEventStore.EventStore.AdvisoryLocks
@@ -10,7 +10,7 @@ defmodule EventStore.AdvisoryLocksTest do
   setup do
     postgrex_config = Config.parsed(TestEventStore, :eventstore) |> Config.default_postgrex_opts()
 
-    {:ok, conn} = Postgrex.start_link(postgrex_config)
+    conn = start_supervised!({Postgrex, postgrex_config})
 
     [conn: conn]
   end
@@ -45,18 +45,20 @@ defmodule EventStore.AdvisoryLocksTest do
 
       pid =
         spawn_link(fn ->
-          assert {:ok, _lock} = AdvisoryLocks.try_advisory_lock(@locks, 1)
+          {:ok, _lock} = AdvisoryLocks.try_advisory_lock(@locks, 1)
 
           send(reply_to, :lock_acquired)
 
-          # Wait until terminated
-          :timer.sleep(:infinity)
+          # Wait until shutdown
+          receive do
+            :shutdown -> :ok
+          end
         end)
 
       assert_receive :lock_acquired
       assert {:error, :lock_already_taken} = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
 
-      ProcessHelper.shutdown(pid)
+      send(pid, :shutdown)
 
       # Wait for lock to be released after process terminates
       Wait.until(fn ->
@@ -67,7 +69,7 @@ defmodule EventStore.AdvisoryLocksTest do
 
   describe "disconnect" do
     test "should send `lock_released` message" do
-      assert {:ok, lock} = AdvisoryLocks.try_advisory_lock(@locks, 1)
+      {:ok, lock} = AdvisoryLocks.try_advisory_lock(@locks, 1)
 
       connection_down()
 
@@ -79,17 +81,19 @@ defmodule EventStore.AdvisoryLocksTest do
     setup do
       postgrex_config = Config.parsed(TestEventStore, :eventstore)
 
-      {:ok, conn1} =
+      public_schema =
         postgrex_config
         |> Keyword.put(:schema, "public")
         |> Config.default_postgrex_opts()
-        |> Postgrex.start_link()
 
-      {:ok, conn2} =
+      conn1 = start_supervised!({Postgrex, public_schema}, id: :conn1)
+
+      example_schema =
         postgrex_config
         |> Keyword.put(:schema, "example")
         |> Config.default_postgrex_opts()
-        |> Postgrex.start_link()
+
+      conn2 = start_supervised!({Postgrex, example_schema}, id: :conn2)
 
       [conn1: conn1, conn2: conn2]
     end

@@ -506,13 +506,9 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
         |> EventStore.Config.parsed(:eventstore)
         |> EventStore.Config.sync_connect_postgrex_opts()
 
-      {:ok, conn} = Postgrex.start_link(config)
+      conn = start_supervised!({Postgrex, config})
 
       EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1)
-
-      on_exit(fn ->
-        ProcessHelper.shutdown(conn)
-      end)
 
       [conn2: conn]
     end

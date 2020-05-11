@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config, EventFactory, ProcessHelper, Storage}
+  alias EventStore.{Config, EventFactory, Storage}
   alias EventStore.Subscriptions.Subscription
 
   @conn TestEventStore.Postgrex
@@ -109,7 +109,6 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
     end
 
     test "should only allow single active subscription", %{
-      conn2: conn2,
       event_store: event_store,
       subscription: subscription
     } do
@@ -119,7 +118,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       refute_receive {:events, _received_events}
 
       # Release lock, allowing subscriber to subscribe
-      ProcessHelper.shutdown(conn2)
+      stop_supervised!(:subscription_conn)
 
       # Subscription should now be subscribed
       assert_receive {:subscribed, ^subscription}
@@ -152,13 +151,9 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   defp lock_subscription(context) do
     config = Map.fetch!(context, :config) |> Config.sync_connect_postgrex_opts()
 
-    {:ok, conn} = Postgrex.start_link(config)
+    conn = start_supervised!({Postgrex, config}, id: :subscription_conn)
 
-    EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1)
-
-    on_exit(fn ->
-      ProcessHelper.shutdown(conn)
-    end)
+    :ok = EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1)
 
     [conn2: conn]
   end
