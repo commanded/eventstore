@@ -123,7 +123,7 @@ To drop an existing EventStore database and recreate it you can run the followin
 $ mix do event_store.drop, event_store.create, event_store.init
 ```
 
-*Warning* this will delete all EventStore data.
+*Warning* This will drop the database and delete all data.
 
 ## Initialize a database using an Elixir release
 
@@ -135,8 +135,8 @@ $ mix do event_store.create, event_store.init
 
 To do that you can use task modules defined inside EventStore (in `lib/mix/tasks`):
 
-* [Tasks.EventStore.Create](https://github.com/commanded/eventstore/blob/master/lib/event_store/tasks/create.ex)
-* [Tasks.EventStore.Init](https://github.com/commanded/eventstore/blob/master/lib/event_store/tasks/init.ex)
+* [EventStore.Tasks.Create](https://github.com/commanded/eventstore/blob/master/lib/event_store/tasks/create.ex)
+* [EventStore.Tasks.Init](https://github.com/commanded/eventstore/blob/master/lib/event_store/tasks/init.ex)
 
  So you can take advantage of the [running one-off commands](https://hexdocs.pm/mix/Mix.Tasks.Release.html#module-one-off-commands-eval-and-rpc) supported by Mix release, using a helper module defined like this:
 
@@ -148,7 +148,7 @@ defmodule MyApp.ReleaseTasks do
 
     :ok = Application.load(:my_app)
 
-    config = EventStore.Config.parsed(MyApp.EventStore, :my_app)
+    config = MyApp.EventStore.config()
 
     :ok = EventStore.Tasks.Create.exec(config, [])
     :ok = EventStore.Tasks.Init.exec(MyApp.EventStore, config, [])
@@ -160,11 +160,23 @@ end
 
 A Postgres database contains one or more [named schemas](https://www.postgresql.org/docs/current/ddl-schemas.html), which in turn contain tables. By default tables are defined in a schema named "public".
 
-An EventStore an be configured to use a different schema name. Specify the schema when using the `EventStore` macro in your event store module:
+An EventStore can be configured to use a different schema name. Specify the schema when using the `EventStore` macro in your event store module:
 
 ```elixir
 defmodule MyApp.EventStore do
   use EventStore, otp_app: :my_app, schema: "example"
+end
+```
+
+Or provide the schema as an option in the `init/1` callback function:
+
+```elixir
+defmodule MyApp.EventStore do
+  use EventStore, otp_app: :my_app
+
+  def init(config) do
+    {:ok, Keyword.put(config, :schema, "example")}
+  end
 end
 ```
 

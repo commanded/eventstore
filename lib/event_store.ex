@@ -73,11 +73,21 @@ defmodule EventStore do
         use EventStore, otp_app: :my_app, schema: "schema_name"
       end
 
+  Or provide the schema as an option in the `init/1` callback function:
+
+      defmodule MyApp.EventStore do
+        use EventStore, otp_app: :my_app
+
+        def init(config) do
+          {:ok, Keyword.put(config, :schema, "schema_name")}
+        end
+      end
+
   Or define it in environment config when configuring the database connection
   settings:
 
       # config/config.exs
-      config :my_app, MyApp.EventStore, schema: "example"
+      config :my_app, MyApp.EventStore, schema: "schema_name"
 
   This feature allows you to define and start multiple event stores sharing a
   single Postgres database, but with their data isolated and segregated by
@@ -106,7 +116,7 @@ defmodule EventStore do
       {:ok, _pid} = EventStore.start_link(name: :eventstore2)
       {:ok, _pid} = EventStore.start_link(name: :eventstore3)
 
-  Use an event store by providing a name:
+  Use a dynamic event store by providing its name as an option to each function:
 
       :ok = EventStore.append_to_stream(stream_uuid, expected_version, events, name: :eventstore1)
 
@@ -124,14 +134,15 @@ defmodule EventStore do
 
       children =
         for tenant <- [:tenant1, :tenant2, :tenant3] do
-          {MyApp.EventStore, name: :tenant1, schema: Atom.to_string("tenant1")}
+          {MyApp.EventStore, name: :tenant1, schema: Atom.to_string(tenant)}
         end
 
       opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+
       Supervisor.start_link(children, opts)
 
   The above can be used for multi-tenancy where the data for each tenant is
-  stored in a separate schema.
+  stored in a separate, isolated schema.
 
   ## Guides
 

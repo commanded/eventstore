@@ -11,17 +11,7 @@
 
 ### Upgrading
 
-Upgrade an existing EventStore database by running:
-
-```console
-mix event_store.migrate
-```
-
-You can drop and recreate an EventStore database by running:
-
-```console
-mix do event_store.drop, event_store.create, event_store.init
-```
+This release requires a database migration to be run. Please read the [Upgrading an EventStore](https://hexdocs.pm/eventstore/upgrades.html) guide for details on how to migrate an existing database.
 
 ## v1.0.3
 
