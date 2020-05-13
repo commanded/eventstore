@@ -58,7 +58,7 @@ BEGIN
     FOR EACH STATEMENT
     EXECUTE PROCEDURE event_store_delete('Cannot delete stream events');
 
-  CREATE TRIGGER no_delete_events
+  CREATE TRIGGER no_delete_streams
     BEFORE DELETE ON streams
     FOR EACH STATEMENT
     EXECUTE PROCEDURE event_store_delete('Cannot delete streams');

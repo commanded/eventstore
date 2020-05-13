@@ -190,7 +190,7 @@ defmodule EventStore.Sql.Statements do
 
   def prevent_streams_delete do
     """
-    CREATE TRIGGER no_delete_events
+    CREATE TRIGGER no_delete_streams
     BEFORE DELETE ON streams
     FOR EACH STATEMENT
     EXECUTE PROCEDURE event_store_delete('Cannot delete streams');

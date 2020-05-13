@@ -687,7 +687,7 @@ defmodule EventStore do
       - `:hard` - the stream and its events are permanently deleted from the
         database.
 
-      Soft deletion is the default it the type is not provided.
+      Soft deletion is the default if the type is not provided.
 
   Returns `:ok` on success or an error tagged tuple on failure.
 
@@ -708,8 +708,8 @@ defmodule EventStore do
   will remove data**. Events will be removed from the globally ordered all
   events stream and any linked streams.
 
-  After being hard deleted, a stream can later be appended to and read as if had
-  never existed.
+  After being hard deleted, a stream can later be appended to and read as if it
+  had never existed.
 
   ### Examples
 

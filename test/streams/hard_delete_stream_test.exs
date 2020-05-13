@@ -62,6 +62,9 @@ defmodule EventStore.Streams.HardDeleteStreamTest do
       events = EventFactory.create_events(1)
 
       assert :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      assert {:ok, [event]} = EventStore.read_stream_forward(stream_uuid)
+      assert match?(%RecordedEvent{stream_uuid: ^stream_uuid, stream_version: 1}, event)
     end
 
     test "should prevent deleting global `$all` events stream" do
