@@ -1,13 +1,49 @@
 # Changelog
 
-## Next release
+## v1.1.0
 
 ### Enhancements
 
 - Support Postgres schemas ([#182](https://github.com/commanded/eventstore/pull/182)).
 - Dynamic event store ([#184](https://github.com/commanded/eventstore/pull/184)).
 - Add `timeout` option to config ([#189](https://github.com/commanded/eventstore/pull/189)).
+- Namespace advisory lock to prevent clash with other applications ([#166](https://github.com/commanded/eventstore/issues/166)).
 - Use database lock to prevent migrations from running concurrently ([#204](https://github.com/commanded/eventstore/pull/204)).
+
+### Breaking changes
+
+The following EventStore API functions have been changed where previously (in v1.0 and earlier) the last argument was an optional timeout (a non-negative integer or `:infinity`). This has been changed to be an optional Keyword list, which may include a timeout (e.g. `[timeout: 5_000]`). The `stream_forward` and `stream_all_forward` functions now also require the optional `read_batch_size` argument to be provided as part of the options Keyword list.
+
+These changes were required to support dynamic event stores where an event store name can be included in the options to each function. If you did not provide a timeout to any of these functions then you will not need to make any changes to your code. See the example usages below for details.
+
+- `EventStore.append_to_stream`
+- `EventStore.link_to_stream`
+- `EventStore.read_stream_forward`
+- `EventStore.read_all_streams_forward`
+- `EventStore.stream_forward`
+- `EventStore.stream_all_forward`
+
+Previous usage:
+
+```elixir
+EventStore.append_to_stream(stream_uuid, expected_version, events, timeout)
+EventStore.link_to_stream(stream_uuid, expected_version, events_or_event_ids, timeout)
+EventStore.read_stream_forward(stream_uuid, start_version, count, timeout)
+EventStore.read_all_streams_forward(start_version, count, timeout)
+EventStore.stream_forward(stream_uuid, start_version, read_batch_size, timeout)
+EventStore.stream_all_forward(start_version, read_batch_size, timeout)
+```
+
+Usage now:
+
+```elixir
+EventStore.append_to_stream(stream_uuid, expected_version, events, timeout: timeout)
+EventStore.link_to_stream(stream_uuid, expected_version, events_or_event_ids, timeout: timeout)
+EventStore.read_stream_forward(stream_uuid, start_version, count, timeout: timeout)
+EventStore.read_all_streams_forward(start_version, count, timeout: timeout)
+EventStore.stream_forward(stream_uuid, start_version, read_batch_size: read_batch_size, timeout: timeout)
+EventStore.stream_all_forward(start_version, read_batch_size: read_batch_size, timeout: timeout)
+```
 
 ### Upgrading
 
