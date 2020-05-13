@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Enhancements
+
+- Delete event stream ([#203](https://github.com/commanded/eventstore/pull/203)).
+
 ## v1.1.0
 
 ### Enhancements
