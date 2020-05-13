@@ -16,7 +16,11 @@ defmodule EventStore.Storage.Database do
     end
   end
 
-  def dump(config, target_path) do
+  def dump(config, target_path) when is_binary(target_path) do
+    dump(config, File.stream!(target_path))
+  end
+
+  def dump(config, collectable) do
     database = Keyword.fetch!(config, :database)
 
     unless System.find_executable("pg_dump") do
@@ -27,7 +31,7 @@ defmodule EventStore.Storage.Database do
     args = include_default_args([database], config)
     env = parse_env(config)
 
-    System.cmd("pg_dump", args, env: env, into: File.stream!(target_path))
+    System.cmd("pg_dump", args, env: env, into: collectable)
   end
 
   def restore(config, dump_path) do

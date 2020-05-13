@@ -271,15 +271,15 @@ defmodule EventStore do
       end
 
       def read_all_streams_forward(
-            start_event_number \\ 0,
+            start_version \\ 0,
             count \\ @default_count,
             opts \\ []
           )
 
-      def read_all_streams_forward(start_event_number, count, opts) do
+      def read_all_streams_forward(start_version, count, opts) do
         {conn, opts} = opts(opts)
 
-        Stream.read_stream_forward(conn, @all_stream, start_event_number, count, opts)
+        Stream.read_stream_forward(conn, @all_stream, start_version, count, opts)
       end
 
       def stream_forward(stream_uuid, start_version \\ 0, opts \\ [])
@@ -591,7 +591,7 @@ defmodule EventStore do
   Reads the requested number of events from all streams, in the order in which
   they were originally written.
 
-    - `start_event_number` optionally, the number of the first event to read.
+    - `start_version` optionally, the number of the first event to read.
       Defaults to the beginning of the stream if not set.
 
     - `count` optionally, the maximum number of events to read.
@@ -603,7 +603,7 @@ defmodule EventStore do
         milliseconds. Defaults to 15,000ms.
   """
   @callback read_all_streams_forward(
-              start_event_number :: non_neg_integer,
+              start_version :: non_neg_integer,
               count :: non_neg_integer,
               opts :: options
             ) :: {:ok, list(EventStore.RecordedEvent.t())} | {:error, reason :: term}
@@ -632,7 +632,7 @@ defmodule EventStore do
   Streams events from all streams, in the order in which they were originally
   written.
 
-    - `start_event_number` optionally, the number of the first event to read.
+    - `start_version` optionally, the number of the first event to read.
       Defaults to the beginning of the stream if not set.
 
     - `opts` an optional keyword list containing:
@@ -643,7 +643,7 @@ defmodule EventStore do
         storage. Defaults to reading 1,000 events per batch.
   """
   @callback stream_all_forward(
-              start_event_number :: non_neg_integer,
+              start_version :: non_neg_integer,
               opts :: [options | {:read_batch_size, non_neg_integer}]
             ) :: Enumerable.t()
 
