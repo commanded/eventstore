@@ -11,15 +11,18 @@ defmodule EventStore.Sql.Statements do
     [
       create_streams_table(),
       create_stream_uuid_index(),
-      seed_all_stream(),
       create_events_table(column_data_type),
-      prevent_event_update(),
-      prevent_event_delete(),
       create_stream_events_table(),
       create_stream_events_index(),
-      prevent_stream_events_update(),
+      create_event_store_exception_function(),
+      create_event_store_delete_function(),
+      prevent_streams_delete(),
+      prevent_event_delete(),
+      prevent_event_update(),
       prevent_stream_events_delete(),
+      prevent_stream_events_update(),
       create_notify_events_function(),
+      seed_all_stream(),
       create_event_notification_trigger(),
       create_subscriptions_table(),
       create_subscription_index(),
@@ -31,21 +34,11 @@ defmodule EventStore.Sql.Statements do
 
   def reset do
     [
-      drop_rule("no_update_stream_events", "stream_events"),
-      drop_rule("no_delete_stream_events", "stream_events"),
-      drop_rule("no_update_events", "events"),
-      drop_rule("no_delete_events", "events"),
+      "SET SESSION eventstore.reset TO 'on'",
       truncate_tables(),
       seed_all_stream(),
-      prevent_event_update(),
-      prevent_event_delete(),
-      prevent_stream_events_update(),
-      prevent_stream_events_delete()
+      "SET SESSION eventstore.reset TO DEFAULT"
     ]
-  end
-
-  defp drop_rule(name, table) do
-    "DROP RULE #{name} ON #{table}"
   end
 
   defp truncate_tables do
@@ -62,7 +55,8 @@ defmodule EventStore.Sql.Statements do
         stream_id bigserial PRIMARY KEY NOT NULL,
         stream_uuid text NOT NULL,
         stream_version bigint default 0 NOT NULL,
-        created_at timestamp with time zone default now() NOT NULL
+        created_at timestamp with time zone DEFAULT NOW() NOT NULL,
+        deleted_at timestamp with time zone
     );
     """
   end
@@ -90,22 +84,67 @@ defmodule EventStore.Sql.Statements do
         correlation_id uuid NULL,
         data #{column_data_type} NOT NULL,
         metadata #{column_data_type} NULL,
-        created_at timestamp with time zone default now() NOT NULL
+        created_at timestamp with time zone DEFAULT NOW() NOT NULL
     );
+    """
+  end
+
+  defp create_event_store_exception_function do
+    """
+      CREATE OR REPLACE FUNCTION event_store_exception()
+        RETURNS trigger AS $$
+      DECLARE
+        message text;
+      BEGIN
+        message := 'EventStore: ' || TG_ARGV[0];
+
+        RAISE EXCEPTION USING MESSAGE = message;
+      END;
+      $$ LANGUAGE plpgsql;
+    """
+  end
+
+  # Prevent DELETE operations unless hard deletes have been enabled.
+  defp create_event_store_delete_function do
+    """
+      CREATE OR REPLACE FUNCTION event_store_delete()
+        RETURNS trigger AS $$
+      DECLARE
+        message text;
+      BEGIN
+        IF current_setting('eventstore.enable_hard_deletes', true) = 'on' OR
+          current_setting('eventstore.reset', true) = 'on'
+        THEN
+          -- Allow DELETE
+          RETURN OLD;
+        ELSE
+          -- Prevent DELETE
+          message := 'EventStore: ' || TG_ARGV[0];
+
+          RAISE EXCEPTION USING MESSAGE = message, ERRCODE = 'feature_not_supported';
+        END IF;
+      END;
+      $$ LANGUAGE plpgsql;
     """
   end
 
   # prevent updates to `events` table
   defp prevent_event_update do
     """
-    CREATE RULE no_update_events AS ON UPDATE TO events DO INSTEAD NOTHING;
+    CREATE TRIGGER no_update_events
+    BEFORE UPDATE ON events
+    FOR EACH STATEMENT
+    EXECUTE PROCEDURE event_store_exception('Cannot update events');
     """
   end
 
   # prevent deletion from `events` table
   defp prevent_event_delete do
     """
-    CREATE RULE no_delete_events AS ON DELETE TO events DO INSTEAD NOTHING;
+    CREATE TRIGGER no_delete_events
+    BEFORE DELETE ON events
+    FOR EACH STATEMENT
+    EXECUTE PROCEDURE event_store_delete('Cannot delete events');
     """
   end
 
@@ -132,14 +171,29 @@ defmodule EventStore.Sql.Statements do
   # prevent updates to `stream_events` table
   defp prevent_stream_events_update do
     """
-    CREATE RULE no_update_stream_events AS ON UPDATE TO stream_events DO INSTEAD NOTHING;
+    CREATE TRIGGER no_update_stream_events
+    BEFORE UPDATE ON stream_events
+    FOR EACH STATEMENT
+    EXECUTE PROCEDURE event_store_exception('Cannot update stream events');
     """
   end
 
   # prevent deletion from `stream_events` table
-  defp prevent_stream_events_delete do
+  def prevent_stream_events_delete do
     """
-    CREATE RULE no_delete_stream_events AS ON DELETE TO stream_events DO INSTEAD NOTHING;
+    CREATE TRIGGER no_delete_stream_events
+    BEFORE DELETE ON stream_events
+    FOR EACH STATEMENT
+    EXECUTE PROCEDURE event_store_delete('Cannot delete stream events');
+    """
+  end
+
+  def prevent_streams_delete do
+    """
+    CREATE TRIGGER no_delete_events
+    BEFORE DELETE ON streams
+    FOR EACH STATEMENT
+    EXECUTE PROCEDURE event_store_delete('Cannot delete streams');
     """
   end
 
@@ -186,7 +240,7 @@ defmodule EventStore.Sql.Statements do
         stream_uuid text NOT NULL,
         subscription_name text NOT NULL,
         last_seen bigint NULL,
-        created_at timestamp with time zone default now() NOT NULL
+        created_at timestamp with time zone DEFAULT NOW() NOT NULL
     );
     """
   end
@@ -206,7 +260,7 @@ defmodule EventStore.Sql.Statements do
         source_type text NOT NULL,
         data #{column_data_type} NOT NULL,
         metadata #{column_data_type} NULL,
-        created_at timestamp with time zone default now() NOT NULL
+        created_at timestamp with time zone DEFAULT NOW() NOT NULL
     );
     """
   end
@@ -219,7 +273,7 @@ defmodule EventStore.Sql.Statements do
         major_version int NOT NULL,
         minor_version int NOT NULL,
         patch_version int NOT NULL,
-        migrated_at timestamp with time zone default now() NOT NULL,
+        migrated_at timestamp with time zone DEFAULT NOW() NOT NULL,
         PRIMARY KEY(major_version, minor_version, patch_version)
     );
     """
@@ -229,7 +283,7 @@ defmodule EventStore.Sql.Statements do
   defp record_event_store_schema_version do
     """
     INSERT INTO schema_migrations (major_version, minor_version, patch_version)
-    VALUES (1, 1, 0);
+    VALUES (1, 2, 0);
     """
   end
 
@@ -388,6 +442,35 @@ defmodule EventStore.Sql.Statements do
     ]
   end
 
+  def soft_delete_stream do
+    """
+    UPDATE streams
+    SET deleted_at = NOW()
+    WHERE stream_id = $1;
+    """
+  end
+
+  def hard_delete_stream do
+    """
+    WITH deleted_stream_events AS (
+      DELETE FROM stream_events
+      WHERE stream_id = $1
+      RETURNING event_id
+    ),
+    linked_events AS (
+      DELETE FROM stream_events
+      WHERE event_id IN (SELECT event_id FROM deleted_stream_events)
+    ),
+    events AS (
+      DELETE FROM events
+      WHERE event_id IN (SELECT event_id FROM deleted_stream_events)
+    )
+    DELETE FROM streams
+    WHERE stream_id = $1
+    RETURNING stream_id;
+    """
+  end
+
   def create_subscription do
     """
     INSERT INTO subscriptions (stream_uuid, subscription_name, last_seen)
@@ -473,17 +556,9 @@ defmodule EventStore.Sql.Statements do
     """
   end
 
-  def query_stream_id do
+  def query_stream_info do
     """
-    SELECT stream_id
-    FROM streams
-    WHERE stream_uuid = $1;
-    """
-  end
-
-  def query_stream_id_and_latest_version do
-    """
-    SELECT stream_id, stream_version
+    SELECT stream_id, stream_version, deleted_at
     FROM streams
     WHERE stream_uuid = $1;
     """
@@ -513,7 +588,7 @@ defmodule EventStore.Sql.Statements do
     FROM stream_events se
     INNER JOIN streams s ON s.stream_id = se.original_stream_id
     INNER JOIN events e ON se.event_id = e.event_id
-    WHERE se.stream_id = $1 and se.stream_version >= $2
+    WHERE se.stream_id = $1 AND se.stream_version >= $2
     ORDER BY se.stream_version ASC
     LIMIT $3;
     """

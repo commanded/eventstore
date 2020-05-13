@@ -27,10 +27,7 @@ defmodule EventStore.Storage.Subscription do
     do: Subscription.All.execute(conn, opts)
 
   def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from, opts \\ []) do
-    with {:ok, subscription} <-
-           Subscription.Query.execute(conn, stream_uuid, subscription_name, opts) do
-      {:ok, subscription}
-    else
+    case Subscription.Query.execute(conn, stream_uuid, subscription_name, opts) do
       {:error, :subscription_not_found} ->
         create_subscription(conn, stream_uuid, subscription_name, start_from, opts)
 

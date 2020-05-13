@@ -74,7 +74,7 @@ defmodule EventStore.Config do
   def default_postgrex_opts(config) do
     config
     |> Keyword.take(@postgrex_connection_opts)
-    |> Keyword.put(:after_connect, set_schema_search_path(config))
+    |> Keyword.put(:after_connect, after_connect(config))
   end
 
   def postgrex_opts(config, name) do
@@ -97,7 +97,7 @@ defmodule EventStore.Config do
     )
     |> Keyword.put(:backoff_type, :exp)
     |> Keyword.put(:name, Module.concat([name, Postgrex]))
-    |> Keyword.put(:after_connect, set_schema_search_path(config))
+    |> Keyword.put(:after_connect, after_connect(config))
   end
 
   def sync_connect_postgrex_opts(config) do
@@ -107,11 +107,29 @@ defmodule EventStore.Config do
     |> Keyword.put(:sync_connect, true)
   end
 
+  defp after_connect(config) do
+    schema = Keyword.fetch!(config, :schema)
+    enable_hard_deletes = Keyword.get(config, :enable_hard_deletes, false)
+
+    transaction = fn conn ->
+      set_schema_search_path(conn, schema)
+      set_enable_hard_deletes(conn, enable_hard_deletes)
+    end
+
+    {Postgrex, :transaction, [transaction]}
+  end
+
   # Set the Postgres connection's `search_path` to include only the configured
   # schema. This will be `public` by default.
-  defp set_schema_search_path(config) do
-    schema = Keyword.fetch!(config, :schema)
-
-    {Postgrex, :query!, ["SET search_path TO #{schema};", []]}
+  defp set_schema_search_path(conn, schema) do
+    Postgrex.query!(conn, "SET SESSION search_path TO #{schema};", [])
   end
+
+  # Optionally enable hard deletes to allow destructive delete operations for
+  # events, streams, and stream events tables.
+  defp set_enable_hard_deletes(conn, true) do
+    Postgrex.query!(conn, "SET SESSION eventstore.enable_hard_deletes TO 'on';", [])
+  end
+
+  defp set_enable_hard_deletes(_conn, false), do: nil
 end

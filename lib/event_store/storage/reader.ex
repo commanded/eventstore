@@ -54,15 +54,15 @@ defmodule EventStore.Storage.Reader do
         ]) do
       %RecordedEvent{
         event_number: event_number,
-        event_id: event_id |> from_uuid(),
+        event_id: from_uuid(event_id),
         stream_uuid: stream_uuid,
         stream_version: stream_version,
         event_type: event_type,
-        correlation_id: correlation_id |> from_uuid(),
-        causation_id: causation_id |> from_uuid(),
+        correlation_id: from_uuid(correlation_id),
+        causation_id: from_uuid(causation_id),
         data: data,
         metadata: metadata,
-        created_at: created_at |> from_timestamp()
+        created_at: from_timestamp(created_at)
       }
     end
 
@@ -72,7 +72,7 @@ defmodule EventStore.Storage.Reader do
     defp from_timestamp(%DateTime{} = timestamp), do: timestamp
 
     defp from_timestamp(%NaiveDateTime{} = timestamp) do
-      timestamp |> DateTime.from_naive("Etc/UTC")
+      DateTime.from_naive(timestamp, "Etc/UTC")
     end
 
     if Code.ensure_loaded?(Postgrex.Timestamp) do

@@ -6,6 +6,7 @@ defmodule EventStore.Storage do
   alias EventStore.Storage.{
     Appender,
     CreateStream,
+    DeleteStream,
     QueryStreamInfo,
     Reader,
     Snapshot,
@@ -47,6 +48,16 @@ defmodule EventStore.Storage do
   def stream_info(conn, stream_uuid, opts \\ []) do
     QueryStreamInfo.execute(conn, stream_uuid, opts)
   end
+
+  @doc """
+  Soft delete a stream by marking it as deleted.
+  """
+  defdelegate soft_delete_stream(conn, stream_id, opts), to: DeleteStream, as: :soft_delete
+
+  @doc """
+  Hard delete a stream by removing the stream and all its event.
+  """
+  defdelegate hard_delete_stream(conn, stream_id, opts), to: DeleteStream, as: :hard_delete
 
   @doc """
   Create, or locate an existing, persistent subscription to a stream using a
