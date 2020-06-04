@@ -2,6 +2,7 @@ defmodule EventStore.Storage.AppendEventsTest do
   use EventStore.StorageCase
 
   alias EventStore.EventFactory
+  alias EventStore.RecordedEvent
   alias EventStore.Storage.{Appender, CreateStream}
 
   test "append single event to new stream", %{conn: conn} do
@@ -102,7 +103,9 @@ defmodule EventStore.Storage.AppendEventsTest do
     {:ok, stream_uuid, stream_id} = create_stream(conn)
     events = EventFactory.create_recorded_events(1, stream_uuid)
 
-    assert :ok = Appender.append(conn, stream_id, events)
+    :ok = Appender.append(conn, stream_id, events)
+
+    events = EventFactory.create_recorded_events(1, stream_uuid)
     assert {:error, :wrong_expected_version} = Appender.append(conn, stream_id, events)
   end
 
@@ -118,37 +121,79 @@ defmodule EventStore.Storage.AppendEventsTest do
     {:ok, stream_uuid, stream_id} = create_stream(conn)
     events = EventFactory.create_recorded_events(2, stream_uuid)
 
-    assert :ok = Appender.append(conn, stream_id, events)
+    :ok = Appender.append(conn, stream_id, events)
+
+    events = EventFactory.create_recorded_events(2, stream_uuid)
     assert {:error, :wrong_expected_version} = Appender.append(conn, stream_id, events)
   end
 
   test "append events to same stream concurrently", %{conn: conn} do
     {:ok, stream_uuid, stream_id} = create_stream(conn)
-    events = EventFactory.create_recorded_events(10, stream_uuid)
 
     results =
       1..5
       |> Enum.map(fn _ ->
         Task.async(fn ->
+          events = EventFactory.create_recorded_events(10, stream_uuid)
+
           Appender.append(conn, stream_id, events)
         end)
       end)
       |> Enum.map(&Task.await/1)
+      |> Enum.sort()
 
-    assert results --
-             [
-               :ok,
-               {:error, :wrong_expected_version},
-               {:error, :wrong_expected_version},
-               {:error, :wrong_expected_version},
-               {:error, :wrong_expected_version}
-             ] == []
+    assert results == [
+             :ok,
+             {:error, :wrong_expected_version},
+             {:error, :wrong_expected_version},
+             {:error, :wrong_expected_version},
+             {:error, :wrong_expected_version}
+           ]
+  end
+
+  test "append events to the same stream twice should fail", %{conn: conn} do
+    {:ok, stream_uuid, stream_id} = create_stream(conn)
+
+    events = EventFactory.create_recorded_events(3, stream_uuid)
+    :ok = Appender.append(conn, stream_id, events)
+
+    {:error, :duplicate_event} = Appender.append(conn, stream_id, events)
+  end
+
+  test "append existing events to the same stream should fail", %{conn: conn} do
+    {:ok, stream_uuid, stream_id} = create_stream(conn)
+
+    events = EventFactory.create_recorded_events(3, stream_uuid)
+    :ok = Appender.append(conn, stream_id, events)
+
+    for event <- events do
+      events = [%RecordedEvent{event | stream_version: 4}]
+
+      assert {:error, :duplicate_event} = Appender.append(conn, stream_id, events)
+    end
+  end
+
+  test "append existing events to a different stream should fail", %{conn: conn} do
+    {:ok, stream1_uuid, stream1_id} = create_stream(conn)
+    {:ok, stream2_uuid, stream2_id} = create_stream(conn)
+
+    events = EventFactory.create_recorded_events(3, stream1_uuid)
+    :ok = Appender.append(conn, stream1_id, events)
+
+    for event <- events do
+      events = [
+        %RecordedEvent{event | stream_uuid: stream2_uuid, stream_version: 1}
+      ]
+
+      assert {:error, :duplicate_event} = Appender.append(conn, stream2_id, events)
+    end
   end
 
   defp create_stream(conn) do
     stream_uuid = UUID.uuid4()
-    {:ok, stream_id} = CreateStream.execute(conn, stream_uuid)
 
-    {:ok, stream_uuid, stream_id}
+    with {:ok, stream_id} <- CreateStream.execute(conn, stream_uuid) do
+      {:ok, stream_uuid, stream_id}
+    end
   end
 end

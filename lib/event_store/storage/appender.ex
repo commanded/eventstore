@@ -11,9 +11,8 @@ defmodule EventStore.Storage.Appender do
   @doc """
   Append the given list of events to storage.
 
-  Events are inserted atomically in batches of 1,000 within a single
-  transaction. This is due to PostgreSQL's limit of 65,535 parameters in a
-  single statement.
+  Events are inserted in batches of 1,000 within a single transaction. This is
+  due to PostgreSQL's limit of 65,535 parameters for a single statement.
 
   Returns `:ok` on success, `{:error, reason}` on failure.
   """
@@ -186,20 +185,11 @@ defmodule EventStore.Storage.Appender do
   defp handle_response({:ok, %Postgrex.Result{}}), do: :ok
 
   defp handle_response({:error, %Postgrex.Error{} = error}) do
-    %Postgrex.Error{
-      postgres: %{
-        code: error_code,
-        constraint: constraint,
-        message: message
-      }
-    } = error
-
-    Logger.warn(fn ->
-      "Failed to append events to stream due to: #{inspect(message)}"
-    end)
+    %Postgrex.Error{postgres: %{code: error_code, constraint: constraint}} = error
 
     case {error_code, constraint} do
       {:foreign_key_violation, _constraint} -> {:error, :not_found}
+      {:unique_violation, "events_pkey"} -> {:error, :duplicate_event}
       {:unique_violation, "stream_events_pkey"} -> {:error, :duplicate_event}
       {:unique_violation, _constraint} -> {:error, :wrong_expected_version}
       {error_code, _constraint} -> {:error, error_code}
