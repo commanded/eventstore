@@ -8,14 +8,7 @@ defmodule EventStore.Tasks.Migrate do
   alias EventStore.Storage
   alias EventStore.Config
   alias EventStore.Storage.Database
-
-  @available_migrations [
-    "0.13.0",
-    "0.14.0",
-    "0.17.0",
-    "1.1.0",
-    "1.2.0"
-  ]
+  alias EventStore.Tasks.Migrations
 
   @dialyzer {:no_return, exec: 2, handle_response: 1}
 
@@ -68,13 +61,13 @@ defmodule EventStore.Tasks.Migrate do
     case event_store_schema_version(config) do
       %Version{} = event_store_version ->
         # Only run newer migrations
-        Enum.filter(@available_migrations, fn migration_version ->
+        Enum.filter(Migrations.available_migrations(), fn migration_version ->
           migration_version |> Version.parse!() |> Version.compare(event_store_version) == :gt
         end)
 
       nil ->
         # Run all migrations
-        @available_migrations
+        Migrations.available_migrations()
     end
   end
 
