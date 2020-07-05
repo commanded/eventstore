@@ -8,7 +8,7 @@ defmodule Mix.Tasks.EventStore.Migrations do
 
   ## Examples
 
-      mix event_store.migration -e MyApp.EventStore
+      mix event_store.migrations -e MyApp.EventStore
 
   ## Command line options
 
