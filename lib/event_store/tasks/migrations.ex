@@ -44,9 +44,11 @@ defmodule EventStore.Tasks.Migrations do
 
     Enum.each(migrations, &list_migration(&1, opts))
 
-    migrations
-    |> Enum.all?(& &1.state == :completed)
-    |> exit_normally()
+    if opts[:is_mix] do
+      migrations
+      |> Enum.all?(&(&1.state == :completed))
+      |> exit_normally()
+    end
   end
 
   @doc false
