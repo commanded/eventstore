@@ -237,6 +237,7 @@ EventStore exists thanks to the following people who have contributed.
 - [Eamon Taaffe](https://github.com/eamontaaffe)
 - [Floris Huetink](https://github.com/florish)
 - [Jan Vereecken](https://github.com/javereec)
+- [Kai Kuchenbecker](https://github.com/kaikuchn)
 - [Kaz Walker](https://github.com/KazW)
 - [Nicholas Henry](https://github.com/nicholasjhenry)
 - [Olafur Arason](https://github.com/olafura)

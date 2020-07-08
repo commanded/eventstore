@@ -38,24 +38,20 @@ defmodule EventStore.Tasks.Migrations do
 
     migrations = migrations(config)
     event_store = Keyword.get(opts, :eventstore, "default")
+    event_store_name = event_store |> to_string() |> String.replace_prefix("Elixir.", "")
 
-    write_info("EventStore: #{event_store}\n\n", opts)
+    write_info("\nEventStore: #{event_store_name}\n", opts)
     write_table_header(opts)
 
     Enum.each(migrations, &list_migration(&1, opts))
 
-    if opts[:is_mix] do
-      migrations
-      |> Enum.all?(&(&1.state == :completed))
-      |> exit_normally()
-    end
+    write_info("", opts)
+
+    Enum.map(migrations, & &1.state)
   end
 
   @doc false
   def available_migrations(), do: @available_migrations
-
-  defp exit_normally(true), do: exit(:normal)
-  defp exit_normally(false), do: exit({:shutdown, 1})
 
   defp list_migration(%Migration{version: version, state: :pending}, opts) do
     write_info("  #{version |> String.pad_trailing(10)}\tpending", opts)

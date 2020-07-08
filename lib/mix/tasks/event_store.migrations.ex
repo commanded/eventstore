@@ -13,6 +13,7 @@ defmodule Mix.Tasks.EventStore.Migrations do
   ## Command line options
 
     * `-e`, `--eventstore` - the event store to create
+    * `--quiet` - do not log output
 
   """
 
@@ -23,7 +24,10 @@ defmodule Mix.Tasks.EventStore.Migrations do
 
   @shortdoc "Display Migration status of an existing EventStore database"
 
-  @switches [eventstore: [:string, :keep]]
+  @switches [
+    eventstore: [:string, :keep],
+    quiet: :boolean
+  ]
 
   @aliases [e: :eventstore]
 
@@ -35,13 +39,23 @@ defmodule Mix.Tasks.EventStore.Migrations do
     {:ok, _} = Application.ensure_all_started(:postgrex)
     {:ok, _} = Application.ensure_all_started(:ssl)
 
-    Enum.each(event_stores, fn event_store ->
-      ensure_event_store(event_store, args)
-      config = event_store.config()
+    migration_status =
+      Enum.flat_map(event_stores, fn event_store ->
+        ensure_event_store(event_store, args)
+        config = event_store.config()
 
-      Migrations.exec(config, Keyword.put(opts, :is_mix, true))
-    end)
+        opts =
+          opts
+          |> Keyword.put(:is_mix, true)
+          |> Keyword.put(:eventstore, event_store)
 
-    Mix.Task.reenable("event_store.migrations")
+        Migrations.exec(config, opts)
+      end)
+
+    if Enum.any?(migration_status, &(&1 == :pending)) do
+      exit({:shutdown, 1})
+    else
+      Mix.Task.reenable("event_store.migrations")
+    end
   end
 end

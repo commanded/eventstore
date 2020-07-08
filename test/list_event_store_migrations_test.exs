@@ -16,22 +16,27 @@ defmodule ListEventStoreMigrationsTest do
       restore_pre_migration_event_store(config)
 
       expected = """
-      EventStore: default
 
+      EventStore: TestEventStore
 
         migration     state           migrated_at
       -------------------------------------------------------------
         0.17.0    \tcompleted\t2020-04-28 22:15:48.922963Z
         1.1.0     \tpending
         1.2.0     \tpending
+
       """
 
-      assert expected == list_migrations(config)
+      assert expected == list_migrations(config, eventstore: TestEventStore)
     end
 
     test "exits with status 1 when running via mix", %{config: config} do
       restore_pre_migration_event_store(config)
-      assert {:shutdown, 1} == catch_exit(list_migrations(config, is_mix: true))
+
+      assert {:shutdown, 1} ==
+               catch_exit(
+                 Mix.Task.run("event_store.migrations", ["-e", "TestEventStore", "--quiet"])
+               )
     end
   end
 
@@ -39,16 +44,17 @@ defmodule ListEventStoreMigrationsTest do
     test "lists migrations as completed", %{config: config} do
       create_new_database(config)
 
-      table_header = """
-      EventStore: default
+      expected_header = """
 
+      EventStore: TestEventStore
 
         migration     state           migrated_at
       -------------------------------------------------------------
       """
 
-      output = list_migrations(config)
-      assert String.starts_with?(output, table_header)
+      output = list_migrations(config, eventstore: TestEventStore)
+
+      assert String.starts_with?(output, expected_header)
 
       migrations =
         output |> String.split("\n") |> Enum.drop(5) |> Enum.filter(&(String.trim(&1) != ""))
@@ -59,7 +65,8 @@ defmodule ListEventStoreMigrationsTest do
     test "exits normally when running via mix", %{config: config} do
       create_new_database(config)
 
-      assert :normal == catch_exit(list_migrations(config, is_mix: true))
+      # Task should exit normally
+      Mix.Task.run("event_store.migrations", ["-e", "TestEventStore", "--quiet"])
     end
   end
 
@@ -78,10 +85,10 @@ defmodule ListEventStoreMigrationsTest do
     EventStore.Storage.Database.drop(config)
     :ok = EventStore.Storage.Database.create(config)
 
-    {_, 1} = EventStore.Storage.Database.restore(config, "test/fixture/eventstore.dump")
+    {_, 0} = EventStore.Storage.Database.restore(config, "test/fixture/eventstore.dump")
   end
 
-  defp list_migrations(config, opts \\ []) do
+  defp list_migrations(config, opts) do
     capture_io(fn -> EventStore.Tasks.Migrations.exec(config, opts) end)
   end
 end
