@@ -28,4 +28,4 @@ os: linux
 dist: bionic
 
 addons:
-  postgresql: 12
+  postgresql: 10
