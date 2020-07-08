@@ -14,7 +14,7 @@ EventStore supports [running on a cluster of nodes](guides/Cluster.md).
 
 MIT License
 
-![Build Status](https://github.com/commanded/eventstore/workflows/Test/badge.svg)
+![Build Status](https://github.com/commanded/eventstore/workflows/Test/badge.svg?branch=master)
 
 ---
 

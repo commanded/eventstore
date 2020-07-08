@@ -7,6 +7,10 @@ jobs:
 
     name: Build and test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        otp: ['22.3']
+        elixir: ['1.10.3']
 
     services:
       postgres:
@@ -27,14 +31,14 @@ jobs:
     - name: Set up Elixir
       uses: actions/setup-elixir@v1
       with:
-        elixir-version: '1.10.3'
-        otp-version: '22.3'
+        elixir-version: ${{matrix.elixir}}
+        otp-version: ${{matrix.otp}}
 
     - name: Restore dependencies cache
       uses: actions/cache@v2
       with:
         path: deps
-        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+        key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-mix-${{ hashFiles('**/mix.lock') }}
         restore-keys: ${{ runner.os }}-mix-
 
     - name: Install dependencies
@@ -53,3 +57,19 @@ jobs:
 
     - name: Run tests
       run: mix test.all
+
+    - name: Retrieve Dialyzer PLT cache
+      uses: actions/cache@v1
+      id: plt-cache
+      with:
+        path: priv/plts
+        key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plts-${{ hashFiles('**/mix.lock') }}
+
+    - name: Create Dialyzer PLTs
+      if: steps.plt-cache.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p priv/plts
+        mix dialyzer --plt
+
+    - name: Run Dialyzer
+      run: mix dialyzer --no-check
