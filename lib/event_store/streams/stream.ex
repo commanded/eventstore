@@ -7,19 +7,37 @@ defmodule EventStore.Streams.Stream do
   def append_to_stream(conn, stream_uuid, expected_version, events, opts \\ []) do
     {serializer, opts} = Keyword.pop(opts, :serializer)
 
-    with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, opts),
-         {:ok, stream} <- prepare_stream(conn, stream, opts) do
-      do_append_to_storage(conn, stream, events, serializer, opts)
-    end
+    transaction(
+      conn,
+      fn transaction ->
+        with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, opts),
+             {:ok, stream} <- prepare_stream(transaction, stream, opts),
+             :ok <- do_append_to_storage(transaction, stream, events, serializer, opts) do
+          :ok
+        else
+          {:error, error} -> Postgrex.rollback(transaction, error)
+        end
+      end,
+      opts
+    )
   end
 
   def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts \\ []) do
     {_serializer, opts} = Keyword.pop(opts, :serializer)
 
-    with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, opts),
-         {:ok, stream} <- prepare_stream(conn, stream, opts) do
-      do_link_to_storage(conn, stream, events_or_event_ids, opts)
-    end
+    transaction(
+      conn,
+      fn transaction ->
+        with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, opts),
+             {:ok, stream} <- prepare_stream(transaction, stream, opts),
+             :ok <- do_link_to_storage(transaction, stream, events_or_event_ids, opts) do
+          :ok
+        else
+          {:error, error} -> Postgrex.rollback(transaction, error)
+        end
+      end,
+      opts
+    )
   end
 
   def read_stream_forward(conn, stream_uuid, start_version, count, opts \\ []) do
@@ -211,6 +229,13 @@ defmodule EventStore.Streams.Stream do
     opts = query_opts(opts)
 
     Storage.hard_delete_stream(conn, stream_id, opts)
+  end
+
+  defp transaction(conn, transaction_fun, opts) do
+    case Postgrex.transaction(conn, transaction_fun, opts) do
+      {:ok, :ok} -> :ok
+      {:error, _error} = reply -> reply
+    end
   end
 
   defp query_opts(opts), do: Keyword.take(opts, [:timeout])

@@ -21,54 +21,44 @@ defmodule EventStore.Storage.Appender do
   def append(conn, stream_id, events, opts) do
     stream_uuid = stream_uuid(events)
 
-    Postgrex.transaction(
-      conn,
-      fn transaction ->
-        events
-        |> Stream.map(&encode_uuids/1)
-        |> Stream.chunk_every(1_000)
-        |> Enum.each(fn batch ->
-          event_count = length(batch)
+    try do
+      events
+      |> Stream.map(&encode_uuids/1)
+      |> Stream.chunk_every(1_000)
+      |> Enum.each(fn batch ->
+        event_count = length(batch)
 
-          stream_params =
-            Enum.flat_map(batch, fn
-              %RecordedEvent{event_id: event_id, stream_version: stream_version} ->
-                [event_id, stream_version]
-            end)
+        stream_params =
+          Enum.flat_map(batch, fn
+            %RecordedEvent{event_id: event_id, stream_version: stream_version} ->
+              [event_id, stream_version]
+          end)
 
-          all_stream_params =
-            batch
-            |> Stream.with_index(1)
-            |> Enum.flat_map(fn {%RecordedEvent{event_id: event_id}, index} ->
-              [index, event_id]
-            end)
+        all_stream_params =
+          batch
+          |> Stream.with_index(1)
+          |> Enum.flat_map(fn {%RecordedEvent{event_id: event_id}, index} ->
+            [index, event_id]
+          end)
 
-          stream_params = [stream_id | [event_count | stream_params]]
-          all_stream_params = [@all_stream_id | [event_count | all_stream_params]]
+        stream_params = [stream_id | [event_count | stream_params]]
+        all_stream_params = [@all_stream_id | [event_count | all_stream_params]]
 
-          with :ok <- insert_event_batch(transaction, batch, opts),
-               :ok <- insert_stream_events(transaction, stream_params, event_count, opts),
-               :ok <- insert_link_events(transaction, all_stream_params, event_count, opts) do
-            :ok
-          else
-            {:error, reason} -> Postgrex.rollback(transaction, reason)
-          end
-        end)
-      end,
-      opts
-    )
-    |> case do
-      {:ok, :ok} ->
-        Logger.debug(fn ->
-          "Appended #{length(events)} event(s) to stream #{inspect(stream_uuid)}"
-        end)
+        with :ok <- insert_event_batch(conn, batch, opts),
+             :ok <- insert_stream_events(conn, stream_params, event_count, opts),
+             :ok <- insert_link_events(conn, all_stream_params, event_count, opts) do
+          Logger.debug("Appended #{length(events)} event(s) to stream #{inspect(stream_uuid)}")
 
-        :ok
-
-      {:error, reason} = reply ->
-        Logger.warn(fn ->
-          "Failed to append events to stream #{inspect(stream_uuid)} due to: #{inspect(reason)}"
-        end)
+          :ok
+        else
+          {:error, error} -> throw({:error, error})
+        end
+      end)
+    catch
+      {:error, error} = reply ->
+        Logger.warn(
+          "Failed to append events to stream #{inspect(stream_uuid)} due to: #{inspect(error)}"
+        )
 
         reply
     end
@@ -82,43 +72,31 @@ defmodule EventStore.Storage.Appender do
   def link(conn, stream_id, event_ids, opts \\ [])
 
   def link(conn, stream_id, event_ids, opts) do
-    Postgrex.transaction(
-      conn,
-      fn transaction ->
-        event_ids
-        |> Stream.map(&encode_uuid/1)
-        |> Stream.chunk_every(1_000)
-        |> Enum.each(fn batch ->
-          event_count = length(batch)
+    try do
+      event_ids
+      |> Stream.map(&encode_uuid/1)
+      |> Stream.chunk_every(1_000)
+      |> Enum.each(fn batch ->
+        event_count = length(batch)
 
-          parameters =
-            batch
-            |> Stream.with_index(1)
-            |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
+        parameters =
+          batch
+          |> Stream.with_index(1)
+          |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
-          params = [stream_id | [event_count | parameters]]
+        params = [stream_id | [event_count | parameters]]
 
-          with :ok <- insert_link_events(transaction, params, event_count, opts) do
-            :ok
-          else
-            {:error, reason} -> Postgrex.rollback(transaction, reason)
-          end
-        end)
-      end,
-      opts
-    )
-    |> case do
-      {:ok, :ok} ->
-        Logger.debug(fn ->
-          "Linked #{length(event_ids)} event(s) to stream"
-        end)
+        with :ok <- insert_link_events(conn, params, event_count, opts) do
+          Logger.debug("Linked #{length(event_ids)} event(s) to stream")
 
-        :ok
-
-      {:error, reason} = reply ->
-        Logger.warn(fn ->
-          "Failed to link events to stream due to: #{inspect(reason)}"
-        end)
+          :ok
+        else
+          {:error, error} -> throw({:error, error})
+        end
+      end)
+    catch
+      {:error, error} = reply ->
+        Logger.warn("Failed to link events to stream due to: #{inspect(error)}")
 
         reply
     end

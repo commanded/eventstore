@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, ProcessHelper, Storage, Subscriptions, Wait}
+  alias EventStore.{EventFactory, ProcessHelper, RecordedEvent, Storage, Subscriptions, Wait}
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Support.CollectingSubscriber
   alias TestEventStore, as: EventStore
@@ -430,10 +430,13 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
 
+      refute_receive {:events, _events}
+
       :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_events)
       :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
 
       assert_receive {:events, stream1_received_events}
+
       :ok = Subscription.ack(subscription, 1)
 
       assert_receive {:events, stream2_received_events}
@@ -464,14 +467,22 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-      # should receive events twice
-      assert_receive_events(stream_uuid, events, [1, 2, 3])
-      assert_receive_events(stream_uuid, events, [4, 5, 6])
+      # Should receive the same three events from both subscriptions
+      assert_receive {:events, [%RecordedEvent{event_number: 1} | _events] = received_events1}
+      assert_receive {:events, [%RecordedEvent{event_number: 4} | _events] = received_events2}
+
+      assert_received_events(received_events1, stream_uuid, events, [1, 2, 3])
+      assert_received_events(received_events2, stream_uuid, events, [4, 5, 6])
+
       refute_receive {:events, _received_events}
     end
 
-    defp assert_receive_events(stream_uuid, expected_events, expected_event_numbers) do
-      assert_receive {:events, received_events}
+    defp assert_received_events(
+           received_events,
+           stream_uuid,
+           expected_events,
+           expected_event_numbers
+         ) do
       assert pluck(received_events, :event_number) == expected_event_numbers
       assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
       assert pluck(received_events, :stream_version) == [1, 2, 3]
