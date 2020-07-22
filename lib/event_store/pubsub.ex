@@ -1,16 +1,12 @@
-defmodule EventStore.Registration.LocalRegistry do
+defmodule EventStore.PubSub do
   @moduledoc """
-  Pub/sub using Elixir's local `Registry` module, restricted to running on a
-  single node only.
+  Pub/sub using Elixir's local `Registry` module.
   """
-
-  @behaviour EventStore.Registration
 
   @doc """
-  Return the local supervisor child spec.
+  Return the child spec.
   """
-  @spec child_spec(module) :: [:supervisor.child_spec()]
-  @impl EventStore.Registration
+  @spec child_spec(EventStore.t()) :: [:supervisor.child_spec()]
   def child_spec(event_store) do
     registry_name = registry_name(event_store)
 
@@ -29,12 +25,13 @@ defmodule EventStore.Registration.LocalRegistry do
   Subscribes the caller to the given topic.
   """
   @spec subscribe(
-          module,
+          EventStore.t(),
           binary,
           selector: (EventStore.RecordedEvent.t() -> any()),
           mapper: (EventStore.RecordedEvent.t() -> any())
         ) :: :ok | {:error, term}
-  @impl EventStore.Registration
+  def subscribe(event_store, topic, opts \\ [])
+
   def subscribe(event_store, topic, opts) do
     registry_name = registry_name(event_store)
 
@@ -46,8 +43,7 @@ defmodule EventStore.Registration.LocalRegistry do
   @doc """
   Broadcasts message on given topic.
   """
-  @spec broadcast(module, binary, term) :: :ok | {:error, term}
-  @impl EventStore.Registration
+  @spec broadcast(EventStore.t(), binary, term) :: :ok
   def broadcast(event_store, topic, message) do
     registry_name = registry_name(event_store)
 
@@ -79,6 +75,5 @@ defmodule EventStore.Registration.LocalRegistry do
   defp map(events, mapper) when is_function(mapper, 1), do: Enum.map(events, mapper)
   defp map(events, _mapper), do: events
 
-  defp registry_name(event_store),
-    do: Module.concat([event_store, EventStore.PubSub])
+  defp registry_name(event_store), do: Module.concat([event_store, EventStore.PubSub])
 end

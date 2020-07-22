@@ -58,7 +58,7 @@ defmodule EventStore.Subscriptions.Supervisor do
   end
 
   defp registry_name(event_store, stream_uuid, subscription_name) do
-    registry = Module.concat(event_store, Subscriptions.Registry)
+    registry = Module.concat([event_store, Subscriptions.Registry])
 
     {registry, {stream_uuid, subscription_name}}
   end

@@ -10,15 +10,18 @@ defmodule EventStore.Notifications.Reader do
 
   defmodule State do
     defstruct [:conn, :serializer, :subscribe_to]
+
+    def new(opts) do
+      %State{
+        conn: Keyword.fetch!(opts, :conn),
+        serializer: Keyword.fetch!(opts, :serializer),
+        subscribe_to: Keyword.fetch!(opts, :subscribe_to)
+      }
+    end
   end
 
-  def start_link(opts \\ []) do
-    state = %State{
-      conn: Keyword.fetch!(opts, :conn),
-      serializer: Keyword.fetch!(opts, :serializer),
-      subscribe_to: Keyword.fetch!(opts, :subscribe_to)
-    }
-
+  def start_link(opts) do
+    state = State.new(opts)
     start_opts = Keyword.take(opts, [:name, :timeout, :debug, :spawn_opt])
 
     GenStage.start_link(__MODULE__, state, start_opts)
@@ -43,8 +46,10 @@ defmodule EventStore.Notifications.Reader do
     {:noreply, stream_events, state}
   end
 
-  defp read_events(event, %State{} = state) do
-    {stream_uuid, stream_id, from_stream_version, to_stream_version} = event
+  defp read_events(
+         {stream_uuid, stream_id, from_stream_version, to_stream_version},
+         %State{} = state
+       ) do
     %State{conn: conn, serializer: serializer} = state
 
     count = to_stream_version - from_stream_version + 1

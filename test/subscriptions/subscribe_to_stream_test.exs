@@ -19,7 +19,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     setup [:append_events_to_another_stream]
 
     test "should receive `:subscribed` message once subscribed", %{
-      registry: registry,
       serializer: serializer,
       subscription_name: subscription_name
     } do
@@ -29,7 +28,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
         Subscriptions.subscribe_to_stream(self(),
           event_store: @event_store,
           conn: @conn,
-          registry: registry,
           serializer: serializer,
           retry_interval: 1_000,
           stream_uuid: stream_uuid,
