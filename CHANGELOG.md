@@ -7,6 +7,10 @@
 - Delete event stream ([#203](https://github.com/commanded/eventstore/pull/203)).
 - Introduce `mix event_store.migrations` task to list migration status ([#207](https://github.com/commanded/eventstore/pull/207)).
 
+### Bug fixes
+
+- Support appending events to a stream with `:any_version` concurrently ([#209](https://github.com/commanded/eventstore/pull/209)).
+
 ## v1.1.0
 
 ### Enhancements
