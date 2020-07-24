@@ -102,6 +102,12 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, state}
   end
 
+  def handle_info(:notifications_initialized, state) do
+    :ok = GenServer.cast(self(), :catch_up)
+
+    {:noreply, state}
+  end
+
   def handle_info({:events, events}, %Subscription{subscription: subscription} = state) do
     _ = Logger.debug(fn -> describe(state) <> " received #{length(events)} event(s)" end)
 

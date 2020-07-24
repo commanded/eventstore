@@ -76,9 +76,12 @@ defmodule EventStore.Supervisor do
             Supervisor.child_spec(
               {Registry, keys: :unique, name: subscriptions_registry_name},
               id: subscriptions_registry_name
-            ),
-            {Highlander, {Notifications.Supervisor, {name, registry, serializer, config}}}
-          ] ++ Registration.child_spec(name, registry)
+            )
+          ] ++
+            Registration.child_spec(name, registry) ++
+            [
+              {Highlander, {Notifications.Supervisor, {name, registry, serializer, config}}}
+            ]
 
         Supervisor.init(children, strategy: :one_for_all)
 

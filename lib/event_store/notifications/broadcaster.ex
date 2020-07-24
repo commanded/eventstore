@@ -24,7 +24,9 @@ defmodule EventStore.Notifications.Broadcaster do
   end
 
   def init(%State{} = state) do
-    %State{subscribe_to: subscribe_to} = state
+    %State{subscribe_to: subscribe_to, event_store: event_store, registry: registry} = state
+
+    Registration.broadcast_all(event_store, registry, :notifications_initialized)
 
     {:consumer, state, subscribe_to: [subscribe_to]}
   end

@@ -45,4 +45,9 @@ defmodule EventStore.Registration.DistributedRegistry do
     :ok = LocalRegistry.broadcast(event_store, topic, message)
     :ok = DistributedForwarder.broadcast(event_store, topic, message)
   end
+
+  def broadcast_all(event_store, message) do
+    :ok = LocalRegistry.broadcast_all(event_store, message)
+    :ok = DistributedForwarder.broadcast_all(event_store, message)
+  end
 end

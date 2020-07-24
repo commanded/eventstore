@@ -53,6 +53,9 @@ defmodule EventStore.Registration do
   def broadcast(event_store, registry, topic, message),
     do: registry.broadcast(event_store, topic, message)
 
+  def broadcast_all(event_store, registry, message),
+    do: registry.broadcast_all(event_store, message)
+
   @doc """
   Get the pub/sub registry configured for the given event store.
   """

@@ -58,6 +58,15 @@ defmodule EventStore.Registration.LocalRegistry do
     end)
   end
 
+  def broadcast_all(event_store, message) do
+    registry_name = registry_name(event_store)
+
+    Registry.select(registry_name, [{{:_, :"$2", :_}, [], [{{:"$2"}}]}])
+    |> Enum.each(fn {pid} ->
+      send(pid, message)
+    end)
+  end
+
   defp notify_subscriber(_pid, {:events, []}, _), do: nil
 
   defp notify_subscriber(pid, {:events, events}, opts) do

@@ -24,12 +24,28 @@ defmodule EventStore.Registration.DistributedForwarder do
     :ok
   end
 
+  def broadcast_all(event_store, message) do
+    forwarder_name = forwarder_name(event_store)
+
+    for node <- Node.list() do
+      Process.send({forwarder_name, node}, {:broadcast_all, message}, [:noconnect])
+    end
+
+    :ok
+  end
+
   def init(event_store) do
     {:ok, event_store}
   end
 
   def handle_info({:broadcast, topic, message}, event_store) do
     :ok = LocalRegistry.broadcast(event_store, topic, message)
+
+    {:noreply, event_store}
+  end
+
+  def handle_info({:broadcast_all, message}, event_store) do
+    :ok = LocalRegistry.broadcast_all(event_store, message)
 
     {:noreply, event_store}
   end
