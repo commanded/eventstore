@@ -30,7 +30,7 @@ defmodule EventStore.Mixfile do
     ]
   end
 
-  defp elixirc_paths(env) when env in [:bench, :distributed, :jsonb, :migration, :test],
+  defp elixirc_paths(env) when env in [:bench, :jsonb, :migration, :test],
     do: ["lib", "test/support", "test/subscriptions/support"]
 
   defp elixirc_paths(_env), do: ["lib"]
@@ -41,7 +41,6 @@ defmodule EventStore.Mixfile do
       {:fsm, "~> 0.3"},
       {:gen_stage, "~> 1.0"},
       {:postgrex, "~> 0.15"},
-      {:highlander, "~> 0.2"},
 
       # Optional dependencies
       {:jason, "~> 1.2", optional: true},
@@ -51,7 +50,6 @@ defmodule EventStore.Mixfile do
       {:benchfella, "~> 0.3", only: :bench},
       {:dialyxir, "~> 1.0", only: :dev, runtime: false},
       {:ex_doc, "~> 0.22", only: :dev},
-      {:local_cluster, "~> 1.1", only: [:distributed]},
       {:mix_test_watch, "~> 1.0", only: :dev}
     ]
   end
@@ -110,11 +108,6 @@ defmodule EventStore.Mixfile do
           EventStore.Serializer,
           EventStore.TermSerializer
         ],
-        Registration: [
-          EventStore.Registration,
-          EventStore.Registration.DistributedRegistry,
-          EventStore.Registration.LocalRegistry
-        ],
         Tasks: [
           EventStore.Tasks.Create,
           EventStore.Tasks.Drop,
@@ -144,7 +137,6 @@ defmodule EventStore.Mixfile do
       "es.reset": ["event_store.reset"],
       "es.setup": ["event_store.setup"],
       "test.all": ["test", "test.jsonb", "test.migration", "test --only slow"],
-      "test.distributed": &test_distributed/1,
       "test.jsonb": &test_jsonb/1,
       "test.migration": &test_migration/1
     ]
@@ -153,7 +145,6 @@ defmodule EventStore.Mixfile do
   defp preferred_cli_env do
     [
       "test.all": :test,
-      "test.distributed": :test,
       "test.jsonb": :test,
       "test.migration": :test
     ]
@@ -167,7 +158,6 @@ defmodule EventStore.Mixfile do
     ]
   end
 
-  defp test_distributed(args), do: test_env(:distributed, ["--only", "distributed"] ++ args)
   defp test_migration(args), do: test_env(:migration, ["--include", "migration"] ++ args)
   defp test_jsonb(args), do: test_env(:jsonb, args)
 

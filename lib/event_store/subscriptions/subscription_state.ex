@@ -4,7 +4,6 @@ defmodule EventStore.Subscriptions.SubscriptionState do
   defstruct [
     :conn,
     :event_store,
-    :registry,
     :serializer,
     :stream_uuid,
     :start_from,

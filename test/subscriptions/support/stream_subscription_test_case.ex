@@ -429,7 +429,6 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
 
     defp create_subscription(context, opts \\ []) do
       %{
-        registry: registry,
         serializer: serializer,
         stream_uuid: stream_uuid,
         subscriber: subscriber
@@ -439,7 +438,6 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
         opts
         |> Keyword.put(:conn, @conn)
         |> Keyword.put(:event_store, @event_store)
-        |> Keyword.put(:registry, registry)
         |> Keyword.put(:serializer, serializer)
         |> Keyword.put_new(:buffer_size, 3)
 

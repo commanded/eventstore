@@ -8,17 +8,17 @@ defmodule EventStore.Supervisor do
     Config,
     MonitoredServer,
     Notifications,
-    Registration,
+    PubSub,
     Subscriptions
   }
 
   @doc """
   Starts the event store supervisor.
   """
-  def start_link(event_store, otp_app, serializer, registry, name, opts) do
+  def start_link(event_store, otp_app, serializer, name, opts) do
     Supervisor.start_link(
       __MODULE__,
-      {event_store, otp_app, serializer, registry, name, opts},
+      {event_store, otp_app, serializer, name, opts},
       name: name
     )
   end
@@ -56,7 +56,7 @@ defmodule EventStore.Supervisor do
   ## Supervisor callbacks
 
   @doc false
-  def init({event_store, otp_app, serializer, registry, name, opts}) do
+  def init({event_store, otp_app, serializer, name, opts}) do
     case runtime_config(event_store, otp_app, opts) do
       {:ok, config} ->
         advisory_locks_name = Module.concat([name, AdvisoryLocks])
@@ -73,12 +73,11 @@ defmodule EventStore.Supervisor do
             ),
             {AdvisoryLocks, conn: advisory_locks_postgrex_name, name: advisory_locks_name},
             {Subscriptions.Supervisor, name: subscriptions_name},
-            Supervisor.child_spec(
-              {Registry, keys: :unique, name: subscriptions_registry_name},
+            Supervisor.child_spec({Registry, keys: :unique, name: subscriptions_registry_name},
               id: subscriptions_registry_name
             ),
-            {Highlander, {Notifications.Supervisor, {name, registry, serializer, config}}}
-          ] ++ Registration.child_spec(name, registry)
+            {Notifications.Supervisor, {name, serializer, config}}
+          ] ++ PubSub.child_spec(name)
 
         Supervisor.init(children, strategy: :one_for_all)
 

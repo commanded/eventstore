@@ -1,13 +1,8 @@
 defmodule EventStore.Notifications.Supervisor do
   @moduledoc false
 
-  # Supervises the individual `GenStage` stages used to listen to and broadcast
-  # all events appended to storage.
-  #
-  # Erlang's global module is used to ensure only a single instance of this
-  # supervisor process, and its children including the PostgreSQL listener
-  # process, runs on a cluster of nodes. This minimises connections to the event
-  # store database. There will be at most one `LISTEN` connection per cluster.
+  # Supervises the individual `GenStage` stages used to listen to, read, and
+  # broadcast all events appended to storage.
 
   use Supervisor
 
@@ -15,7 +10,7 @@ defmodule EventStore.Notifications.Supervisor do
   alias EventStore.MonitoredServer
   alias EventStore.Notifications.{Listener, Reader, Broadcaster}
 
-  def child_spec({name, _registry, _serializer, _config} = init_arg) do
+  def child_spec({name, _serializer, _config} = init_arg) do
     %{id: Module.concat(name, __MODULE__), start: {__MODULE__, :start_link, [init_arg]}}
   end
 
@@ -24,7 +19,7 @@ defmodule EventStore.Notifications.Supervisor do
   end
 
   @impl Supervisor
-  def init({event_store, registry, serializer, config}) do
+  def init({event_store, serializer, config}) do
     schema = Keyword.fetch!(config, :schema)
 
     postgrex_config = Config.sync_connect_postgrex_opts(config)
@@ -54,11 +49,7 @@ defmodule EventStore.Notifications.Supervisor do
          serializer: serializer,
          subscribe_to: listener_name,
          name: reader_name},
-        {Broadcaster,
-         event_store: event_store,
-         registry: registry,
-         subscribe_to: reader_name,
-         name: broadcaster_name}
+        {Broadcaster, event_store: event_store, subscribe_to: reader_name, name: broadcaster_name}
       ],
       strategy: :one_for_all
     )

@@ -16,7 +16,7 @@ defmodule EventStore.Notifications.Listener do
 
   defstruct [:listen_to, :schema, :ref, demand: 0, queue: :queue.new()]
 
-  def start_link(opts \\ []) do
+  def start_link(opts) do
     listen_to = Keyword.fetch!(opts, :listen_to)
     schema = Keyword.fetch!(opts, :schema)
 
@@ -43,17 +43,23 @@ defmodule EventStore.Notifications.Listener do
     {:noreply, [], %Listener{state | ref: nil}}
   end
 
+  # Ignore notifications when database connection down.
+  def handle_info(
+        {:notification, _connection_pid, _ref, _channel, _payload},
+        %Listener{ref: nil} = state
+      ) do
+    {:noreply, [], state}
+  end
+
   # Notification received from PostgreSQL's `NOTIFY`
   def handle_info({:notification, _connection_pid, _ref, channel, payload}, %Listener{} = state) do
-    Logger.debug(fn ->
+    Logger.debug(
       "Listener received notification on channel " <>
         inspect(channel) <> " with payload: " <> inspect(payload)
-    end)
+    )
 
-    %Listener{queue: queue} = state
-
-    # Notify payload contains the stream uuid, stream id, and first / last stream
-    # versions (e.g. "stream-12345,1,1,5")
+    # `NOTIFY` payload contains the stream uuid, stream id, and first / last
+    # stream versions (e.g. "stream-12345,1,1,5")
 
     [last, first, stream_id, stream_uuid] =
       payload
@@ -65,26 +71,17 @@ defmodule EventStore.Notifications.Listener do
     {first_stream_version, ""} = Integer.parse(first)
     {last_stream_version, ""} = Integer.parse(last)
 
-    event = {stream_uuid, stream_id, first_stream_version, last_stream_version}
-
-    state = %Listener{
-      state
-      | queue: :queue.in(event, queue)
-    }
+    state = enqueue({stream_uuid, stream_id, first_stream_version, last_stream_version}, state)
 
     dispatch_events([], state)
   end
 
-  # Ignore notifications when database connection down.
-  def handle_info(
-        {:notification, _connection_pid, _ref, _channel, _payload},
-        %Listener{ref: nil} = state
-      ) do
-    {:noreply, [], state}
-  end
+  def handle_demand(incoming_demand, %Listener{} = state) do
+    %Listener{demand: pending_demand} = state
 
-  def handle_demand(incoming_demand, %Listener{demand: pending_demand} = state) do
-    dispatch_events([], %Listener{state | demand: incoming_demand + pending_demand})
+    state = %Listener{state | demand: pending_demand + incoming_demand}
+
+    dispatch_events([], state)
   end
 
   defp listen_for_events(%Listener{} = state) do
@@ -106,11 +103,17 @@ defmodule EventStore.Notifications.Listener do
 
     case :queue.out(queue) do
       {{:value, event}, queue} ->
-        state = %Listener{state | demand: demand - 1, queue: queue}
+        state = %Listener{state | demand: max(demand - 1, 0), queue: queue}
         dispatch_events([event | events], state)
 
       {:empty, _queue} ->
         {:noreply, Enum.reverse(events), state}
     end
+  end
+
+  defp enqueue(event, %Listener{} = state) do
+    %Listener{queue: queue} = state
+
+    %Listener{state | queue: :queue.in(event, queue)}
   end
 end

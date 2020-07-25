@@ -180,7 +180,7 @@ defmodule EventStore do
     quote bind_quoted: [opts: opts] do
       @behaviour EventStore
 
-      alias EventStore.{Config, EventData, Registration, Serializer, Subscriptions}
+      alias EventStore.{Config, EventData, PubSub, Serializer, Subscriptions}
       alias EventStore.Snapshots.{SnapshotData, Snapshotter}
       alias EventStore.Subscriptions.Subscription
       alias EventStore.Streams.Stream
@@ -188,13 +188,11 @@ defmodule EventStore do
       {otp_app, config} = EventStore.Supervisor.compile_config(__MODULE__, opts)
 
       serializer = Serializer.serializer(__MODULE__, config)
-      registry = Registration.registry(__MODULE__, config)
       subscription_retry_interval = Subscriptions.retry_interval(__MODULE__, config)
 
       @otp_app otp_app
       @config config
       @serializer serializer
-      @registry registry
       @subscription_retry_interval subscription_retry_interval
 
       @all_stream "$all"
@@ -225,7 +223,7 @@ defmodule EventStore do
         opts = Keyword.merge(unquote(opts), opts)
         name = name(opts)
 
-        EventStore.Supervisor.start_link(__MODULE__, @otp_app, @serializer, @registry, name, opts)
+        EventStore.Supervisor.start_link(__MODULE__, @otp_app, @serializer, name, opts)
       end
 
       def stop(supervisor, timeout \\ 5000) do
@@ -318,7 +316,7 @@ defmodule EventStore do
       def subscribe(stream_uuid, opts \\ []) do
         name = name(opts)
 
-        Registration.subscribe(name, @registry, stream_uuid, opts)
+        PubSub.subscribe(name, stream_uuid, opts)
       end
 
       def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ []) do
@@ -332,7 +330,6 @@ defmodule EventStore do
             Keyword.merge(opts,
               conn: conn,
               event_store: name,
-              registry: @registry,
               serializer: @serializer,
               retry_interval: @subscription_retry_interval,
               stream_uuid: stream_uuid,

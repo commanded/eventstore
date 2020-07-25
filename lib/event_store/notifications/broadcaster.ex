@@ -5,19 +5,21 @@ defmodule EventStore.Notifications.Broadcaster do
 
   use GenStage
 
-  alias EventStore.Registration
+  alias EventStore.PubSub
 
   defmodule State do
-    defstruct [:event_store, :registry, :subscribe_to]
+    defstruct [:event_store, :subscribe_to]
+
+    def new(opts) do
+      %State{
+        event_store: Keyword.fetch!(opts, :event_store),
+        subscribe_to: Keyword.fetch!(opts, :subscribe_to)
+      }
+    end
   end
 
-  def start_link(opts \\ []) do
-    state = %State{
-      event_store: Keyword.fetch!(opts, :event_store),
-      registry: Keyword.fetch!(opts, :registry),
-      subscribe_to: Keyword.fetch!(opts, :subscribe_to)
-    }
-
+  def start_link(opts) do
+    state = State.new(opts)
     start_opts = Keyword.take(opts, [:name, :timeout, :debug, :spawn_opt])
 
     GenStage.start_link(__MODULE__, state, start_opts)
@@ -30,16 +32,16 @@ defmodule EventStore.Notifications.Broadcaster do
   end
 
   def handle_events(events, _from, %State{} = state) do
-    %State{event_store: event_store, registry: registry} = state
-
     for {stream_uuid, batch} <- events do
-      :ok = broadcast(event_store, registry, stream_uuid, batch)
+      :ok = broadcast(stream_uuid, batch, state)
     end
 
     {:noreply, [], state}
   end
 
-  defp broadcast(event_store, registry, stream_uuid, events) do
-    Registration.broadcast(event_store, registry, stream_uuid, {:events, events})
+  defp broadcast(stream_uuid, events, %State{} = state) do
+    %State{event_store: event_store} = state
+
+    PubSub.broadcast(event_store, stream_uuid, {:events, events})
   end
 end

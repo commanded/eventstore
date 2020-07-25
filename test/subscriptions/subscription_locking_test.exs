@@ -162,7 +162,6 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
     %{
       conn: conn,
       event_store: event_store,
-      registry: registry,
       serializer: serializer,
       subscription_name: subscription_name
     } = context
@@ -171,7 +170,6 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       Subscription.start_link(
         event_store: event_store,
         conn: conn,
-        registry: registry,
         serializer: serializer,
         retry_interval: 1_000,
         stream_uuid: "$all",

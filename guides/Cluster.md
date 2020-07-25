@@ -14,14 +14,6 @@ Running EventStore on multiple nodes that are not connected together to form a c
 
 PostgreSQL's [advisory locks](https://www.postgresql.org/docs/current/static/explicit-locking.html#ADVISORY-LOCKS) are used to limit each uniquely named subscription to run at most once. This prevents multiple instances of a subscription from running on different nodes. Advisory locks are faster than table locks, are stored in memory to avoid table bloat, and are automatically cleaned up by the server at the end of the session.
 
-## Running on a cluster
-
-Configure your EventStore module to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
-
-```elixir
-config :my_app, MyApp.EventStore, registry: :distributed
-```
-
 ## Automatic cluster formation
 
 You can use [libcluster](https://github.com/bitwalker/libcluster) to automatically form clusters of Erlang nodes, with either static or dynamic node membership.
