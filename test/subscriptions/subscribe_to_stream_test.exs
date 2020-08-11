@@ -297,8 +297,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       refute_receive {:events, _received_events}
     end
 
-    test "subscription process hiberated after inactivity", %{
-      serializer: serializer,
+    test "subscription process hibernated after inactivity", %{
       subscription_name: subscription_name
     } do
       stream_uuid = UUID.uuid4()
@@ -307,18 +306,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       # Create a subscription with `hibernate_after` set to 1ms so process will
       # immediately hibernate
       {:ok, subscription} =
-        Subscriptions.subscribe_to_stream(self(),
-          event_store: @event_store,
-          conn: @conn,
-          serializer: serializer,
-          hibernate_after: 1,
-          retry_interval: 1_000,
-          buffer_size: 3,
-          stream_uuid: stream_uuid,
-          subscription_name: subscription_name
-        )
-
-      assert_receive {:subscribed, ^subscription}
+        subscribe_to_stream(stream_uuid, subscription_name, self(), hibernate_after: 1)
 
       # Subscription process should be hibernated
       Wait.until(fn -> assert_hibernated(subscription) end)

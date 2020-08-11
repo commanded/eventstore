@@ -329,12 +329,13 @@ defmodule EventStore do
         with {start_from, opts} <- Keyword.pop(opts, :start_from, :origin),
              {:ok, start_from} <- Stream.start_from(conn, stream_uuid, start_from) do
           opts =
-            Keyword.merge(opts,
+            opts
+            |> Keyword.put_new(:hibernate_after, @subscription_hibernate_after)
+            |> Keyword.put_new(:retry_interval, @subscription_retry_interval)
+            |> Keyword.merge(
               conn: conn,
               event_store: name,
               serializer: @serializer,
-              hibernate_after: @subscription_hibernate_after,
-              retry_interval: @subscription_retry_interval,
               stream_uuid: stream_uuid,
               subscription_name: subscription_name,
               start_from: start_from
