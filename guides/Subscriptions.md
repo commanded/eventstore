@@ -52,7 +52,6 @@ receive do
 end
 ```
 
-
 #### Mapping events
 
 You can provide an event mapping function that maps each `RecordedEvent` before sending it to the subscriber:

@@ -9,6 +9,7 @@ defmodule EventStore.Notifications.Supervisor do
   alias EventStore.Config
   alias EventStore.MonitoredServer
   alias EventStore.Notifications.{Listener, Reader, Broadcaster}
+  alias EventStore.Subscriptions
 
   def child_spec({name, _serializer, _config} = init_arg) do
     %{id: Module.concat(name, __MODULE__), start: {__MODULE__, :start_link, [init_arg]}}
@@ -23,10 +24,11 @@ defmodule EventStore.Notifications.Supervisor do
     schema = Keyword.fetch!(config, :schema)
 
     postgrex_config = Config.sync_connect_postgrex_opts(config)
+    hibernate_after = Subscriptions.hibernate_after(event_store, config)
 
-    listener_name = Module.concat([event_store, Listener])
-    reader_name = Module.concat([event_store, Reader])
-    broadcaster_name = Module.concat([event_store, Broadcaster])
+    listener_name = listener_name(event_store)
+    reader_name = reader_name(event_store)
+    broadcaster_name = broadcaster_name(event_store)
     postgrex_listener_name = Module.concat([listener_name, Postgrex])
     postgrex_reader_name = Module.concat([reader_name, Postgrex])
 
@@ -43,15 +45,28 @@ defmodule EventStore.Notifications.Supervisor do
            mfa: {Postgrex, :start_link, [postgrex_config]}, name: postgrex_reader_name},
           id: Module.concat([postgrex_reader_name, MonitoredServer])
         ),
-        {Listener, listen_to: postgrex_listener_name, schema: schema, name: listener_name},
+        {Listener,
+         listen_to: postgrex_listener_name,
+         schema: schema,
+         name: listener_name,
+         hibernate_after: hibernate_after},
         {Reader,
          conn: postgrex_reader_name,
          serializer: serializer,
          subscribe_to: listener_name,
-         name: reader_name},
-        {Broadcaster, event_store: event_store, subscribe_to: reader_name, name: broadcaster_name}
+         name: reader_name,
+         hibernate_after: hibernate_after},
+        {Broadcaster,
+         event_store: event_store,
+         subscribe_to: reader_name,
+         name: broadcaster_name,
+         hibernate_after: hibernate_after}
       ],
       strategy: :one_for_all
     )
   end
+
+  def broadcaster_name(event_store), do: Module.concat([event_store, Broadcaster])
+  def listener_name(event_store), do: Module.concat([event_store, Listener])
+  def reader_name(event_store), do: Module.concat([event_store, Reader])
 end

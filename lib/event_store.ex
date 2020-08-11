@@ -7,7 +7,7 @@ defmodule EventStore do
 
   ## Defining an event store
 
-  We can define an event store in our own application as follows:
+  An event store module is defined in your own application as follows:
 
       defmodule MyApp.EventStore do
         use EventStore,
@@ -39,7 +39,8 @@ defmodule EventStore do
   store to use Commanded's JSON serializer which provides additional support for
   JSON decoding:
 
-      config :my_app, MyApp.EventStore, serializer: Commanded.Serialization.JsonSerializer
+      config :my_app, MyApp.EventStore,
+        serializer: Commanded.Serialization.JsonSerializer
 
   The event store module defines a `start_link/1` function that needs to be
   invoked before using the event store. In general, this function is not
@@ -189,11 +190,13 @@ defmodule EventStore do
 
       serializer = Serializer.serializer(__MODULE__, config)
       subscription_retry_interval = Subscriptions.retry_interval(__MODULE__, config)
+      subscription_hibernate_after = Subscriptions.hibernate_after(__MODULE__, config)
 
       @otp_app otp_app
       @config config
       @serializer serializer
       @subscription_retry_interval subscription_retry_interval
+      @subscription_hibernate_after subscription_hibernate_after
 
       @all_stream "$all"
       @default_batch_size 1_000
@@ -320,17 +323,17 @@ defmodule EventStore do
       end
 
       def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ []) do
-        {conn, _opts} = opts(opts)
+        name = name(opts)
+        conn = conn(opts)
 
         with {start_from, opts} <- Keyword.pop(opts, :start_from, :origin),
              {:ok, start_from} <- Stream.start_from(conn, stream_uuid, start_from) do
-          name = name(opts)
-
           opts =
             Keyword.merge(opts,
               conn: conn,
               event_store: name,
               serializer: @serializer,
+              hibernate_after: @subscription_hibernate_after,
               retry_interval: @subscription_retry_interval,
               stream_uuid: stream_uuid,
               subscription_name: subscription_name,
@@ -392,12 +395,16 @@ defmodule EventStore do
       end
 
       defp opts(opts) do
-        name = name(opts)
-        conn = Module.concat([name, Postgrex])
-
+        conn = conn(opts)
         timeout = timeout(opts)
 
         {conn, [timeout: timeout, serializer: @serializer]}
+      end
+
+      defp conn(opts) do
+        name = name(opts)
+
+        Module.concat([name, Postgrex])
       end
 
       defp name(opts) do
