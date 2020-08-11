@@ -7,6 +7,7 @@
 - Delete event stream ([#203](https://github.com/commanded/eventstore/pull/203)).
 - Introduce `mix event_store.migrations` task to list migration status ([#207](https://github.com/commanded/eventstore/pull/207)).
 - Remove distributed registry ([#210](ttps://github.com/commanded/eventstore/pull/210)).
+- Hibernate subscription process after inactivity ([#214](https://github.com/commanded/eventstore/pull/214)).
 
 ### Bug fixes
 
