@@ -2,7 +2,7 @@ defmodule EventStore.MonitoredServer do
   @moduledoc false
 
   # Starts a `GenServer` process using a given module-fun-args tuple.
-  # 
+  #
   # Monitors the started process and attempts to restart it on terminate using
   # an exponential backoff strategy. Allows interested processes to be informed
   # when the process terminates.
@@ -32,7 +32,8 @@ defmodule EventStore.MonitoredServer do
   end
 
   def start_link(opts) do
-    {start_opts, monitor_opts} = Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt])
+    {start_opts, monitor_opts} =
+      Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt, :hibernate_after])
 
     state = State.new(monitor_opts, start_opts)
 

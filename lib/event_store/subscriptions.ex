@@ -57,4 +57,37 @@ defmodule EventStore.Subscriptions do
               " config. Expected an integer in milliseconds but got: " <> inspect(invalid)
     end
   end
+
+  @doc """
+  Get the inactivity period, in milliseconds, after which a subscription process
+  will be automatically hibernated.
+
+  From Erlang/OTP 20, subscription processes will automatically hibernate to
+  save memory after `15_000` milliseconds of inactivity. This can be changed by
+  configuring the `:subscription_hibernate_after` option for the event store
+  module.
+
+  You can also set it to `:infinity` to fully disable it.
+  """
+  def hibernate_after(event_store, config) do
+    case Keyword.get(config, :subscription_hibernate_after) do
+      interval when is_integer(interval) and interval >= 0 ->
+        interval
+
+      :infinity ->
+        :infinity
+
+      nil ->
+        # Default to 15 seconds when not configured
+        15_000
+
+      invalid ->
+        raise ArgumentError,
+          message:
+            "Invalid `:subscription_hibernate_after` setting in " <>
+              inspect(event_store) <>
+              " config. Expected an integer (in milliseconds) or `:infinity` but got: " <>
+              inspect(invalid)
+    end
+  end
 end

@@ -21,8 +21,10 @@ defmodule EventStore.Notifications.Reader do
   end
 
   def start_link(opts) do
-    state = State.new(opts)
-    start_opts = Keyword.take(opts, [:name, :timeout, :debug, :spawn_opt])
+    {start_opts, reader_opts} =
+      Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt, :hibernate_after])
+
+    state = State.new(reader_opts)
 
     GenStage.start_link(__MODULE__, state, start_opts)
   end

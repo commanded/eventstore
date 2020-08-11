@@ -19,11 +19,10 @@ defmodule EventStore.Subscriptions.Supervisor do
 
     supervisor = Module.concat(event_store, __MODULE__)
 
-    name = {:via, Registry, registry_name(event_store, stream_uuid, subscription_name)}
-    opts = Keyword.put(opts, :name, name)
-    spec = {Subscription, opts}
+    via_name = {:via, Registry, registry_name(event_store, stream_uuid, subscription_name)}
+    opts = Keyword.put(opts, :name, via_name)
 
-    DynamicSupervisor.start_child(supervisor, spec)
+    DynamicSupervisor.start_child(supervisor, {Subscription, opts})
   end
 
   def unsubscribe_from_stream(event_store, stream_uuid, subscription_name) do

@@ -75,6 +75,11 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
       - `:schema` - define the Postgres schema to use (default: `public` schema).
       - `:timeout` - set the default database query timeout in milliseconds (default: 15,000ms).
 
+      Subscription options:
+
+      - `:subscription_retry_interval` - interval between subscription connection retry attempts (default: 60,000ms).
+      - `:subscription_hibernate_after` - subscriptions will automatically hibernate to save memory after a period of inactivity (default: 15,000ms).
+
   4. Add your event store module to the `event_stores` list for your app in mix config:
 
       ```elixir

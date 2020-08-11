@@ -29,6 +29,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
           event_store: @event_store,
           conn: @conn,
           serializer: serializer,
+          hibernate_after: 15_000,
           retry_interval: 1_000,
           stream_uuid: stream_uuid,
           subscription_name: subscription_name
@@ -294,6 +295,39 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert_receive_events(subscription, [14, 15])
 
       refute_receive {:events, _received_events}
+    end
+
+    test "subscription process hibernated after inactivity", %{
+      subscription_name: subscription_name
+    } do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
+
+      # Create a subscription with `hibernate_after` set to 1ms so process will
+      # immediately hibernate
+      {:ok, subscription} =
+        subscribe_to_stream(stream_uuid, subscription_name, self(), hibernate_after: 1)
+
+      # Subscription process should be hibernated
+      Wait.until(fn -> assert_hibernated(subscription) end)
+
+      # Appending events to the stream should resume the subscription's event loop
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      assert_receive {:events, received_events}
+
+      assert pluck(received_events, :event_number) == [1, 2, 3]
+      assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
+      assert pluck(received_events, :stream_version) == [1, 2, 3]
+      assert pluck(received_events, :correlation_id) == pluck(events, :correlation_id)
+      assert pluck(received_events, :causation_id) == pluck(events, :causation_id)
+      assert pluck(received_events, :event_type) == pluck(events, :event_type)
+      assert pluck(received_events, :data) == pluck(events, :data)
+      assert pluck(received_events, :metadata) == pluck(events, :metadata)
+      refute pluck(received_events, :created_at) |> Enum.any?(&is_nil/1)
+
+      # Subscription process should be hibernated again after inactivity
+      Wait.until(fn -> assert_hibernated(subscription) end)
     end
   end
 
@@ -579,6 +613,10 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       assert {:ok, []} = Storage.subscriptions(@conn)
     end
+  end
+
+  defp assert_hibernated(pid) do
+    assert Process.info(pid, :current_function) == {:current_function, {:erlang, :hibernate, 3}}
   end
 
   # Append events to another stream so that for single stream subscription tests

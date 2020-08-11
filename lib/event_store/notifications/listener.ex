@@ -17,10 +17,11 @@ defmodule EventStore.Notifications.Listener do
   defstruct [:listen_to, :schema, :ref, demand: 0, queue: :queue.new()]
 
   def start_link(opts) do
-    listen_to = Keyword.fetch!(opts, :listen_to)
-    schema = Keyword.fetch!(opts, :schema)
+    {start_opts, listener_opts} =
+      Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt, :hibernate_after])
 
-    start_opts = Keyword.take(opts, [:name, :timeout, :debug, :spawn_opt])
+    listen_to = Keyword.fetch!(listener_opts, :listen_to)
+    schema = Keyword.fetch!(listener_opts, :schema)
 
     state = %Listener{listen_to: listen_to, schema: schema}
 
