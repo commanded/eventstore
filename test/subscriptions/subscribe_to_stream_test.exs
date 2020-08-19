@@ -9,7 +9,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   @event_store TestEventStore
   @conn TestEventStore.Postgrex
 
-  #@moduletag :wip
+  # @moduletag :wip
 
   setup do
     subscription_name = UUID.uuid4()
@@ -609,7 +609,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
 
-      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
 
       assert_receive {:subscribed, ^subscription}
       assert_receive {:events, received_events}
@@ -621,7 +622,9 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       refute Process.info(subscription)
 
       :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
-      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
 
       assert_receive {:subscribed, ^subscription}
       assert_receive {:events, received_events}
@@ -640,7 +643,8 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
       :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
 
-      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
 
       assert_receive {:subscribed, ^subscription}
       assert_receive {:events, received_events}
@@ -655,14 +659,17 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       refute Process.info(subscription)
 
       :ok = EventStore.append_to_stream(stream_uuid, 2, after_restart_events)
-      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true, start_from: 1)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(),
+          transient: true,
+          start_from: 1
+        )
 
       assert_receive {:subscribed, ^subscription}
       assert_receive {:events, received_events}
       assert pluck(received_events, :data) == pluck(new_events, :data)
     end
-
-
   end
 
   describe "unsubscribe from stream" do

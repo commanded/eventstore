@@ -41,6 +41,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           partitions: %{},
           processed_event_numbers: MapSet.new()
       }
+
       with :ok <- subscribe_to_events(data) do
         last_seen = data.start_from
 
@@ -60,6 +61,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           next_state(:initial, data)
       end
     end
+
     defevent subscribe,
       data: %SubscriptionState{} = data do
       data = %SubscriptionState{
