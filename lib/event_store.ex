@@ -808,7 +808,7 @@ defmodule EventStore do
               :ok | {:error, term}
 
   @doc """
-  Create a persistent subscription to a single stream.
+  Create a subscription to a single stream. By default the subscription is persistent.
 
   The `subscriber` process will be notified of each batch of events appended to
   the single stream identified by `stream_uuid`.
@@ -867,6 +867,21 @@ defmodule EventStore do
             )
           ```
 
+      - `transient` is an optional boolean flag to create a transient subscription.
+        By default this is set to `false`. If you want to create a transient
+        subscription set this flag to true. Your subscription will not be
+        persisted, so if the subscription is restarted, you will receive the events
+        again starting from `start_from`.
+
+        An example usage are short lived event handlers that keep their state in
+        memory but still want to have the guarantee to have received all events.
+
+        It's possible to create a persistent subscription with some name,
+        stop it and later create a transient subscription with the same name. The
+        transient subscription will now receive all events starting from `start_from`.
+        If you later stop this `transient` subscription and start a persistent
+        subscription again with the same name, you will receive the events again
+        as if the transient subscription never existed.
 
   The subscription will resume from the last acknowledged event if it already
   exists. It will ignore the `start_from` argument in this case.
@@ -914,7 +929,7 @@ defmodule EventStore do
               | {:error, reason :: term}
 
   @doc """
-  Create a persistent subscription to all streams.
+  Create a subscription to all streams. By default the subscription is persistent.
 
   The `subscriber` process will be notified of each batch of events appended to
   any stream.
@@ -946,6 +961,9 @@ defmodule EventStore do
         allowed to connect to the subscription. By default only one subscriber
         may connect. If too many subscribers attempt to connect to the
         subscription an `{:error, :too_many_subscribers}` is returned.
+
+      - `transient` is an optional boolean flag to create a transient subscription.
+        See `subscribe_to_stream` for the full information.
 
   The subscription will resume from the last acknowledged event if it already
   exists. It will ignore the `start_from` argument in this case.
