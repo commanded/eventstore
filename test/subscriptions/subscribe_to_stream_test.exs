@@ -9,8 +9,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   @event_store TestEventStore
   @conn TestEventStore.Postgrex
 
-  # @moduletag :wip
-
   setup do
     subscription_name = UUID.uuid4()
 
@@ -598,7 +596,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   end
 
   describe "restarting a transient subscription" do
-    @tag :wip
     test "should receive all events after restart", %{
       subscription_name: subscription_name
     } do
@@ -630,7 +627,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert pluck(received_events, :data) == pluck(initial_events, :data)
     end
 
-    @tag :wip
     test "should receive all events starting from start_from after restart", %{
       subscription_name: subscription_name
     } do
@@ -670,7 +666,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert pluck(received_events, :data) == pluck(new_events, :data)
     end
 
-    @tag :wip
     test "should allow to start with a transient subscription and change it to a none transient subscription",
          %{
            subscription_name: subscription_name
@@ -703,7 +698,6 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert pluck(received_events, :data) == pluck(initial_events, :data)
     end
 
-    @tag :wip
     test "should allow to start with a persistent subscription and later start a transient subscription with the same name",
          %{
            subscription_name: subscription_name
