@@ -86,9 +86,7 @@ defmodule EventStore.Config do
     Keyword.take(config, @postgrex_connection_opts)
   end
 
-  def postgrex_opts(config) do
-    {name, config} = Keyword.pop(config, :conn)
-
+  def postgrex_opts(config, name) do
     [
       pool_size: 10,
       queue_target: 50,

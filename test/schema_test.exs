@@ -1,4 +1,4 @@
-defmodule SchemaTest do
+defmodule EventStore.SchemaTest do
   use EventStore.StorageCase
 
   alias EventStore.Config

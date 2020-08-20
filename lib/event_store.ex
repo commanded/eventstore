@@ -145,6 +145,32 @@ defmodule EventStore do
   The above can be used for multi-tenancy where the data for each tenant is
   stored in a separate, isolated schema.
 
+  ## Shared database connection pools
+
+  By default each event store will start its own `Postgrex` database connection
+  pool. The size of the pool is configured with the `pool_size` config option.
+
+  When you have multiple event stores running you will also end up with multiple
+  connection pools. If they are all to the same physical Postgres database then
+  it can be useful to share a single pool amongst all event stores. Use the
+  `shared_connection_pool` config option to specify a name for the shared connection
+  pool. Then configure the event stores you'd like to share the pool with the
+  same name.
+
+  This can be done in config:
+
+      # config/config.exs
+      config :my_app, MyApp.EventStore, shared_connection_pool: :shared_pool
+
+  Or when starting the event stores, such as via a `Supervisor`:
+
+      Supervisor.start_link(
+        [
+          {MyApp.EventStore, name: :eventstore1, shared_connection_pool: :shared_pool},
+          {MyApp.EventStore, name: :eventstore2, shared_connection_pool: :shared_pool},
+          {MyApp.EventStore, name: :eventstore3, shared_connection_pool: :shared_pool}
+        ], opts)
+
   ## Guides
 
   Please refer to the following guides to learn more:

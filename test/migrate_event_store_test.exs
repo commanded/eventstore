@@ -1,4 +1,4 @@
-defmodule MigrateEventStoreTest do
+defmodule EventStore.MigrateEventStoreTest do
   use ExUnit.Case
 
   import ExUnit.CaptureIO
