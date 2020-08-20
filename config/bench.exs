@@ -13,7 +13,6 @@ default_config = [
   database: "eventstore_bench",
   hostname: "localhost",
   pool_size: 10,
-  pool_overflow: 5,
   serializer: EventStore.TermSerializer
 ]
 

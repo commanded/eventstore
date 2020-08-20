@@ -54,7 +54,6 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
       ```elixir
       config :my_app, MyApp.EventStore,
         pool_size: 10
-        pool_overflow: 5
         queue_target: 50
         queue_interval: 1_000,
         schema: "schema_name"
@@ -63,7 +62,6 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
       The database connection pool configuration options are:
 
       - `:pool_size` - The number of connections (default: `10`).
-      - `:pool_overflow` - The maximum number of overflow connections to start if all connections are checked out (default: `0`).
 
       Handling requests is done through a queue. When DBConnection is started, there are two relevant options to control the queue:
 

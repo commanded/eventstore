@@ -13,7 +13,6 @@ default_config = [
   database: "eventstore_migration_test",
   hostname: "localhost",
   pool_size: 1,
-  pool_overflow: 0,
   serializer: EventStore.JsonSerializer,
   subscription_retry_interval: 1_000
 ]

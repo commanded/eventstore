@@ -80,7 +80,6 @@ defmodule EventStore.Config do
   def postgrex_opts(config, name) do
     [
       pool_size: 10,
-      pool_overflow: 0,
       queue_target: 50,
       queue_interval: 1_000
     ]
@@ -90,7 +89,6 @@ defmodule EventStore.Config do
         [
           :pool,
           :pool_size,
-          :pool_overflow,
           :queue_target,
           :queue_interval
         ]

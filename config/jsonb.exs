@@ -14,7 +14,6 @@ default_config = [
   database: "eventstore_jsonb_test",
   hostname: "localhost",
   pool_size: 1,
-  pool_overflow: 0,
   serializer: EventStore.JsonbSerializer,
   subscription_retry_interval: 1_000,
   types: EventStore.PostgresTypes
