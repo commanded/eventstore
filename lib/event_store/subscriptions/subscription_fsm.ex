@@ -642,12 +642,14 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
     cond do
       MapSet.member?(processed_event_numbers, ack) ->
+        persist_if_not_transient = not data.transient
+
         %SubscriptionState{
           data
           | processed_event_numbers: MapSet.delete(processed_event_numbers, ack),
             last_ack: ack
         }
-        |> checkpoint_last_seen(true)
+        |> checkpoint_last_seen(persist_if_not_transient)
 
       persist ->
         Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, last_ack)
