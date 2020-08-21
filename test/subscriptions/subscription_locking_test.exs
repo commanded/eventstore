@@ -64,6 +64,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
     test "should not send events ack'd by another subscription during disconnect", %{
       event_store: event_store,
+      schema: schema,
       subscription: subscription,
       subscription_name: subscription_name
     } do
@@ -76,7 +77,10 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
       :ok = disconnect(subscription)
 
-      :ok = Storage.Subscription.ack_last_seen_event(@conn, "$all", subscription_name, 2)
+      :ok =
+        Storage.Subscription.ack_last_seen_event(@conn, "$all", subscription_name, 2,
+          schema: schema
+        )
 
       :ok = reconnect(subscription)
 
@@ -149,11 +153,13 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   end
 
   defp lock_subscription(context) do
+    %{schema: schema} = context
+
     config = Map.fetch!(context, :config) |> Config.sync_connect_postgrex_opts()
 
     conn = start_supervised!({Postgrex, config}, id: :subscription_conn)
 
-    :ok = EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1)
+    :ok = EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1, schema: schema)
 
     [conn2: conn]
   end
@@ -161,6 +167,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   defp create_subscription(context) do
     %{
       conn: conn,
+      schema: schema,
       event_store: event_store,
       serializer: serializer,
       subscription_name: subscription_name
@@ -170,6 +177,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       Subscription.start_link(
         event_store: event_store,
         conn: conn,
+        schema: schema,
         serializer: serializer,
         retry_interval: 1_000,
         stream_uuid: "$all",

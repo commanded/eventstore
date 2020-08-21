@@ -26,17 +26,20 @@ defmodule EventStore.Tasks.Migrations do
   Run task
 
   ## Parameters
-  - config: the parsed EventStore config
+
+    - config: the parsed EventStore config
 
   ## Opts
-  - is_mix: set to `true` if running as part of a Mix task
+
+    - is_mix: set to `true` if running as part of a Mix task
 
   """
   def exec(config, opts) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
+    schema = Keyword.fetch!(config, :schema)
     config = Config.default_postgrex_opts(config)
 
-    migrations = migrations(config)
+    migrations = migrations(config, schema)
     event_store = Keyword.get(opts, :eventstore, "default")
     event_store_name = event_store |> to_string() |> String.replace_prefix("Elixir.", "")
 
@@ -70,8 +73,8 @@ defmodule EventStore.Tasks.Migrations do
     |> write_info(opts)
   end
 
-  defp migrations(config) do
-    completed = query_schema_migrations(config)
+  defp migrations(config, schema) do
+    completed = query_schema_migrations(config, schema)
     latest_migration = completed |> Enum.reverse() |> Enum.at(0, nil)
 
     completed ++ pending_migrations(latest_migration)
@@ -87,23 +90,24 @@ defmodule EventStore.Tasks.Migrations do
     end)
   end
 
-  defp query_schema_migrations(config) do
+  defp query_schema_migrations(config, schema) do
     config
-    |> run_query(
-      "SELECT major_version, minor_version, patch_version, migrated_at FROM schema_migrations ORDER BY 1, 2, 3"
-    )
+    |> run_query("""
+      SELECT major_version, minor_version, patch_version, migrated_at
+      FROM #{schema}.schema_migrations
+      ORDER BY 1, 2, 3
+    """)
     |> handle_response()
   end
 
   defp run_query(config, query) do
     {:ok, conn} = Postgrex.start_link(config)
 
-    reply = Postgrex.query!(conn, query, [])
-
-    true = Process.unlink(conn)
-    true = Process.exit(conn, :shutdown)
-
-    reply
+    try do
+      Postgrex.query!(conn, query, [])
+    after
+      GenServer.stop(conn)
+    end
   end
 
   defp handle_response(%Postgrex.Result{rows: rows}) do

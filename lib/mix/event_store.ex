@@ -44,7 +44,7 @@ defmodule Mix.EventStore do
         You can avoid this warning by passing the -e flag or by setting the
         event stores managed by those applications in your config/config.exs:
 
-            config #{inspect(hd(apps))}, event_stores: [...]
+          config #{inspect(hd(apps))}, event_stores: [...]
         """)
 
         []
@@ -61,8 +61,8 @@ defmodule Mix.EventStore do
   @doc """
   Ensures the given module is an EventStore.
   """
-  @spec ensure_event_store(module, list) :: EventStore.t()
-  def ensure_event_store(event_store, args) do
+  @spec ensure_event_store!(module, list) :: EventStore.t()
+  def ensure_event_store!(event_store, args) do
     Mix.Task.run("loadpaths", args)
 
     unless "--no-compile" in args do

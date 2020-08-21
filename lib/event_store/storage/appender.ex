@@ -16,9 +16,9 @@ defmodule EventStore.Storage.Appender do
 
   Returns `:ok` on success, `{:error, reason}` on failure.
   """
-  def append(conn, stream_id, events, opts \\ [])
-
   def append(conn, stream_id, events, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
+
     stream_uuid = stream_uuid(events)
 
     try do
@@ -44,9 +44,9 @@ defmodule EventStore.Storage.Appender do
         stream_params = [stream_id | [event_count | stream_params]]
         all_stream_params = [@all_stream_id | [event_count | all_stream_params]]
 
-        with :ok <- insert_event_batch(conn, batch, opts),
-             :ok <- insert_stream_events(conn, stream_params, event_count, opts),
-             :ok <- insert_link_events(conn, all_stream_params, event_count, opts) do
+        with :ok <- insert_event_batch(conn, batch, schema, opts),
+             :ok <- insert_stream_events(conn, stream_params, event_count, schema, opts),
+             :ok <- insert_link_events(conn, all_stream_params, event_count, schema, opts) do
           Logger.debug("Appended #{length(events)} event(s) to stream #{inspect(stream_uuid)}")
 
           :ok
@@ -57,7 +57,7 @@ defmodule EventStore.Storage.Appender do
     catch
       {:error, error} = reply ->
         Logger.warn(
-          "Failed to append events to stream #{inspect(stream_uuid)} due to: #{inspect(error)}"
+          "Failed to append events to stream #{inspect(stream_uuid)} due to: " <> inspect(error)
         )
 
         reply
@@ -72,6 +72,8 @@ defmodule EventStore.Storage.Appender do
   def link(conn, stream_id, event_ids, opts \\ [])
 
   def link(conn, stream_id, event_ids, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
+
     try do
       event_ids
       |> Stream.map(&encode_uuid/1)
@@ -86,7 +88,7 @@ defmodule EventStore.Storage.Appender do
 
         params = [stream_id | [event_count | parameters]]
 
-        with :ok <- insert_link_events(conn, params, event_count, opts) do
+        with :ok <- insert_link_events(conn, params, event_count, schema, opts) do
           Logger.debug("Linked #{length(event_ids)} event(s) to stream")
 
           :ok
@@ -115,9 +117,9 @@ defmodule EventStore.Storage.Appender do
     event_id |> uuid()
   end
 
-  defp insert_event_batch(conn, events, opts) do
+  defp insert_event_batch(conn, events, schema, opts) do
     event_count = length(events)
-    statement = Statements.create_events(event_count)
+    statement = Statements.create_events(schema, event_count)
     parameters = build_insert_parameters(events)
 
     conn
@@ -140,16 +142,16 @@ defmodule EventStore.Storage.Appender do
     end)
   end
 
-  defp insert_stream_events(conn, params, event_count, opts) do
-    statement = Statements.create_stream_events(event_count)
+  defp insert_stream_events(conn, params, event_count, schema, opts) do
+    statement = Statements.create_stream_events(schema, event_count)
 
     conn
     |> Postgrex.query(statement, params, opts)
     |> handle_response()
   end
 
-  defp insert_link_events(conn, params, event_count, opts) do
-    statement = Statements.create_link_events(event_count)
+  defp insert_link_events(conn, params, event_count, schema, opts) do
+    statement = Statements.create_link_events(schema, event_count)
 
     conn
     |> Postgrex.query(statement, params, opts)

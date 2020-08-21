@@ -13,8 +13,10 @@ defmodule EventStore.Config.Parser do
       {key, value}, config ->
         Keyword.put(config, key, get_config_value(value))
     end)
-    |> Keyword.merge(pool: EventStore.Config.get_pool())
+    |> Keyword.put(:pool, EventStore.Config.get_pool())
     |> Keyword.put_new(:schema, "public")
+    |> Keyword.put_new(:column_data_type, "bytea")
+    |> Keyword.put_new(:enable_hard_deletes, false)
   end
 
   # Converts a database url into a Keyword list

@@ -5,6 +5,7 @@ defmodule EventStore.Subscriptions.SubscriptionState do
     :conn,
     :event_store,
     :serializer,
+    :schema,
     :stream_uuid,
     :start_from,
     :subscription_name,

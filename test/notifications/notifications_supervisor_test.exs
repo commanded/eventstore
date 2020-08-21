@@ -1,15 +1,14 @@
 defmodule EventStore.Notifications.NotificationsSupervisorTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, Notifications, PubSub, Serializer, Wait}
+  alias EventStore.{EventFactory, Notifications, PubSub, Wait}
   alias TestEventStore, as: EventStore
 
   describe "notifications supervisor" do
     setup do
       config = TestEventStore.config() |> Keyword.put(:subscription_hibernate_after, 0)
-      serializer = Serializer.serializer(TestEventStore, config)
 
-      start_supervised!({Notifications.Supervisor, {ES, serializer, config}})
+      start_supervised!({Notifications.Supervisor, {ES, config}})
       for child_spec <- PubSub.child_spec(ES), do: start_supervised!(child_spec)
 
       :ok

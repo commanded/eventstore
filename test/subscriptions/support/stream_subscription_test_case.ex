@@ -429,6 +429,7 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
 
     defp create_subscription(context, opts \\ []) do
       %{
+        schema: schema,
         serializer: serializer,
         stream_uuid: stream_uuid,
         subscriber: subscriber
@@ -438,6 +439,7 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
         opts
         |> Keyword.put(:conn, @conn)
         |> Keyword.put(:event_store, @event_store)
+        |> Keyword.put(:schema, schema)
         |> Keyword.put(:serializer, serializer)
         |> Keyword.put_new(:buffer_size, 3)
 
@@ -498,7 +500,9 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
       SubscriptionFsm.ack(subscription, event_number, subscriber)
     end
 
-    defp lock_subscription(_context) do
+    defp lock_subscription(context) do
+      %{schema: schema} = context
+
       config =
         @event_store
         |> EventStore.Config.parsed(:eventstore)
@@ -506,7 +510,7 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
 
       conn = start_supervised!({Postgrex, config})
 
-      EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1)
+      EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1, schema: schema)
 
       [conn2: conn]
     end

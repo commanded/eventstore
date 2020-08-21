@@ -3,8 +3,10 @@ defmodule EventStore.Storage.QueryStreamInfo do
 
   alias EventStore.Sql.Statements
 
-  def execute(conn, stream_uuid, opts \\ []) do
-    query = Statements.query_stream_info()
+  def execute(conn, stream_uuid, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
+
+    query = Statements.query_stream_info(schema)
 
     case Postgrex.query(conn, query, [stream_uuid], opts) do
       {:ok, %Postgrex.Result{num_rows: 0}} ->

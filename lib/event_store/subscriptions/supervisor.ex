@@ -37,7 +37,7 @@ defmodule EventStore.Subscriptions.Supervisor do
     end
   end
 
-  def shutdown_subscription(event_store, stream_uuid, subscription_name) do
+  def stop_subscription(event_store, stream_uuid, subscription_name) do
     name = registry_name(event_store, stream_uuid, subscription_name)
 
     case Registry.whereis_name(name) do

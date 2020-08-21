@@ -5,29 +5,27 @@ defmodule EventStore.Storage.Lock do
 
   alias EventStore.Sql.Statements
 
-  def try_acquire_exclusive_lock(conn, key, opts \\ []) do
-    case Postgrex.query(conn, Statements.try_advisory_lock(), [key], opts) do
-      {:ok, %Postgrex.Result{rows: [[true]]}} ->
-        :ok
+  def try_acquire_exclusive_lock(conn, key, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
 
-      {:ok, %Postgrex.Result{rows: [[false]]}} ->
-        {:error, :lock_already_taken}
+    query = Statements.try_advisory_lock(schema)
 
-      {:error, _error} = reply ->
-        reply
+    case Postgrex.query(conn, query, [key], opts) do
+      {:ok, %Postgrex.Result{rows: [[true]]}} -> :ok
+      {:ok, %Postgrex.Result{rows: [[false]]}} -> {:error, :lock_already_taken}
+      {:error, _error} = reply -> reply
     end
   end
 
-  def unlock(conn, key, opts \\ []) do
-    case Postgrex.query(conn, Statements.advisory_unlock(), [key], opts) do
-      {:ok, %Postgrex.Result{rows: [[true]]}} ->
-        :ok
+  def unlock(conn, key, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
 
-      {:ok, %Postgrex.Result{rows: [[false]]}} ->
-        :ok
+    query = Statements.advisory_unlock(schema)
 
-      {:error, _error} = reply ->
-        reply
+    case Postgrex.query(conn, query, [key], opts) do
+      {:ok, %Postgrex.Result{rows: [[true]]}} -> :ok
+      {:ok, %Postgrex.Result{rows: [[false]]}} -> :ok
+      {:error, _error} = reply -> reply
     end
   end
 end

@@ -3,14 +3,14 @@ defmodule EventStore.Storage.Initializer do
 
   alias EventStore.Sql.Statements
 
-  def run!(event_store, config, conn, opts \\ []) do
-    statements = Statements.initializers(event_store, config)
+  def run!(conn, config, opts \\ []) do
+    statements = Statements.initializers(config)
 
     execute!(conn, statements, opts)
   end
 
-  def reset!(conn, opts \\ []) do
-    statements = Statements.reset()
+  def reset!(conn, config, opts \\ []) do
+    statements = Statements.reset(config)
 
     execute!(conn, statements, opts)
   end

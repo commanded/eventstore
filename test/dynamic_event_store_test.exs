@@ -13,9 +13,9 @@ defmodule DynamicEventStoreTest do
     end
 
     test "should ensure name is an atom" do
-      assert_raise ArgumentError,
-                   "expected :name option to be an atom but got: \"invalid\"",
-                   fn -> {:ok, _pid} = EventStore.start_link(name: "invalid") end
+      assert_raise ArgumentError, "expected `:name` to be an atom, got: \"invalid\"", fn ->
+        EventStore.start_link(name: "invalid")
+      end
     end
 
     test "should append and read events" do

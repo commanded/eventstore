@@ -12,9 +12,16 @@ defmodule EventStore.Streams.AllStreamTest do
   describe "read stream forward" do
     setup [:append_events_to_streams]
 
-    test "should fetch events from all streams", %{conn: conn, serializer: serializer} do
+    test "should fetch events from all streams", %{
+      conn: conn,
+      schema: schema,
+      serializer: serializer
+    } do
       {:ok, read_events} =
-        Stream.read_stream_forward(conn, @all_stream, 0, 1_000, serializer: serializer)
+        Stream.read_stream_forward(conn, @all_stream, 0, 1_000,
+          schema: schema,
+          serializer: serializer
+        )
 
       assert length(read_events) == 6
     end
@@ -25,10 +32,15 @@ defmodule EventStore.Streams.AllStreamTest do
 
     test "should stream events from all streams using single event batch size", %{
       conn: conn,
+      schema: schema,
       serializer: serializer
     } do
       read_events =
-        Stream.stream_forward(conn, @all_stream, 0, read_batch_size: 1, serializer: serializer)
+        Stream.stream_forward(conn, @all_stream, 0,
+          read_batch_size: 1,
+          schema: schema,
+          serializer: serializer
+        )
         |> Enum.to_list()
 
       assert length(read_events) == 6
@@ -36,10 +48,15 @@ defmodule EventStore.Streams.AllStreamTest do
 
     test "should stream events from all streams using two event batch size", %{
       conn: conn,
+      schema: schema,
       serializer: serializer
     } do
       read_events =
-        Stream.stream_forward(conn, @all_stream, 0, read_batch_size: 2, serializer: serializer)
+        Stream.stream_forward(conn, @all_stream, 0,
+          read_batch_size: 2,
+          schema: schema,
+          serializer: serializer
+        )
         |> Enum.to_list()
 
       assert length(read_events) == 6
@@ -47,10 +64,15 @@ defmodule EventStore.Streams.AllStreamTest do
 
     test "should stream events from all streams uisng large batch size", %{
       conn: conn,
+      schema: schema,
       serializer: serializer
     } do
       read_events =
-        Stream.stream_forward(conn, @all_stream, 0, read_batch_size: 1_000, serializer: serializer)
+        Stream.stream_forward(conn, @all_stream, 0,
+          read_batch_size: 1_000,
+          schema: schema,
+          serializer: serializer
+        )
         |> Enum.to_list()
 
       assert length(read_events) == 6
@@ -84,6 +106,7 @@ defmodule EventStore.Streams.AllStreamTest do
     test "from current should receive only new events", %{
       conn: conn,
       serializer: serializer,
+      schema: schema,
       stream1_uuid: stream1_uuid
     } do
       {:ok, _subscription} =
@@ -92,13 +115,19 @@ defmodule EventStore.Streams.AllStreamTest do
           @subscription_name,
           self(),
           start_from: :current,
+          schema: schema,
           buffer_size: 2
         )
 
       refute_receive {:events, _received_events}
 
       events = EventFactory.create_events(1, 4)
-      :ok = Stream.append_to_stream(conn, stream1_uuid, 3, events, serializer: serializer)
+
+      :ok =
+        Stream.append_to_stream(conn, stream1_uuid, 3, events,
+          schema: schema,
+          serializer: serializer
+        )
 
       assert_receive {:events, received_events}
       assert length(received_events) == 1
@@ -126,9 +155,14 @@ defmodule EventStore.Streams.AllStreamTest do
     end
   end
 
-  defp append_events_to_streams(%{conn: conn, serializer: serializer}) do
-    {stream1_uuid, stream1_events} = append_events_to_stream(conn, serializer: serializer)
-    {stream2_uuid, stream2_events} = append_events_to_stream(conn, serializer: serializer)
+  defp append_events_to_streams(context) do
+    %{conn: conn, schema: schema, serializer: serializer} = context
+
+    {stream1_uuid, stream1_events} =
+      append_events_to_stream(conn, schema: schema, serializer: serializer)
+
+    {stream2_uuid, stream2_events} =
+      append_events_to_stream(conn, schema: schema, serializer: serializer)
 
     [
       stream1_uuid: stream1_uuid,

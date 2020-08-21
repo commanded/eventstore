@@ -17,6 +17,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         stream_uuid: stream_uuid,
         subscription_name: subscription_name,
         serializer: Keyword.fetch!(opts, :serializer),
+        schema: Keyword.fetch!(opts, :schema),
         start_from: opts[:start_from] || 0,
         mapper: opts[:mapper],
         selector: opts[:selector],
@@ -260,6 +261,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp create_subscription(%SubscriptionState{} = data) do
     %SubscriptionState{
       conn: conn,
+      schema: schema,
       start_from: start_from,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name
@@ -269,7 +271,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       conn,
       stream_uuid,
       subscription_name,
-      start_from
+      start_from,
+      schema: schema
     )
   end
 
@@ -404,13 +407,17 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp read_stream_forward(%SubscriptionState{} = data) do
     %SubscriptionState{
       conn: conn,
+      schema: schema,
       serializer: serializer,
       stream_uuid: stream_uuid,
       last_sent: last_sent,
       max_size: max_size
     } = data
 
-    Stream.read_stream_forward(conn, stream_uuid, last_sent + 1, max_size, serializer: serializer)
+    Stream.read_stream_forward(conn, stream_uuid, last_sent + 1, max_size,
+      schema: schema,
+      serializer: serializer
+    )
   end
 
   defp enqueue_events(%SubscriptionState{} = data, []), do: data
@@ -603,6 +610,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp checkpoint_last_seen(%SubscriptionState{} = data, persist \\ false) do
     %SubscriptionState{
       conn: conn,
+      schema: schema,
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
       processed_event_numbers: processed_event_numbers,
@@ -621,7 +629,9 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         |> checkpoint_last_seen(true)
 
       persist ->
-        Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, last_ack)
+        Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, last_ack,
+          schema: schema
+        )
 
         data
 

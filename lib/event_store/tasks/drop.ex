@@ -11,11 +11,13 @@ defmodule EventStore.Tasks.Drop do
   Runs task
 
   ## Parameters
-  - config: the parsed EventStore config
+
+    - config: the parsed EventStore config
 
   ## Opts
-  - is_mix: set to `true` if running as part of a Mix task
-  - quiet: set to `true` to silence output
+
+    - is_mix: set to `true` if running as part of a Mix task
+    - quiet: set to `true` to silence output
 
   """
   def exec(config, opts) do
