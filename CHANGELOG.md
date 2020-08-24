@@ -8,6 +8,7 @@
 - Introduce `mix event_store.migrations` task to list migration status ([#207](https://github.com/commanded/eventstore/pull/207)).
 - Remove distributed registry ([#210](https://github.com/commanded/eventstore/pull/210)).
 - Hibernate subscription process after inactivity ([#214](https://github.com/commanded/eventstore/pull/214)).
+- Runtime event store configuration ((#217)[https://github.com/commanded/eventstore/pull/217]).
 
 ### Bug fixes
 
