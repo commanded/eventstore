@@ -26,7 +26,7 @@ defmodule EventStore.Notifications.Supervisor do
   supervised children, is kept running on a cluster of nodes.
   """
   def start_link(config) do
-    case Supervisor.start_link(__MODULE__, config, name: {:global, __MODULE__}) do
+    case Supervisor.start_link(__MODULE__, config, name: __MODULE__) do
       {:ok, pid} ->
         {:ok, pid}
 
