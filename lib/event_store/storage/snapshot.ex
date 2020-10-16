@@ -9,7 +9,7 @@ defmodule EventStore.Storage.Snapshot do
   def read_snapshot(conn, source_uuid, opts) do
     {schema, opts} = Keyword.pop(opts, :schema)
 
-    query = Statements.query_get_snapshot(schema)
+    query = Statements.query_snapshot(schema)
 
     case Postgrex.query(conn, query, [source_uuid], opts) do
       {:ok, %Postgrex.Result{num_rows: 0}} ->
@@ -38,7 +38,7 @@ defmodule EventStore.Storage.Snapshot do
 
     {schema, opts} = Keyword.pop(opts, :schema)
 
-    query = Statements.record_snapshot(schema)
+    query = Statements.insert_snapshot(schema)
     params = [source_uuid, source_version, source_type, data, metadata]
 
     case Postgrex.query(conn, query, params, opts) do

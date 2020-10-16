@@ -1,0 +1,9 @@
+SELECT
+  source_uuid,
+  source_version,
+  source_type,
+  data,
+  metadata,
+  created_at
+FROM <%= schema %>.snapshots
+WHERE source_uuid = $1;

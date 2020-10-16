@@ -1,5 +1,6 @@
-defmodule EventStore.Sql.Statements.Init do
+defmodule EventStore.Sql.Init do
   @moduledoc false
+
   # PostgreSQL statements to intialize an event store schema.
 
   def statements(config) do

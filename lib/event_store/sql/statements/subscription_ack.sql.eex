@@ -1,0 +1,3 @@
+UPDATE <%= schema %>.subscriptions
+SET last_seen = $3
+WHERE stream_uuid = $1 AND subscription_name = $2;

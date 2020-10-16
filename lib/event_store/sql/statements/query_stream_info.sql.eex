@@ -1,0 +1,6 @@
+SELECT
+  stream_id,
+  stream_version,
+  deleted_at
+FROM <%= schema %>.streams
+WHERE stream_uuid = $1;

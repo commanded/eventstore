@@ -101,7 +101,7 @@ defmodule EventStore.Storage.Reader do
     def read_events_forward(conn, stream_id, start_version, count, opts) do
       {schema, opts} = Keyword.pop(opts, :schema)
 
-      query = Statements.read_events_forward(schema)
+      query = Statements.query_stream_events(schema)
 
       case Postgrex.query(conn, query, [stream_id, start_version, count], opts) do
         {:ok, %Postgrex.Result{num_rows: 0}} ->

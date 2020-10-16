@@ -1,0 +1,2 @@
+DELETE FROM <%= schema %>.snapshots
+WHERE source_uuid = $1;

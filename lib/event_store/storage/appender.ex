@@ -119,7 +119,7 @@ defmodule EventStore.Storage.Appender do
 
   defp insert_event_batch(conn, events, schema, opts) do
     event_count = length(events)
-    statement = Statements.create_events(schema, event_count)
+    statement = Statements.insert_events(schema, event_count)
     parameters = build_insert_parameters(events)
 
     conn
@@ -143,7 +143,7 @@ defmodule EventStore.Storage.Appender do
   end
 
   defp insert_stream_events(conn, params, event_count, schema, opts) do
-    statement = Statements.create_stream_events(schema, event_count)
+    statement = Statements.insert_stream_events(schema, event_count)
 
     conn
     |> Postgrex.query(statement, params, opts)
@@ -151,7 +151,7 @@ defmodule EventStore.Storage.Appender do
   end
 
   defp insert_link_events(conn, params, event_count, schema, opts) do
-    statement = Statements.create_link_events(schema, event_count)
+    statement = Statements.insert_link_events(schema, event_count)
 
     conn
     |> Postgrex.query(statement, params, opts)

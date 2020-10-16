@@ -73,7 +73,7 @@ defmodule EventStore.Storage.Subscription do
     def execute(conn, stream_uuid, subscription_name, opts) do
       {schema, opts} = Keyword.pop(opts, :schema)
 
-      query = Statements.query_get_subscription(schema)
+      query = Statements.query_subscription(schema)
 
       case Postgrex.query(conn, query, [stream_uuid, subscription_name], opts) do
         {:ok, %Postgrex.Result{num_rows: 0}} -> {:error, :subscription_not_found}
@@ -95,7 +95,7 @@ defmodule EventStore.Storage.Subscription do
 
       {schema, opts} = Keyword.pop(opts, :schema)
 
-      query = Statements.create_subscription(schema)
+      query = Statements.insert_subscription(schema)
 
       case Postgrex.query(conn, query, [stream_uuid, subscription_name, start_from], opts) do
         {:ok, %Postgrex.Result{rows: rows}} ->
@@ -132,7 +132,7 @@ defmodule EventStore.Storage.Subscription do
     def execute(conn, stream_uuid, subscription_name, last_seen, opts) do
       {schema, opts} = Keyword.pop(opts, :schema)
 
-      query = Statements.ack_last_seen_event(schema)
+      query = Statements.subscription_ack(schema)
 
       case Postgrex.query(conn, query, [stream_uuid, subscription_name, last_seen], opts) do
         {:ok, _result} ->

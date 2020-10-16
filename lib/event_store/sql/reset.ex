@@ -1,5 +1,6 @@
-defmodule EventStore.Sql.Statements.Reset do
+defmodule EventStore.Sql.Reset do
   @moduledoc false
+
   # PostgreSQL statements to reset an event store schema.
 
   def statements(config) do

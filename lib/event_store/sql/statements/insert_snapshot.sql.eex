@@ -1,0 +1,11 @@
+INSERT INTO <%= schema %>.snapshots 
+  (
+    source_uuid,
+    source_version,
+    source_type,
+    data,
+    metadata
+  )
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (source_uuid)
+DO UPDATE SET source_version = $2, source_type = $3, data = $4, metadata = $5;

@@ -1,0 +1,28 @@
+WITH
+  stream AS (
+    UPDATE <%= schema %>.streams
+    SET stream_version = stream_version + $2::bigint
+    WHERE stream_id = $1::bigint
+    RETURNING stream_id
+  ),
+  events (event_id, stream_version) AS (
+    VALUES
+    <%= for i <- 0..(number_of_events - 1) do %>
+      ($<%= i * 2 + 3 %>::uuid, $<%= i * 2 + 4 %>::bigint)
+    <% end |> Enum.intersperse(",") %>
+  )
+INSERT INTO <%= schema %>.stream_events
+  (
+    event_id,
+    stream_id,
+    stream_version,
+    original_stream_id,
+    original_stream_version
+  )
+SELECT
+  events.event_id,
+  stream.stream_id,
+  events.stream_version,
+  stream.stream_id,
+  events.stream_version
+FROM events, stream;
