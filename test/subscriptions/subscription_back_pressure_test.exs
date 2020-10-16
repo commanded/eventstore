@@ -69,7 +69,7 @@ defmodule EventStore.Subscriptions.SubscriptionBackPressureTest do
 
       append_to_stream("stream1", 5)
 
-      assert_receive {:events, received_events}
+      assert_receive {:events, _received_events}
 
       assert {:error, :unexpected_ack} = Subscription.ack(subscription, 999)
     end

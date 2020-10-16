@@ -33,7 +33,7 @@ defmodule EventStore.Notifications.NotificationsSupervisorTest do
       # Appending events to the event store should resume listener processes
       :ok = append_events(stream_uuid, 3)
 
-      assert_receive {:events, events}
+      assert_receive {:events, _events}
 
       # Listener processes should be hibernated again after inactivity
       Wait.until(fn ->
