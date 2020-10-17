@@ -19,6 +19,7 @@ default_config = [
 
 config :eventstore, TestEventStore, default_config
 config :eventstore, SchemaEventStore, default_config
+config :eventstore, MigrationSourceEventStore, default_config
 config :eventstore, SecondEventStore, Keyword.put(default_config, :database, "eventstore_test_2")
 
 config :eventstore, event_stores: [TestEventStore]

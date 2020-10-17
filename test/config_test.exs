@@ -5,6 +5,7 @@ defmodule EventStore.ConfigTest do
 
   test "parse keys" do
     config = [
+      migration_source: "my_new_migration_source",
       username: "postgres",
       hostname: "localhost",
       database: "eventstore_test",
@@ -22,6 +23,7 @@ defmodule EventStore.ConfigTest do
                database: "eventstore_test",
                hostname: "localhost",
                username: "postgres",
+               migration_source: "my_new_migration_source",
                pool: EventStore.Config.get_pool()
              ]
   end

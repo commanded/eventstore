@@ -57,6 +57,17 @@ defmodule EventStore.Config do
     end
   end
 
+
+  @migration_source "schema_migrations"
+
+  @doc """
+  Returns the configured migration_source value.
+  """
+  def get_migration_source(config) do
+    config
+    |> Keyword.get(:migration_source, @migration_source)
+  end
+
   @postgrex_connection_opts [
     :username,
     :password,

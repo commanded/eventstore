@@ -27,8 +27,8 @@ defmodule EventStore.Sql.Statements do
       create_subscriptions_table(),
       create_subscription_index(),
       create_snapshots_table(column_data_type),
-      create_schema_migrations_table(),
-      record_event_store_schema_version()
+      create_schema_migrations_table(config),
+      record_event_store_schema_version(config)
     ]
   end
 
@@ -266,9 +266,11 @@ defmodule EventStore.Sql.Statements do
   end
 
   # record execution of upgrade scripts
-  defp create_schema_migrations_table do
+  defp create_schema_migrations_table(config) do
+    migration_source = EventStore.Config.get_migration_source(config)
+
     """
-    CREATE TABLE schema_migrations
+    CREATE TABLE #{migration_source}
     (
         major_version int NOT NULL,
         minor_version int NOT NULL,
@@ -280,9 +282,11 @@ defmodule EventStore.Sql.Statements do
   end
 
   # record current event store schema version
-  defp record_event_store_schema_version do
+  defp record_event_store_schema_version(config) do
+    migration_source = EventStore.Config.get_migration_source(config)
+
     """
-    INSERT INTO schema_migrations (major_version, minor_version, patch_version)
+    INSERT INTO #{migration_source} (major_version, minor_version, patch_version)
     VALUES (1, 2, 0);
     """
   end
