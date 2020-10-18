@@ -1,4 +1,4 @@
-defmodule EventStore.Storage.MigrationSourceTest do
+defmodule MigrationSourceTest do
   use ExUnit.Case
 
   alias EventStore.Config
