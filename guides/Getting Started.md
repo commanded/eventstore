@@ -120,6 +120,19 @@ You can use an existing PostgreSQL database with EventStore by running the follo
 $ mix event_store.init
 ```
 
+#### 👉 Heads up
+You might run into a naming colision. Ecto & EventStore are using the same name for the migration table. You have to options to avoid this issue:
+
+1. Change the Ecto migration table name with the `:migration_source` option. Please checkout the [Ecto migration documentation](https://hexdocs.pm/ecto_sql/Ecto.Migration.html) for more information
+2. You can do the same for EventStore. Change the name of the table name by providing a `:migration_source` option to your configuration
+
+```elixir
+config :your_app, Your.EventStore,
+  ...
+  migration_source: "event_source_migrations"
+```
+
+
 ## Reset an existing database
 
 To drop an existing EventStore database and recreate it you can run the following `mix` tasks:
