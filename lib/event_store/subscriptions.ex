@@ -1,11 +1,12 @@
 defmodule EventStore.Subscriptions do
   @moduledoc false
 
-  alias EventStore.{Storage, Subscriptions}
+  alias EventStore.Storage
   alias EventStore.Subscriptions.Subscription
+  alias EventStore.Subscriptions.Supervisor, as: SubscriptionsSupervisor
 
   def subscribe_to_stream(subscriber, opts \\ []) do
-    case Subscriptions.Supervisor.start_subscription(opts) do
+    case SubscriptionsSupervisor.start_subscription(opts) do
       {:ok, subscription} ->
         Subscription.connect(subscription, subscriber, opts)
 
@@ -20,18 +21,9 @@ defmodule EventStore.Subscriptions do
     end
   end
 
-  def unsubscribe_from_stream(event_store, stream_uuid, subscription_name) do
-    Subscriptions.Supervisor.unsubscribe_from_stream(event_store, stream_uuid, subscription_name)
-  end
-
-  def delete_subscription(event_store, stream_uuid, subscription_name, opts \\ []) do
-    :ok =
-      Subscriptions.Supervisor.shutdown_subscription(event_store, stream_uuid, subscription_name)
-
-    conn = Module.concat(event_store, Postgrex)
-
-    Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
-  end
+  defdelegate unsubscribe_from_stream(event_store, stream_uuid, name), to: SubscriptionsSupervisor
+  defdelegate stop_subscription(event_store, stream_uuid, name), to: SubscriptionsSupervisor
+  defdelegate delete_subscription(conn, stream_uuid, subscription_name, opts), to: Storage
 
   @doc """
   Get the delay between subscription retry attempts, in milliseconds, from the

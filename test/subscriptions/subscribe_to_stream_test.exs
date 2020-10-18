@@ -19,6 +19,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     setup [:append_events_to_another_stream]
 
     test "should receive `:subscribed` message once subscribed", %{
+      schema: schema,
       serializer: serializer,
       subscription_name: subscription_name
     } do
@@ -28,6 +29,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
         Subscriptions.subscribe_to_stream(self(),
           event_store: @event_store,
           conn: @conn,
+          schema: schema,
           serializer: serializer,
           hibernate_after: 15_000,
           retry_interval: 1_000,
@@ -603,7 +605,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   end
 
   describe "delete subscription" do
-    test "should be deleted", %{subscription_name: subscription_name} do
+    test "should be deleted", %{subscription_name: subscription_name, schema: schema} do
       stream_uuid = UUID.uuid4()
 
       {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
@@ -611,7 +613,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert :ok = EventStore.delete_subscription(stream_uuid, subscription_name)
       refute Process.alive?(subscription)
 
-      assert {:ok, []} = Storage.subscriptions(@conn)
+      assert {:ok, []} = Storage.subscriptions(@conn, schema: schema)
     end
   end
 

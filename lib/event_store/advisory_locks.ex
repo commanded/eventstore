@@ -11,7 +11,7 @@ defmodule EventStore.AdvisoryLocks do
 
   defmodule State do
     @moduledoc false
-    defstruct [:conn, state: :connected, locks: %{}]
+    defstruct [:conn, :schema, state: :connected, locks: %{}]
   end
 
   defmodule Lock do
@@ -23,18 +23,27 @@ defmodule EventStore.AdvisoryLocks do
             ref: reference()
           }
     defstruct [:key, :owner, :ref]
+
+    def new(key, owner) do
+      %Lock{key: key, owner: owner, ref: make_ref()}
+    end
+
+    def ref(%Lock{ref: ref}), do: ref
   end
 
   alias EventStore.AdvisoryLocks.{Lock, State}
   alias EventStore.Storage
 
   def start_link(opts) do
-    conn = Keyword.fetch!(opts, :conn)
-    name = Keyword.get(opts, :name, __MODULE__)
+    {start_opts, advisory_locks_opts} =
+      Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt, :hibernate_after])
 
-    state = %State{conn: conn}
+    conn = Keyword.fetch!(advisory_locks_opts, :conn)
+    schema = Keyword.fetch!(advisory_locks_opts, :schema)
 
-    GenServer.start_link(__MODULE__, state, name: name)
+    state = %State{conn: conn, schema: schema}
+
+    GenServer.start_link(__MODULE__, state, start_opts)
   end
 
   def init(%State{} = state) do
@@ -68,28 +77,22 @@ defmodule EventStore.AdvisoryLocks do
   end
 
   def handle_call({:try_advisory_lock, key, owner}, _from, %State{} = state) do
-    %State{conn: conn} = state
-
-    case try_acquire_exclusive_lock(conn, key, owner) do
-      {:ok, %Lock{ref: lock_ref} = lock} ->
+    case try_acquire_exclusive_lock(key, owner, state) do
+      {:ok, %Lock{} = lock} ->
         state = monitor_acquired_lock(lock, state)
 
-        {:reply, {:ok, lock_ref}, state}
+        {:reply, {:ok, Lock.ref(lock)}, state}
 
       reply ->
         {:reply, reply, state}
     end
   end
 
-  defp try_acquire_exclusive_lock(conn, key, owner) do
-    case Storage.Lock.try_acquire_exclusive_lock(conn, key) do
-      :ok ->
-        lock = %Lock{key: key, owner: owner, ref: make_ref()}
+  defp try_acquire_exclusive_lock(key, owner, %State{} = state) do
+    %State{conn: conn, schema: schema} = state
 
-        {:ok, lock}
-
-      {:error, error} ->
-        {:error, error}
+    with :ok <- Storage.Lock.try_acquire_exclusive_lock(conn, key, schema: schema) do
+      {:ok, Lock.new(key, owner)}
     end
   end
 
@@ -144,9 +147,9 @@ defmodule EventStore.AdvisoryLocks do
   end
 
   defp release_lock(key, %State{state: :connected} = state) do
-    %State{conn: conn} = state
+    %State{conn: conn, schema: schema} = state
 
-    Storage.Lock.unlock(conn, key)
+    Storage.Lock.unlock(conn, key, schema: schema)
   end
 
   defp release_lock(_key, %State{}), do: :ok

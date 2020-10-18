@@ -1,0 +1,8 @@
+SELECT
+  subscription_id,
+  stream_uuid,
+  subscription_name,
+  last_seen,
+  created_at
+FROM <%= schema %>.subscriptions
+WHERE stream_uuid = $1 AND subscription_name = $2;

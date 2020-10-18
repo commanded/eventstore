@@ -1,0 +1,14 @@
+INSERT INTO <%= schema %>.events
+  (
+    event_id,
+    event_type,
+    causation_id,
+    correlation_id,
+    data,
+    metadata,
+    created_at
+  )
+VALUES
+<%= for i <- 0..(number_of_events - 1) do %>
+  ($<%= i * 7 + 1 %>, $<%= i * 7 + 2 %>, $<%= i * 7 + 3 %>, $<%= i * 7 + 4 %>, $<%= i * 7 + 5 %>, $<%= i * 7 + 6 %>, $<%= i * 7 + 7 %>)
+<% end |> Enum.intersperse(",") %>;

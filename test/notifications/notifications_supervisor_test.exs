@@ -1,15 +1,14 @@
 defmodule EventStore.Notifications.NotificationsSupervisorTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, Notifications, PubSub, Serializer, Wait}
+  alias EventStore.{EventFactory, Notifications, PubSub, Wait}
   alias TestEventStore, as: EventStore
 
   describe "notifications supervisor" do
     setup do
       config = TestEventStore.config() |> Keyword.put(:subscription_hibernate_after, 0)
-      serializer = Serializer.serializer(TestEventStore, config)
 
-      start_supervised!({Notifications.Supervisor, {ES, serializer, config}})
+      start_supervised!({Notifications.Supervisor, {ES, config}})
       for child_spec <- PubSub.child_spec(ES), do: start_supervised!(child_spec)
 
       :ok
@@ -34,7 +33,7 @@ defmodule EventStore.Notifications.NotificationsSupervisorTest do
       # Appending events to the event store should resume listener processes
       :ok = append_events(stream_uuid, 3)
 
-      assert_receive {:events, events}
+      assert_receive {:events, _events}
 
       # Listener processes should be hibernated again after inactivity
       Wait.until(fn ->

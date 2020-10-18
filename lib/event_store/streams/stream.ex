@@ -4,7 +4,7 @@ defmodule EventStore.Streams.Stream do
   alias EventStore.{EventData, RecordedEvent, Storage}
   alias EventStore.Streams.StreamInfo
 
-  def append_to_stream(conn, stream_uuid, expected_version, events, opts \\ []) do
+  def append_to_stream(conn, stream_uuid, expected_version, events, opts) do
     {serializer, opts} = Keyword.pop(opts, :serializer)
 
     transaction(
@@ -22,9 +22,7 @@ defmodule EventStore.Streams.Stream do
     )
   end
 
-  def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts \\ []) do
-    {_serializer, opts} = Keyword.pop(opts, :serializer)
-
+  def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts) do
     transaction(
       conn,
       fn transaction ->
@@ -40,19 +38,17 @@ defmodule EventStore.Streams.Stream do
     )
   end
 
-  def read_stream_forward(conn, stream_uuid, start_version, count, opts \\ []) do
+  def read_stream_forward(conn, stream_uuid, start_version, count, opts) do
     with {:ok, stream} <- stream_info(conn, stream_uuid, :stream_exists, opts) do
       read_storage_forward(conn, stream, start_version, count, opts)
     end
   end
 
-  def stream_forward(conn, stream_uuid, start_version, opts \\ []) do
+  def stream_forward(conn, stream_uuid, start_version, opts) do
     with {:ok, stream} <- stream_info(conn, stream_uuid, :stream_exists, opts) do
       stream_storage_forward(conn, stream, start_version, opts)
     end
   end
-
-  def start_from(conn, stream_uuid, start_from, opts \\ [])
 
   def start_from(_conn, _stream_uuid, :origin, _opts), do: {:ok, 0}
 
@@ -66,14 +62,12 @@ defmodule EventStore.Streams.Stream do
   def start_from(_conn, _stream_uuid, _start_from, _opts),
     do: {:error, :invalid_start_from}
 
-  def stream_version(conn, stream_uuid, opts \\ []) do
+  def stream_version(conn, stream_uuid, opts) do
     with {:ok, %StreamInfo{stream_version: stream_version}} <-
            stream_info(conn, stream_uuid, :any_version, opts) do
       {:ok, stream_version}
     end
   end
-
-  def delete(conn, stream_uuid, expected_version, type, opts \\ [])
 
   def delete(conn, stream_uuid, expected_version, :soft, opts) do
     with {:ok, %StreamInfo{} = stream} <- stream_info(conn, stream_uuid, expected_version, opts) do
@@ -226,9 +220,32 @@ defmodule EventStore.Streams.Stream do
   defp hard_delete_stream(conn, stream, opts) do
     %StreamInfo{stream_id: stream_id} = stream
 
-    opts = query_opts(opts)
+    if Keyword.fetch!(opts, :enable_hard_deletes) do
+      opts = query_opts(opts)
 
-    Storage.hard_delete_stream(conn, stream_id, opts)
+      transaction(
+        conn,
+        fn transaction ->
+          with :ok <- set_enable_hard_deletes(transaction),
+               :ok <- Storage.hard_delete_stream(transaction, stream_id, opts) do
+            :ok
+          else
+            {:error, error} -> Postgrex.rollback(transaction, error)
+          end
+        end,
+        opts
+      )
+    else
+      {:error, :not_supported}
+    end
+  end
+
+  defp set_enable_hard_deletes(conn) do
+    query = "SET SESSION eventstore.enable_hard_deletes TO 'on';"
+
+    with {:ok, %Postgrex.Result{}} <- Postgrex.query(conn, query, []) do
+      :ok
+    end
   end
 
   defp transaction(conn, transaction_fun, opts) do
@@ -238,7 +255,7 @@ defmodule EventStore.Streams.Stream do
     end
   end
 
-  defp query_opts(opts), do: Keyword.take(opts, [:timeout])
+  defp query_opts(opts), do: Keyword.take(opts, [:schema, :timeout])
 
   # Returns the current date time in UTC.
   defp utc_now, do: DateTime.utc_now()

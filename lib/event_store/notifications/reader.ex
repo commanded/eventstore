@@ -9,11 +9,12 @@ defmodule EventStore.Notifications.Reader do
   alias EventStore.Storage
 
   defmodule State do
-    defstruct [:conn, :serializer, :subscribe_to]
+    defstruct [:conn, :schema, :serializer, :subscribe_to]
 
     def new(opts) do
       %State{
         conn: Keyword.fetch!(opts, :conn),
+        schema: Keyword.fetch!(opts, :schema),
         serializer: Keyword.fetch!(opts, :serializer),
         subscribe_to: Keyword.fetch!(opts, :subscribe_to)
       }
@@ -52,12 +53,12 @@ defmodule EventStore.Notifications.Reader do
          {stream_uuid, stream_id, from_stream_version, to_stream_version},
          %State{} = state
        ) do
-    %State{conn: conn, serializer: serializer} = state
+    %State{conn: conn, schema: schema, serializer: serializer} = state
 
     count = to_stream_version - from_stream_version + 1
 
     with {:ok, events} <-
-           Storage.read_stream_forward(conn, stream_id, from_stream_version, count),
+           Storage.read_stream_forward(conn, stream_id, from_stream_version, count, schema: schema),
          deserialized_events <- deserialize_recorded_events(events, serializer) do
       {stream_uuid, deserialized_events}
     end

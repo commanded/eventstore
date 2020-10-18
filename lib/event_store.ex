@@ -181,27 +181,16 @@ defmodule EventStore do
     quote bind_quoted: [opts: opts] do
       @behaviour EventStore
 
-      alias EventStore.{Config, EventData, PubSub, Serializer, Subscriptions}
+      alias EventStore.{Config, EventData, PubSub, Subscriptions}
       alias EventStore.Snapshots.{SnapshotData, Snapshotter}
       alias EventStore.Subscriptions.Subscription
       alias EventStore.Streams.Stream
 
-      {otp_app, config} = EventStore.Supervisor.compile_config(__MODULE__, opts)
-
-      serializer = Serializer.serializer(__MODULE__, config)
-      subscription_retry_interval = Subscriptions.retry_interval(__MODULE__, config)
-      subscription_hibernate_after = Subscriptions.hibernate_after(__MODULE__, config)
-
-      @otp_app otp_app
-      @config config
-      @serializer serializer
-      @subscription_retry_interval subscription_retry_interval
-      @subscription_hibernate_after subscription_hibernate_after
+      @otp_app Keyword.fetch!(opts, :otp_app)
 
       @all_stream "$all"
       @default_batch_size 1_000
       @default_count 1_000
-      @default_timeout config[:timeout] || 15_000
 
       def config(opts \\ []) do
         opts = Keyword.merge(unquote(opts), opts)
@@ -226,7 +215,7 @@ defmodule EventStore do
         opts = Keyword.merge(unquote(opts), opts)
         name = name(opts)
 
-        EventStore.Supervisor.start_link(__MODULE__, @otp_app, @serializer, name, opts)
+        EventStore.Supervisor.start_link(__MODULE__, @otp_app, name, opts)
       end
 
       def stop(supervisor, timeout \\ 5000) do
@@ -239,7 +228,7 @@ defmodule EventStore do
         do: {:error, :cannot_append_to_all_stream}
 
       def append_to_stream(stream_uuid, expected_version, events, opts) do
-        {conn, opts} = opts(opts)
+        {conn, opts} = parse_opts(opts)
 
         Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
       end
@@ -255,7 +244,7 @@ defmodule EventStore do
         do: {:error, :cannot_append_to_all_stream}
 
       def link_to_stream(stream_uuid, expected_version, events_or_event_ids, opts) do
-        {conn, opts} = opts(opts)
+        {conn, opts} = parse_opts(opts)
 
         Stream.link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts)
       end
@@ -268,7 +257,7 @@ defmodule EventStore do
           )
 
       def read_stream_forward(stream_uuid, start_version, count, opts) do
-        {conn, opts} = opts(opts)
+        {conn, opts} = parse_opts(opts)
 
         Stream.read_stream_forward(conn, stream_uuid, start_version, count, opts)
       end
@@ -279,11 +268,8 @@ defmodule EventStore do
             opts \\ []
           )
 
-      def read_all_streams_forward(start_version, count, opts) do
-        {conn, opts} = opts(opts)
-
-        Stream.read_stream_forward(conn, @all_stream, start_version, count, opts)
-      end
+      def read_all_streams_forward(start_version, count, opts),
+        do: read_stream_forward(@all_stream, start_version, count, opts)
 
       def stream_forward(stream_uuid, start_version \\ 0, opts \\ [])
 
@@ -293,7 +279,7 @@ defmodule EventStore do
       end
 
       def stream_forward(stream_uuid, start_version, opts) do
-        {conn, opts} = opts(opts)
+        {conn, opts} = parse_opts(opts)
 
         opts = Keyword.put_new(opts, :read_batch_size, @default_batch_size)
 
@@ -311,7 +297,7 @@ defmodule EventStore do
         do: {:error, :cannot_delete_all_stream}
 
       def delete_stream(stream_uuid, expected_version, type, opts) when type in [:soft, :hard] do
-        {conn, opts} = opts(opts)
+        {conn, opts} = parse_opts(opts)
 
         Stream.delete(conn, stream_uuid, expected_version, type, opts)
       end
@@ -324,18 +310,24 @@ defmodule EventStore do
 
       def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ []) do
         name = name(opts)
-        conn = conn(opts)
+        config = Config.lookup(name)
+        conn = Keyword.fetch!(config, :conn)
+        schema = Keyword.fetch!(config, :schema)
+        serializer = Keyword.fetch!(config, :serializer)
 
         with {start_from, opts} <- Keyword.pop(opts, :start_from, :origin),
-             {:ok, start_from} <- Stream.start_from(conn, stream_uuid, start_from) do
+             {:ok, start_from} <- Stream.start_from(conn, stream_uuid, start_from, schema: schema) do
           opts =
-            opts
-            |> Keyword.put_new(:hibernate_after, @subscription_hibernate_after)
-            |> Keyword.put_new(:retry_interval, @subscription_retry_interval)
+            [
+              hibernate_after: Keyword.fetch!(config, :subscription_hibernate_after),
+              retry_interval: Keyword.fetch!(config, :subscription_retry_interval)
+            ]
+            |> Keyword.merge(opts)
             |> Keyword.merge(
               conn: conn,
               event_store: name,
-              serializer: @serializer,
+              schema: schema,
+              serializer: serializer,
               stream_uuid: stream_uuid,
               subscription_name: subscription_name,
               start_from: start_from
@@ -345,13 +337,10 @@ defmodule EventStore do
         end
       end
 
-      def subscribe_to_all_streams(subscription_name, subscriber, opts \\ []) do
-        subscribe_to_stream(@all_stream, subscription_name, subscriber, opts)
-      end
+      def subscribe_to_all_streams(subscription_name, subscriber, opts \\ []),
+        do: subscribe_to_stream(@all_stream, subscription_name, subscriber, opts)
 
-      def ack(subscription, ack) do
-        Subscription.ack(subscription, ack)
-      end
+      defdelegate ack(subscription, ack), to: Subscription
 
       def unsubscribe_from_stream(stream_uuid, subscription_name, opts \\ []) do
         name = name(opts)
@@ -359,53 +348,47 @@ defmodule EventStore do
         Subscriptions.unsubscribe_from_stream(name, stream_uuid, subscription_name)
       end
 
-      def unsubscribe_from_all_streams(subscription_name, opts \\ []) do
-        name = name(opts)
-
-        Subscriptions.unsubscribe_from_stream(name, @all_stream, subscription_name)
-      end
+      def unsubscribe_from_all_streams(subscription_name, opts \\ []),
+        do: unsubscribe_from_stream(@all_stream, subscription_name, opts)
 
       def delete_subscription(stream_uuid, subscription_name, opts \\ []) do
         name = name(opts)
 
-        Subscriptions.delete_subscription(name, stream_uuid, subscription_name)
+        with :ok <- Subscriptions.stop_subscription(name, stream_uuid, subscription_name) do
+          {conn, opts} = parse_opts(opts)
+
+          Subscriptions.delete_subscription(conn, stream_uuid, subscription_name, opts)
+        end
       end
 
-      def delete_all_streams_subscription(subscription_name, opts \\ []) do
-        name = name(opts)
-
-        Subscriptions.delete_subscription(name, @all_stream, subscription_name)
-      end
+      def delete_all_streams_subscription(subscription_name, opts \\ []),
+        do: delete_subscription(@all_stream, subscription_name, opts)
 
       def read_snapshot(source_uuid, opts \\ []) do
-        {conn, opts} = opts(opts)
+        {conn, opts} = parse_opts(opts)
 
-        Snapshotter.read_snapshot(conn, source_uuid, @serializer, opts)
+        Snapshotter.read_snapshot(conn, source_uuid, opts)
       end
 
       def record_snapshot(%SnapshotData{} = snapshot, opts \\ []) do
-        {conn, opts} = opts(opts)
+        {conn, opts} = parse_opts(opts)
 
-        Snapshotter.record_snapshot(conn, snapshot, @serializer, opts)
+        Snapshotter.record_snapshot(conn, snapshot, opts)
       end
 
       def delete_snapshot(source_uuid, opts \\ []) do
-        {conn, opts} = opts(opts)
+        {conn, opts} = parse_opts(opts)
 
         Snapshotter.delete_snapshot(conn, source_uuid, opts)
       end
 
-      defp opts(opts) do
-        conn = conn(opts)
-        timeout = timeout(opts)
-
-        {conn, [timeout: timeout, serializer: @serializer]}
-      end
-
-      defp conn(opts) do
+      defp parse_opts(opts) do
         name = name(opts)
+        config = Config.lookup(name)
+        conn = Keyword.fetch!(config, :conn)
+        timeout = timeout(opts, config)
 
-        Module.concat([name, Postgrex])
+        {conn, Keyword.put(config, :timeout, timeout)}
       end
 
       defp name(opts) do
@@ -418,16 +401,15 @@ defmodule EventStore do
 
           invalid ->
             raise ArgumentError,
-              message:
-                "expected :name option to be an atom but got: " <>
-                  inspect(invalid)
+              message: "expected `:name` to be an atom, got: " <> inspect(invalid)
         end
       end
 
-      defp timeout(opts) do
+      defp timeout(opts, config) do
         case Keyword.get(opts, :timeout) do
           nil ->
-            @default_timeout
+            # Use event store default timeout, or 15 seconds if not configured
+            Keyword.get(config, :timeout, 15_000)
 
           timeout when is_integer(timeout) ->
             timeout
@@ -438,7 +420,7 @@ defmodule EventStore do
           invalid ->
             raise ArgumentError,
               message:
-                "expected :timeout option to be an integer or :infinity but got: " <>
+                "expected `:timeout` to be an integer or `:infinity`, got: " <>
                   inspect(invalid)
         end
       end

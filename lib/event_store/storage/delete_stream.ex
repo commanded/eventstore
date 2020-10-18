@@ -5,8 +5,10 @@ defmodule EventStore.Storage.DeleteStream do
 
   alias EventStore.Sql.Statements
 
-  def soft_delete(conn, stream_id, opts \\ []) do
-    query = Statements.soft_delete_stream()
+  def soft_delete(conn, stream_id, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
+
+    query = Statements.soft_delete_stream(schema)
 
     case Postgrex.query(conn, query, [stream_id], opts) do
       {:ok, %Postgrex.Result{num_rows: 1}} ->
@@ -30,8 +32,10 @@ defmodule EventStore.Storage.DeleteStream do
     end
   end
 
-  def hard_delete(conn, stream_id, opts \\ []) do
-    query = Statements.hard_delete_stream()
+  def hard_delete(conn, stream_id, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
+
+    query = Statements.hard_delete_stream(schema)
 
     case Postgrex.query(conn, query, [stream_id], opts) do
       {:ok, %Postgrex.Result{num_rows: 1, rows: [[^stream_id]]}} ->

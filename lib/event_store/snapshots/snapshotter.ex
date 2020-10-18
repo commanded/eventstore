@@ -7,7 +7,9 @@ defmodule EventStore.Snapshots.Snapshotter do
   @doc """
   Read a snapshot, if available, for a given source.
   """
-  def read_snapshot(conn, source_uuid, serializer, opts \\ []) do
+  def read_snapshot(conn, source_uuid, opts) do
+    {serializer, opts} = Keyword.pop(opts, :serializer)
+
     with {:ok, snapshot} <- Snapshot.read_snapshot(conn, source_uuid, opts) do
       deserialized = SnapshotData.deserialize(snapshot, serializer)
 
@@ -20,7 +22,9 @@ defmodule EventStore.Snapshots.Snapshotter do
 
   Returns `:ok` on success.
   """
-  def record_snapshot(conn, %SnapshotData{} = snapshot, serializer, opts \\ []) do
+  def record_snapshot(conn, %SnapshotData{} = snapshot, opts) do
+    {serializer, opts} = Keyword.pop(opts, :serializer)
+
     serialized = SnapshotData.serialize(snapshot, serializer)
 
     Snapshot.record_snapshot(conn, serialized, opts)

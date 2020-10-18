@@ -54,22 +54,23 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc """
-  Confirm receipt of an event by its event number.
+  Confirm receipt of one or more events by:
+
+    * an event number,
+    * a list of events; or
+    * an `EventStore.RecordedEvent` struct.
+
   """
+  def ack(subscription, ack)
+
   def ack(subscription, ack) when is_integer(ack) do
     GenServer.call(subscription, {:ack, ack, self()})
   end
 
-  @doc """
-  Confirm receipt of the given list of events.
-  """
   def ack(subscription, events) when is_list(events) do
     Subscription.ack(subscription, List.last(events))
   end
 
-  @doc """
-  Confirm receipt of the given `EventStore.RecordedEvent` struct.
-  """
   def ack(subscription, %RecordedEvent{} = event) do
     %RecordedEvent{event_number: event_number} = event
 

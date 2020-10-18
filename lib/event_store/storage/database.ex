@@ -138,6 +138,7 @@ defmodule EventStore.Storage.Database do
       opts
       |> Keyword.drop([:name, :log])
       |> Keyword.put(:pool, EventStore.Config.get_pool())
+      |> Keyword.put(:pool_size, 1)
       |> Keyword.put(:backoff_type, :stop)
 
     {:ok, pid} = Task.Supervisor.start_link()

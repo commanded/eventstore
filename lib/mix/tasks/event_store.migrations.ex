@@ -41,7 +41,8 @@ defmodule Mix.Tasks.EventStore.Migrations do
 
     migration_status =
       Enum.flat_map(event_stores, fn event_store ->
-        ensure_event_store(event_store, args)
+        ensure_event_store!(event_store, args)
+
         config = event_store.config()
 
         opts =

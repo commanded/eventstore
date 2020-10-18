@@ -1,0 +1,16 @@
+WITH deleted_stream_events AS (
+  DELETE FROM <%= schema %>.stream_events
+  WHERE stream_id = $1
+  RETURNING event_id
+),
+linked_events AS (
+  DELETE FROM <%= schema %>.stream_events
+  WHERE event_id IN (SELECT event_id FROM deleted_stream_events)
+),
+events AS (
+  DELETE FROM <%= schema %>.events
+  WHERE event_id IN (SELECT event_id FROM deleted_stream_events)
+)
+DELETE FROM <%= schema %>.streams
+WHERE stream_id = $1
+RETURNING stream_id;

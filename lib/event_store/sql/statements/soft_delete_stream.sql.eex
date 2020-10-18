@@ -1,0 +1,3 @@
+UPDATE <%= schema %>.streams
+SET deleted_at = NOW()
+WHERE stream_id = $1;

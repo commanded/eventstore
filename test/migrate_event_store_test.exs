@@ -94,7 +94,7 @@ defmodule MigrateEventStoreTest do
 
     {:ok, conn} = Postgrex.start_link(config)
 
-    EventStore.Storage.Initializer.run!(TestEventStore, config, conn)
+    EventStore.Storage.Initializer.run!(conn, config)
 
     :ok = GenServer.stop(conn)
   end

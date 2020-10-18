@@ -16,49 +16,51 @@ defmodule EventStore.Tasks.Migrate do
   Run task
 
   ## Parameters
-  - config: the parsed EventStore config
+
+    - config: the parsed EventStore config
 
   ## Opts
-  - is_mix: set to `true` if running as part of a Mix task
-  - quiet: set to `true` to silence output
+
+    - is_mix: set to `true` if running as part of a Mix task
+    - quiet: set to `true` to silence output
 
   """
   def exec(config, opts) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
+    schema = Keyword.fetch!(config, :schema)
     config = Config.default_postgrex_opts(config)
 
-    {:ok, conn} = Postgrex.start_link(config)
+    {:ok, lock_conn} = Postgrex.start_link(config)
 
-    with :ok <- acquire_migration_lock(conn) do
-      migrations = available_migrations(config)
+    try do
+      with :ok <- acquire_migration_lock(lock_conn, schema) do
+        migrations = available_migrations(config, schema)
 
-      migrate(config, opts, migrations)
+        migrate(config, opts, migrations)
+      else
+        {:error, :lock_already_taken} ->
+          write_info("EventStore database migration already in progress.", opts)
 
-      GenServer.stop(conn)
-    else
-      {:error, :lock_already_taken} ->
-        GenServer.stop(conn)
-
-        write_info("EventStore database migration already in progress.", opts)
-
-      {:error, %Postgrex.Error{} = error} ->
-        GenServer.stop(conn)
-
-        raise_msg(
-          "The EventStore database could not be migrated. Could not acquire migration lock due to: " <>
-            inspect(error),
-          opts
-        )
+        {:error, %Postgrex.Error{} = error} ->
+          raise_msg(
+            "The EventStore database could not be migrated. Could not acquire migration lock due to: " <>
+              inspect(error),
+            opts
+          )
+      end
+    after
+      GenServer.stop(lock_conn)
     end
   end
 
-  # Prevent database migrations from running concurrently.
-  defp acquire_migration_lock(conn) do
-    Storage.Lock.try_acquire_exclusive_lock(conn, -1)
+  # Prevent database migrations from running concurrently by acquiring a
+  # Postgres advisory lock.
+  defp acquire_migration_lock(conn, schema) do
+    Storage.Lock.try_acquire_exclusive_lock(conn, -1, schema: schema)
   end
 
-  defp available_migrations(config) do
-    case event_store_schema_version(config) do
+  defp available_migrations(config, schema) do
+    case event_store_schema_version(config, schema) do
       %Version{} = event_store_version ->
         # Only run newer migrations
         Enum.filter(Migrations.available_migrations(), fn migration_version ->
@@ -88,9 +90,8 @@ defmodule EventStore.Tasks.Migrate do
 
         {:error, error} ->
           raise_msg(
-            "The EventStore database couldn't be migrated, reason given: #{
-              inspect(Exception.message(error))
-            }.",
+            "The EventStore database couldn't be migrated, reason given: " <>
+              inspect(Exception.message(error)),
             opts
           )
       end
@@ -99,9 +100,9 @@ defmodule EventStore.Tasks.Migrate do
     write_info("The EventStore database has been migrated.", opts)
   end
 
-  defp event_store_schema_version(config) do
+  defp event_store_schema_version(config, schema) do
     config
-    |> query_schema_migrations()
+    |> query_schema_migrations(schema)
     |> Enum.sort(fn left, right ->
       case Version.compare(left, right) do
         :gt -> true
@@ -111,21 +112,23 @@ defmodule EventStore.Tasks.Migrate do
     |> Enum.at(0)
   end
 
-  defp query_schema_migrations(config) do
+  defp query_schema_migrations(config, schema) do
     config
-    |> run_query("SELECT major_version, minor_version, patch_version FROM schema_migrations")
+    |> run_query("""
+      SELECT major_version, minor_version, patch_version
+      FROM #{schema}.schema_migrations
+    """)
     |> handle_response()
   end
 
   defp run_query(config, query) do
     {:ok, conn} = Postgrex.start_link(config)
 
-    reply = Postgrex.query!(conn, query, [])
-
-    true = Process.unlink(conn)
-    true = Process.exit(conn, :shutdown)
-
-    reply
+    try do
+      Postgrex.query!(conn, query, [])
+    after
+      GenServer.stop(conn)
+    end
   end
 
   defp handle_response(%Postgrex.Result{num_rows: 0}), do: []

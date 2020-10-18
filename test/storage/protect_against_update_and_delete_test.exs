@@ -20,13 +20,6 @@ defmodule EventStore.Storage.ProtectAgainstUpdateAndDeleteTest do
               %Postgrex.Error{postgres: %{message: "EventStore: Cannot update stream events"}}} =
                Postgrex.query(conn, "UPDATE stream_events SET stream_id = 1;", [])
     end
-
-    defp assert_cannot_delete(conn, table) do
-      expected_message = "EventStore: Cannot delete #{String.replace(table, "_", " ")}"
-
-      assert {:error, %Postgrex.Error{postgres: %{message: ^expected_message}}} =
-               Postgrex.query(conn, "DELETE FROM #{table};", [])
-    end
   end
 
   describe "event store enable hard deletes" do
@@ -37,9 +30,22 @@ defmodule EventStore.Storage.ProtectAgainstUpdateAndDeleteTest do
 
       conn = start_supervised!({Postgrex, config})
 
-      for table <- ["events", "streams", "stream_events"] do
-        assert {:ok, %Postgrex.Result{}} = Postgrex.query(conn, "DELETE FROM #{table};", [])
-      end
+      Postgrex.transaction(conn, fn transaction ->
+        {:ok, %Postgrex.Result{}} =
+          Postgrex.query(transaction, "SET SESSION eventstore.enable_hard_deletes TO 'on';", [])
+
+        for table <- ["events", "streams", "stream_events"] do
+          assert {:ok, %Postgrex.Result{}} =
+                   Postgrex.query(transaction, "DELETE FROM #{table};", [])
+        end
+      end)
     end
+  end
+
+  defp assert_cannot_delete(conn, table) do
+    expected_message = "EventStore: Cannot delete #{String.replace(table, "_", " ")}"
+
+    assert {:error, %Postgrex.Error{postgres: %{message: ^expected_message}}} =
+             Postgrex.query(conn, "DELETE FROM #{table};", [])
   end
 end

@@ -26,7 +26,8 @@ defmodule EventStore.Mixfile do
 
   def application do
     [
-      extra_applications: [:logger, :ssl]
+      extra_applications: [:eex, :logger, :ssl],
+      mod: {EventStore.Application, []}
     ]
   end
 
@@ -49,7 +50,7 @@ defmodule EventStore.Mixfile do
       # Development and test tooling
       {:benchfella, "~> 0.3", only: :bench},
       {:dialyxir, "~> 1.0", only: :dev, runtime: false},
-      {:ex_doc, "~> 0.22", only: :dev},
+      {:ex_doc, "~> 0.23", only: :dev},
       {:mix_test_watch, "~> 1.0", only: :dev}
     ]
   end

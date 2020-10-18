@@ -43,7 +43,8 @@ defmodule Mix.Tasks.EventStore.Migrate do
     {:ok, _} = Application.ensure_all_started(:ssl)
 
     Enum.each(event_stores, fn event_store ->
-      ensure_event_store(event_store, args)
+      ensure_event_store!(event_store, args)
+
       config = event_store.config()
 
       Migrate.exec(config, Keyword.put(opts, :is_mix, true))
