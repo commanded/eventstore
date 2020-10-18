@@ -57,7 +57,6 @@ defmodule EventStore.Config do
     end
   end
 
-
   @migration_source "schema_migrations"
 
   @doc """

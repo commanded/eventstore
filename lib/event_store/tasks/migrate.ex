@@ -113,7 +113,9 @@ defmodule EventStore.Tasks.Migrate do
 
   defp query_schema_migrations(config) do
     config
-    |> run_query("SELECT major_version, minor_version, patch_version FROM $1", [ EventStore.Config.get_migration_source(config) ])
+    |> run_query("SELECT major_version, minor_version, patch_version FROM $1", [
+      EventStore.Config.get_migration_source(config)
+    ])
     |> handle_response()
   end
 

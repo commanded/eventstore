@@ -5,7 +5,7 @@ defmodule MigrationSourceTest do
   alias EventStore.Storage.Database
 
   setup_all do
-    config =  MigrationSourceEventStore.config()
+    config = MigrationSourceEventStore.config()
 
     [config: config]
   end
@@ -14,7 +14,9 @@ defmodule MigrationSourceTest do
     # construct a query
     migration_source = Config.get_migration_source(config)
     schema = Keyword.get(config, :schema)
-    script = "select major_version, minor_version, patch_version from #{schema}.#{migration_source}"
+
+    script =
+      "select major_version, minor_version, patch_version from #{schema}.#{migration_source}"
 
     # get the result from the database
     {:ok, result} = Database.execute_query(config, script)

@@ -29,4 +29,5 @@ config :eventstore,
 config :eventstore, SchemaEventStore, default_config
 config :eventstore, MigrationSourceEventStore, default_config
 
-config :eventstore, event_stores: [TestEventStore, SecondEventStore, SchemaEventStore, MigrationSourceEventStore]
+config :eventstore,
+  event_stores: [TestEventStore, SecondEventStore, SchemaEventStore, MigrationSourceEventStore]
