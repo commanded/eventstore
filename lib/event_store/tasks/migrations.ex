@@ -88,9 +88,11 @@ defmodule EventStore.Tasks.Migrations do
   end
 
   defp query_schema_migrations(config) do
+    migration_source = Config.get_migration_source(config)
+
     config
     |> run_query(
-      "SELECT major_version, minor_version, patch_version, migrated_at FROM schema_migrations ORDER BY 1, 2, 3"
+      "SELECT major_version, minor_version, patch_version, migrated_at FROM #{migration_source} ORDER BY 1, 2, 3"
     )
     |> handle_response()
   end
