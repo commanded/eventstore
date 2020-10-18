@@ -16,6 +16,8 @@ defmodule EventStore.Storage.Database do
     end
   end
 
+  def execute_query(config, script), do: run_query(script, config)
+
   def dump(config, target_path) when is_binary(target_path) do
     dump(config, File.stream!(target_path))
   end
