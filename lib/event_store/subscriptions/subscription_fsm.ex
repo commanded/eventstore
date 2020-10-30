@@ -23,7 +23,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         selector: opts[:selector],
         partition_by: opts[:partition_by],
         buffer_size: opts[:buffer_size] || 1,
-        max_size: opts[:max_size] || 1_000
+        max_size: opts[:max_size] || 1_000,
+        transient: Keyword.get(opts, :transient, false)
       }
     )
   end
@@ -34,6 +35,34 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   #
 
   defstate initial do
+    defevent subscribe, data: %SubscriptionState{transient: true} = data do
+      data = %SubscriptionState{
+        data
+        | queue_size: 0,
+          partitions: %{},
+          processed_event_numbers: MapSet.new()
+      }
+
+      with :ok <- subscribe_to_events(data) do
+        last_seen = data.start_from
+
+        data = %SubscriptionState{
+          data
+          | last_received: last_seen,
+            last_sent: last_seen,
+            last_ack: last_seen
+        }
+
+        notify_subscribed(data)
+
+        next_state(:request_catch_up, data)
+      else
+        _ ->
+          # Failed to subscribe to stream, retry after delay
+          next_state(:initial, data)
+      end
+    end
+
     defevent subscribe,
       data: %SubscriptionState{} = data do
       data = %SubscriptionState{
@@ -621,12 +650,14 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
     cond do
       MapSet.member?(processed_event_numbers, ack) ->
+        persist_if_not_transient = not data.transient
+
         %SubscriptionState{
           data
           | processed_event_numbers: MapSet.delete(processed_event_numbers, ack),
             last_ack: ack
         }
-        |> checkpoint_last_seen(true)
+        |> checkpoint_last_seen(persist_if_not_transient)
 
       persist ->
         Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, last_ack,

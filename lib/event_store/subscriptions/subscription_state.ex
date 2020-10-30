@@ -22,6 +22,7 @@ defmodule EventStore.Subscriptions.SubscriptionState do
     buffer_size: 1,
     subscribers: %{},
     partitions: %{},
-    processed_event_numbers: MapSet.new()
+    processed_event_numbers: MapSet.new(),
+    transient: false
   ]
 end
