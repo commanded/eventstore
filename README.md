@@ -270,6 +270,7 @@ EventStore exists thanks to the following people who have contributed.
 - [Samuel Roze](https://github.com/sroze)
 - [Simon Harris](https://github.com/harukizaemon)
 - [Stuart Corbishley](https://github.com/stuartc)
+- [Thomas Coopman](https://github.com/tcoopman)
 - [Victor Oliveira Nascimento](https://github.com/victorolinasc)
 - [Yamil Díaz Aguirre](https://github.com/Yamilquery)
 - [Yannis Weishaupt](https://github.com/MrYawe)
