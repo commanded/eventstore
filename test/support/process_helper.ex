@@ -15,6 +15,6 @@ defmodule EventStore.ProcessHelper do
     Process.exit(pid, :shutdown)
 
     ref = Process.monitor(pid)
-    assert_receive {:DOWN, ^ref, _, _, _}, 1_000
+    assert_receive {:DOWN, ^ref, :process, _object, _reason}, 1_000
   end
 end

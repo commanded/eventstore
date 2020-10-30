@@ -52,6 +52,27 @@ defmodule EventStore.ConfigTest do
              ]
   end
 
+  test "parse `:shared_connection_pool`" do
+    config = [
+      username: "postgres",
+      database: "eventstore_test",
+      password: "postgres",
+      shared_connection_pool: :shared_pool
+    ]
+
+    assert Config.parse(config) ==
+             [
+               enable_hard_deletes: false,
+               column_data_type: "bytea",
+               schema: "public",
+               pool: EventStore.Config.get_pool(),
+               shared_connection_pool: :shared_pool,
+               password: "postgres",
+               database: "eventstore_test",
+               username: "postgres"
+             ]
+  end
+
   test "parse socket_dir" do
     config = [
       username: "postgres",

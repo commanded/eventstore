@@ -57,13 +57,22 @@ defmodule EventStore.Supervisor do
         subscriptions_name = Module.concat([name, Subscriptions.Supervisor])
         subscriptions_registry_name = Module.concat([name, Subscriptions.Registry])
         schema = Keyword.fetch!(config, :schema)
+        conn = Keyword.fetch!(config, :conn)
 
         children =
           [
-            {Postgrex, Config.postgrex_opts(config)},
-            MonitoredServer.child_spec(
-              mfa: {Postgrex, :start_link, [Config.sync_connect_postgrex_opts(config)]},
-              name: advisory_locks_postgrex_name
+            Supervisor.child_spec(
+              {MonitoredServer,
+               mfa: {Postgrex, :start_link, [Config.postgrex_opts(config, conn)]},
+               name: Module.concat([name, Postgrex, MonitoredServer]),
+               backoff_min: 0},
+              id: Module.concat([conn, MonitoredServer])
+            ),
+            Supervisor.child_spec(
+              {MonitoredServer,
+               mfa: {Postgrex, :start_link, [Config.sync_connect_postgrex_opts(config)]},
+               name: advisory_locks_postgrex_name},
+              id: Module.concat([advisory_locks_postgrex_name, MonitoredServer])
             ),
             {AdvisoryLocks,
              conn: advisory_locks_postgrex_name, schema: schema, name: advisory_locks_name},
@@ -94,17 +103,41 @@ defmodule EventStore.Supervisor do
   end
 
   defp validate_config!(event_store, name, config) do
-    conn = Module.concat([name, Postgrex])
+    conn = postgrex_conn(name, config)
     column_data_type = Config.column_data_type(event_store, config)
     serializer = Serializer.serializer(event_store, config)
     subscription_retry_interval = Subscriptions.retry_interval(event_store, config)
     subscription_hibernate_after = Subscriptions.hibernate_after(event_store, config)
 
-    config
-    |> Keyword.put(:conn, conn)
-    |> Keyword.put(:column_data_type, column_data_type)
-    |> Keyword.put(:serializer, serializer)
-    |> Keyword.put(:subscription_retry_interval, subscription_retry_interval)
-    |> Keyword.put(:subscription_hibernate_after, subscription_hibernate_after)
+    Keyword.merge(config,
+      conn: conn,
+      column_data_type: column_data_type,
+      serializer: serializer,
+      subscription_retry_interval: subscription_retry_interval,
+      subscription_hibernate_after: subscription_hibernate_after
+    )
+  end
+
+  # Get the name of the main Postgres database connection pool.
+  #
+  # By default each event store instance will start its own connection pool.
+  #
+  # The `:shared_connection_pool` config option can be used to share the same
+  # database connection pool between multiple event store instances when they
+  # connect to the same physical database. This will reduce the total number of
+  # connections.
+  defp postgrex_conn(name, config) do
+    case Keyword.get(config, :shared_connection_pool) do
+      nil ->
+        Module.concat([name, Postgrex])
+
+      shared_connection_pool when is_atom(shared_connection_pool) ->
+        Module.concat([shared_connection_pool, Postgrex])
+
+      invalid ->
+        raise ArgumentError,
+              "Invalid `:shared_connection_pool` specified, expected an atom but got: " <>
+                inspect(invalid)
+    end
   end
 end

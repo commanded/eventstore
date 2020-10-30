@@ -1,4 +1,4 @@
-defmodule EventStoreTest do
+defmodule EventStore.EventStoreTest do
   use EventStore.StorageCase
 
   alias EventStore.{EventData, EventFactory, RecordedEvent}
