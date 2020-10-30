@@ -8,8 +8,9 @@ WITH
   events (event_id, stream_version) AS (
     VALUES
     <%= for i <- 0..(number_of_events - 1) do %>
+      <%= unless i == 0 do %>,<% end %>
       ($<%= i * 2 + 3 %>::uuid, $<%= i * 2 + 4 %>::bigint)
-    <% end |> Enum.intersperse(",") %>
+    <% end %>
   )
 INSERT INTO <%= schema %>.stream_events
   (

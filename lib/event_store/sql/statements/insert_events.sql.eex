@@ -10,5 +10,6 @@ INSERT INTO <%= schema %>.events
   )
 VALUES
 <%= for i <- 0..(number_of_events - 1) do %>
+  <%= unless i == 0 do %>,<% end %>
   ($<%= i * 7 + 1 %>, $<%= i * 7 + 2 %>, $<%= i * 7 + 3 %>, $<%= i * 7 + 4 %>, $<%= i * 7 + 5 %>, $<%= i * 7 + 6 %>, $<%= i * 7 + 7 %>)
-<% end |> Enum.intersperse(",") %>;
+<% end %>;
