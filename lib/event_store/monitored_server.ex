@@ -125,9 +125,7 @@ defmodule EventStore.MonitoredServer do
     {:noreply, start_process(state)}
   end
 
-  @doc """
-  Handle process exit by attempting to restart, after a configurable delay.
-  """
+  # Handle process exit by attempting to restart, after a configurable delay.
   def handle_info({:EXIT, pid, reason}, %State{pid: pid} = state) do
     {:noreply, on_process_exit(pid, reason, state)}
   end
@@ -140,9 +138,7 @@ defmodule EventStore.MonitoredServer do
     {:noreply, state}
   end
 
-  @doc """
-  Handle process down by attempting to restart, after a configurable delay.
-  """
+  # Handle process down by attempting to restart, after a configurable delay.
   def handle_info({:DOWN, _ref, :process, pid, reason}, %State{pid: pid} = state) do
     {:noreply, on_process_exit(pid, reason, state)}
   end

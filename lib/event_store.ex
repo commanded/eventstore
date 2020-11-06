@@ -221,8 +221,7 @@ defmodule EventStore do
       def config(opts \\ []) do
         opts = Keyword.merge(unquote(opts), opts)
 
-        with {:ok, config} <-
-               EventStore.Supervisor.runtime_config(__MODULE__, @otp_app, opts) do
+        with {:ok, config} <- EventStore.Supervisor.runtime_config(__MODULE__, @otp_app, opts) do
           config
         end
       end

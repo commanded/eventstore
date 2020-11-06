@@ -343,7 +343,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream1_events = EventFactory.create_events(1)
       stream2_events = EventFactory.create_events(1)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), buffer_size: 1)
 
       :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_events)
       :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
@@ -392,12 +392,14 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_initial_events)
       :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_initial_events)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), start_from: 2)
+      {:ok, subscription} =
+        subscribe_to_all_streams(subscription_name, self(), buffer_size: 1, start_from: 2)
 
       :ok = EventStore.append_to_stream(stream1_uuid, 1, stream1_new_events)
       :ok = EventStore.append_to_stream(stream2_uuid, 1, stream2_new_events)
 
       assert_receive {:events, stream1_received_events}
+
       :ok = Subscription.ack(subscription, stream1_received_events)
 
       assert_receive {:events, stream2_received_events}
@@ -462,7 +464,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream1_events = EventFactory.create_events(1)
       stream2_events = EventFactory.create_events(1)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), buffer_size: 1)
 
       refute_receive {:events, _events}
 
@@ -819,7 +821,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   end
 
   # subscribe to all streams and wait for the subscription to be subscribed
-  defp subscribe_to_all_streams(subscription_name, subscriber, opts \\ []) do
+  defp subscribe_to_all_streams(subscription_name, subscriber, opts) do
     subscribe_to_stream("$all", subscription_name, subscriber, opts)
   end
 

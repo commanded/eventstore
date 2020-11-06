@@ -55,9 +55,8 @@ defmodule EventStore.Streams.Stream do
   def start_from(conn, stream_uuid, :current, opts),
     do: stream_version(conn, stream_uuid, opts)
 
-  def start_from(_conn, _stream_uuid, start_from, _opts)
-      when is_integer(start_from),
-      do: {:ok, start_from}
+  def start_from(_conn, _stream_uuid, start_from, _opts) when is_integer(start_from),
+    do: {:ok, start_from}
 
   def start_from(_conn, _stream_uuid, _start_from, _opts),
     do: {:error, :invalid_start_from}

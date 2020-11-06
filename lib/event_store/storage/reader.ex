@@ -110,10 +110,15 @@ defmodule EventStore.Storage.Reader do
         {:ok, %Postgrex.Result{rows: rows}} ->
           {:ok, rows}
 
-        {:error, %Postgrex.Error{postgres: %{message: reason}}} ->
-          Logger.warn("Failed to read events from stream due to: " <> inspect(reason))
+        {:error, %Postgrex.Error{postgres: %{message: message}}} ->
+          Logger.warn("Failed to read events from stream due to: " <> inspect(message))
 
-          {:error, reason}
+          {:error, message}
+
+        {:error, %DBConnection.ConnectionError{message: message}} ->
+          Logger.warn("Failed to read events from stream due to: " <> inspect(message))
+
+          {:error, message}
       end
     end
   end

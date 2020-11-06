@@ -11,8 +11,7 @@ defmodule EventStore.Notifications.Listener do
 
   require Logger
 
-  alias EventStore.MonitoredServer
-  alias EventStore.Notifications.Listener
+  alias EventStore.Notifications.{Listener, Notification}
 
   defstruct [:listen_to, :schema, :ref, demand: 0, queue: :queue.new()]
 
@@ -29,27 +28,7 @@ defmodule EventStore.Notifications.Listener do
   end
 
   def init(%Listener{} = state) do
-    %Listener{listen_to: listen_to} = state
-
-    :ok = MonitoredServer.monitor(listen_to)
-
-    {:producer, state}
-  end
-
-  def handle_info({:UP, listen_to, _pid}, %Listener{listen_to: listen_to} = state) do
-    {:noreply, [], listen_for_events(state)}
-  end
-
-  def handle_info({:DOWN, listen_to, _pid, _reason}, %Listener{listen_to: listen_to} = state) do
-    {:noreply, [], %Listener{state | ref: nil}}
-  end
-
-  # Ignore notifications when database connection down.
-  def handle_info(
-        {:notification, _connection_pid, _ref, _channel, _payload},
-        %Listener{ref: nil} = state
-      ) do
-    {:noreply, [], state}
+    {:producer, listen_for_events(state)}
   end
 
   # Notification received from PostgreSQL's `NOTIFY`
@@ -59,20 +38,7 @@ defmodule EventStore.Notifications.Listener do
         inspect(channel) <> " with payload: " <> inspect(payload)
     )
 
-    # `NOTIFY` payload contains the stream uuid, stream id, and first / last
-    # stream versions (e.g. "stream-12345,1,1,5")
-
-    [last, first, stream_id, stream_uuid] =
-      payload
-      |> String.reverse()
-      |> String.split(",", parts: 4)
-      |> Enum.map(&String.reverse/1)
-
-    {stream_id, ""} = Integer.parse(stream_id)
-    {first_stream_version, ""} = Integer.parse(first)
-    {last_stream_version, ""} = Integer.parse(last)
-
-    state = enqueue({stream_uuid, stream_id, first_stream_version, last_stream_version}, state)
+    state = payload |> Notification.new() |> enqueue(state)
 
     dispatch_events([], state)
   end
@@ -112,9 +78,9 @@ defmodule EventStore.Notifications.Listener do
     end
   end
 
-  defp enqueue(event, %Listener{} = state) do
+  defp enqueue(%Notification{} = notification, %Listener{} = state) do
     %Listener{queue: queue} = state
 
-    %Listener{state | queue: :queue.in(event, queue)}
+    %Listener{state | queue: :queue.in(notification, queue)}
   end
 end
