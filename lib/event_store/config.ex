@@ -98,6 +98,16 @@ defmodule EventStore.Config do
     |> Keyword.put(:name, name)
   end
 
+  def postgrex_notifications_opts(config, name) do
+    config
+    |> default_postgrex_opts()
+    |> Keyword.put(:auto_reconnect, true)
+    |> Keyword.put(:backoff_type, :rand_exp)
+    |> Keyword.put(:sync_connect, false)
+    |> Keyword.put(:pool_size, 1)
+    |> Keyword.put(:name, name)
+  end
+
   def sync_connect_postgrex_opts(config) do
     config
     |> default_postgrex_opts()

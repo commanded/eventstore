@@ -90,6 +90,40 @@ defmodule EventStore.SharedConnectionPoolTest do
       assert_receive {:DOWN, ^ref, :process, _object, _reason}
     end
 
+    @tag :manual
+    test "ensure database connections are shared between instances" do
+      # Starting another event store instance using shared pool should only
+      # increase connection count by one (used for advisory locks).
+      assert_connection_count_diff(1, fn ->
+        start_supervised!(
+          {TestEventStore, shared_connection_pool: :shared_pool, name: :eventstore4}
+        )
+      end)
+
+      assert_connection_count_diff(1, fn ->
+        start_supervised!(
+          {TestEventStore, shared_connection_pool: :shared_pool, name: :eventstore5}
+        )
+      end)
+
+      assert_connection_count_diff(3, fn ->
+        start_supervised!(
+          {TestEventStore,
+           shared_connection_pool: :another_pool, name: :eventstore6, pool_size: 1}
+        )
+      end)
+
+      # Start another event store instance with its own connection pool of size 10
+      assert_connection_count_diff(12, fn ->
+        start_supervised!({TestEventStore, name: :eventstore7, pool_size: 10})
+      end)
+
+      assert_connection_count_diff(-12, fn -> stop_supervised!(:eventstore7) end)
+      assert_connection_count_diff(-3, fn -> stop_supervised!(:eventstore6) end)
+      assert_connection_count_diff(-1, fn -> stop_supervised!(:eventstore5) end)
+      assert_connection_count_diff(-1, fn -> stop_supervised!(:eventstore4) end)
+    end
+
     test "append and read events" do
       stream_uuid = UUID.uuid4()
 
@@ -160,5 +194,28 @@ defmodule EventStore.SharedConnectionPoolTest do
   defp refute_stream_exists(event_store_name, stream_uuid) do
     assert {:error, :stream_not_found} ==
              TestEventStore.stream_forward(stream_uuid, 0, name: event_store_name)
+  end
+
+  defp assert_connection_count_diff(expected_diff, fun) when is_function(fun, 0) do
+    conn = Process.whereis(Module.concat([:shared_pool, Postgrex]))
+
+    count_before = count_connections(conn)
+
+    fun.()
+
+    Wait.until(fn ->
+      assert count_connections(conn) == count_before + expected_diff
+    end)
+  end
+
+  defp count_connections(conn) do
+    %Postgrex.Result{rows: [[count]]} =
+      Postgrex.query!(
+        conn,
+        "SELECT count(*) FROM pg_stat_activity WHERE pid <> pg_backend_pid();",
+        []
+      )
+
+    count
   end
 end
