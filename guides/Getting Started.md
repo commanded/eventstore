@@ -6,7 +6,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       ```elixir
       def deps do
-        [{:eventstore, "~> 1.1"}]
+        [{:eventstore, "~> 1.2"}]
       end
       ```
 
@@ -72,6 +72,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       - `:schema` - define the Postgres schema to use (default: `public` schema).
       - `:timeout` - set the default database query timeout in milliseconds (default: 15,000ms).
+      - `:shared_connection_pool` - allows a database connection pool to be shared amongst multiple event store instances (default: `nil`).
 
       Subscription options:
 
@@ -222,7 +223,7 @@ Finally, you need to include the Jason library as a depencency in `mix.exs` to e
 ```elixir
 # mix.exs
 defp deps do
-  [{:jason, "~> 1.1"}]
+  [{:jason, "~> 1.2"}]
 end
 ```
 
