@@ -119,6 +119,11 @@ defmodule EventStore.Storage.Reader do
           Logger.warn("Failed to read events from stream due to: " <> inspect(message))
 
           {:error, message}
+
+        {:error, error} = reply ->
+          Logger.warn("Failed to read events from stream due to: " <> inspect(error))
+
+          reply
       end
     end
   end

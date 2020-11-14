@@ -17,6 +17,8 @@ defmodule EventStore.Storage.QueryStreamInfo do
 
       {:ok, %Postgrex.Result{rows: [[stream_id, stream_version, deleted_at]]}} ->
         {:ok, stream_id, stream_version, deleted_at}
+
+      {:error, _error} = reply -> reply
     end
   end
 end
