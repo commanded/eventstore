@@ -22,7 +22,7 @@ defmodule EventStore.Tasks.Init do
     - quiet: set to `true` to silence output
 
   """
-  def exec(config, opts) do
+  def exec(config, opts \\ []) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
     schema = Keyword.fetch!(config, :schema)
 

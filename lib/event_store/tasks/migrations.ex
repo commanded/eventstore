@@ -34,7 +34,7 @@ defmodule EventStore.Tasks.Migrations do
     - is_mix: set to `true` if running as part of a Mix task
 
   """
-  def exec(config, opts) do
+  def exec(config, opts \\ []) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
     schema = Keyword.fetch!(config, :schema)
     config = Config.default_postgrex_opts(config)

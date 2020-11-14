@@ -25,7 +25,7 @@ defmodule EventStore.Tasks.Migrate do
     - quiet: set to `true` to silence output
 
   """
-  def exec(config, opts) do
+  def exec(config, opts \\ []) do
     opts = Keyword.merge([is_mix: false, quiet: false], opts)
     schema = Keyword.fetch!(config, :schema)
     config = Config.default_postgrex_opts(config)
