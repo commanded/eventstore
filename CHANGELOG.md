@@ -12,6 +12,7 @@
 - Shared database connection pools ([#216](https://github.com/commanded/eventstore/pull/216)).
 - Shared database connection for notifications ([#225](https://github.com/commanded/eventstore/pull/225)).
 - Transient subscriptions ([#215](https://github.com/commanded/eventstore/pull/215))
+- Improve resilience when database connection is unavailable ([#226](https://github.com/commanded/eventstore/pull/226)).
 
 ### Upgrading
 
