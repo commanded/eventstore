@@ -13,7 +13,6 @@ defmodule EventStore.Tasks.Init do
 
   ## Parameters
 
-    - event_store: the name of the event store; e.g. MyApp.EventStore
     - config: the parsed EventStore config
 
   ## Opts
