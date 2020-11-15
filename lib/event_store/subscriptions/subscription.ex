@@ -95,7 +95,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def handle_info(:subscribe_to_stream, %Subscription{subscription: subscription} = state) do
-    _ = Logger.debug(fn -> describe(state) <> " subscribe to stream" end)
+    Logger.debug(describe(state) <> " subscribe to stream")
 
     state =
       subscription
@@ -106,7 +106,7 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   def handle_info({:events, events}, %Subscription{subscription: subscription} = state) do
-    _ = Logger.debug(fn -> describe(state) <> " received #{length(events)} event(s)" end)
+    Logger.debug(describe(state) <> " received #{length(events)} event(s)")
 
     state =
       subscription
@@ -122,8 +122,7 @@ defmodule EventStore.Subscriptions.Subscription do
       ) do
     %Subscription{subscription: subscription} = state
 
-    _ =
-      Logger.debug(fn -> describe(state) <> " advisory lock lost due to: " <> inspect(reason) end)
+    Logger.debug(describe(state) <> " advisory lock lost due to: " <> inspect(reason))
 
     state =
       subscription
@@ -136,10 +135,7 @@ defmodule EventStore.Subscriptions.Subscription do
   def handle_info({:DOWN, _ref, :process, pid, reason}, %Subscription{} = state) do
     %Subscription{subscription: subscription} = state
 
-    _ =
-      Logger.debug(fn ->
-        describe(state) <> " subscriber #{inspect(pid)} down due to: #{inspect(reason)}"
-      end)
+    Logger.debug(describe(state) <> " subscriber #{inspect(pid)} down due to: #{inspect(reason)}")
 
     state =
       subscription
@@ -184,10 +180,7 @@ defmodule EventStore.Subscriptions.Subscription do
         %SubscriptionFsm{data: %SubscriptionState{subscribers: subscribers}} = subscription
     } = state
 
-    _ =
-      Logger.debug(fn ->
-        describe(state) <> " attempting to connect subscriber " <> inspect(subscriber)
-      end)
+    Logger.debug(describe(state) <> " attempting to connect subscriber " <> inspect(subscriber))
 
     with :ok <- ensure_not_already_subscribed(subscribers, subscriber),
          :ok <- ensure_within_concurrency_limit(subscribers, opts) do
@@ -245,7 +238,7 @@ defmodule EventStore.Subscriptions.Subscription do
   defp handle_subscription_state(
          %Subscription{subscription: %SubscriptionFsm{state: :request_catch_up}} = state
        ) do
-    _ = Logger.debug(fn -> describe(state) <> " catching-up" end)
+    Logger.debug(describe(state) <> " catching-up")
 
     :ok = GenServer.cast(self(), :catch_up)
 
@@ -255,19 +248,13 @@ defmodule EventStore.Subscriptions.Subscription do
   defp handle_subscription_state(
          %Subscription{subscription: %SubscriptionFsm{state: :max_capacity}} = state
        ) do
-    _ =
-      Logger.warn(fn ->
-        describe(state) <>
-          " has reached max capacity, events will be ignored until it has caught up"
-      end)
-
     state
   end
 
   defp handle_subscription_state(
          %Subscription{subscription: %SubscriptionFsm{state: :unsubscribed}} = state
        ) do
-    _ = Logger.debug(fn -> describe(state) <> " has no subscribers, shutting down" end)
+    Logger.debug(describe(state) <> " has no subscribers, shutting down")
 
     state
   end

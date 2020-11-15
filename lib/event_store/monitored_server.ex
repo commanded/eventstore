@@ -5,7 +5,9 @@ defmodule EventStore.MonitoredServer do
   #
   # Monitors the started process and attempts to restart it on terminate using
   # an exponential backoff strategy. Allows interested processes to be informed
-  # when the process terminates.
+  # when the process terminates. When the monitored process terminates a
+  # standard `{:DOWN, ref, :process, pid, reason}` message is sent to any
+  # interested processes.
 
   use GenServer
 
@@ -24,7 +26,7 @@ defmodule EventStore.MonitoredServer do
       :terminate?,
       :shutdown,
       :queue,
-      monitors: MapSet.new()
+      monitors: Map.new()
     ]
 
     def new(monitor_opts, start_opts) do
@@ -62,9 +64,7 @@ defmodule EventStore.MonitoredServer do
     end
 
     def on_process_exit(%State{} = state) do
-      %State{backoff: backoff} = state
-
-      %State{state | backoff: Backoff.reset(backoff), pid: nil, terminate?: nil}
+      %State{state | pid: nil, terminate?: nil}
     end
   end
 
@@ -88,17 +88,14 @@ defmodule EventStore.MonitoredServer do
   end
 
   def handle_call({__MODULE__, :monitor, monitor}, _from, %State{} = state) do
-    %State{monitors: monitors, name: name, pid: pid} = state
+    %State{monitors: monitors} = state
 
     Process.monitor(monitor)
 
-    if is_pid(pid) do
-      Process.send(monitor, {:UP, name, pid}, [])
-    end
+    ref = make_ref()
+    state = %State{state | monitors: Map.put(monitors, monitor, ref)}
 
-    state = %State{state | monitors: MapSet.put(monitors, monitor)}
-
-    {:reply, :ok, state}
+    {:reply, {:ok, ref}, state}
   end
 
   def handle_call(msg, from, %State{pid: nil} = state) do
@@ -130,10 +127,11 @@ defmodule EventStore.MonitoredServer do
     {:noreply, on_process_exit(pid, reason, state)}
   end
 
+  # Monitor process has exited so remove from monitors map.
   def handle_info({:EXIT, pid, _reason}, %State{} = state) do
     %State{monitors: monitors} = state
 
-    state = %State{state | monitors: MapSet.delete(monitors, pid)}
+    state = %State{state | monitors: Map.delete(monitors, pid)}
 
     {:noreply, state}
   end
@@ -207,20 +205,21 @@ defmodule EventStore.MonitoredServer do
   end
 
   defp on_process_start(pid, %State{} = state) do
-    %State{name: name, queue: queue} = state
+    %State{queue: queue} = state
 
     :ok = forward_queued_msgs(pid, queue)
-    :ok = notify_monitors({:UP, name, pid}, state)
 
     State.on_process_start(state, pid)
   end
 
   defp on_process_exit(pid, reason, %State{} = state) do
-    %State{name: name} = state
+    %State{monitors: monitors} = state
 
     Logger.debug("Monitored process EXIT due to: " <> inspect(reason))
 
-    notify_monitors({:DOWN, name, pid, reason}, state)
+    Enum.each(monitors, fn {monitor, ref} ->
+      Process.send(monitor, {:DOWN, ref, :process, pid, reason}, [])
+    end)
 
     state = State.on_process_exit(state)
 
@@ -258,12 +257,6 @@ defmodule EventStore.MonitoredServer do
   defp forward_queued_msg(pid, {:call, msg, from}), do: forward_call(pid, msg, from)
   defp forward_queued_msg(pid, {:cast, msg}), do: forward_cast(pid, msg)
   defp forward_queued_msg(pid, {:info, msg}), do: forward_info(pid, msg)
-
-  defp notify_monitors(message, %State{} = state) do
-    %State{monitors: monitors} = state
-
-    Enum.each(monitors, &Process.send(&1, message, []))
-  end
 
   defp delayed_start(%State{} = state) do
     {delay, state} = State.backoff(state)

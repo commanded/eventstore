@@ -73,7 +73,7 @@ defmodule EventStore.AdvisoryLocksTest do
     test "should send `lock_released` message" do
       {:ok, lock} = AdvisoryLocks.try_advisory_lock(@locks, 1)
 
-      connection_down()
+      shutdown_database_connection()
 
       assert_receive({AdvisoryLocks, :lock_released, ^lock, :shutdown})
     end
@@ -106,7 +106,9 @@ defmodule EventStore.AdvisoryLocksTest do
     end
   end
 
-  defp connection_down do
-    send(@locks, {:DOWN, @conn, nil, :shutdown})
+  defp shutdown_database_connection do
+    %{pid: pid} = Process.whereis(@conn) |> :sys.get_state()
+
+    EventStore.ProcessHelper.shutdown(pid)
   end
 end

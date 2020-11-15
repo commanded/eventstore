@@ -102,17 +102,22 @@ defmodule EventStore.Config do
     config
     |> default_postgrex_opts()
     |> Keyword.put(:auto_reconnect, true)
-    |> Keyword.put(:backoff_type, :rand_exp)
-    |> Keyword.put(:sync_connect, false)
+    |> Keyword.put(:backoff_type, :exp)
     |> Keyword.put(:pool_size, 1)
+    |> Keyword.put(:sync_connect, false)
     |> Keyword.put(:name, name)
   end
 
-  def sync_connect_postgrex_opts(config) do
+  @doc """
+  Stop the Postgrex process when the database connection is lost.
+
+  Stopping the process allows a subscription to be notified when it has lost its
+  advisory lock.
+  """
+  def advisory_locks_postgrex_opts(config) do
     config
     |> default_postgrex_opts()
     |> Keyword.put(:backoff_type, :stop)
-    |> Keyword.put(:sync_connect, true)
     |> Keyword.put(:pool_size, 1)
   end
 end

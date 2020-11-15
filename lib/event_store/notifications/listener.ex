@@ -56,7 +56,11 @@ defmodule EventStore.Notifications.Listener do
 
     channel = schema <> ".events"
 
-    {:ok, ref} = Postgrex.Notifications.listen(listen_to, channel)
+    ref =
+      case Postgrex.Notifications.listen(listen_to, channel) do
+        {:ok, ref} -> ref
+        {:eventually, ref} -> ref
+      end
 
     %Listener{state | ref: ref}
   end
