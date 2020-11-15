@@ -18,6 +18,23 @@
 
 This release requires a database migration to be run. Please read the [Upgrading an EventStore](https://hexdocs.pm/eventstore/upgrades.html) guide for details on how to migrate an existing database.
 
+### Breaking changes
+
+Usage of `EventStore.Tasks.Init` task to initialise an event store database has been changed as follows:
+
+Previous usage:
+
+```elixir
+:ok = EventStore.Tasks.Init.exec(MyApp.EventStore, config, opts)
+```
+
+Usage now:
+
+```elixir
+:ok = EventStore.Tasks.Init.exec(config)
+:ok = EventStore.Tasks.Init.exec(config, opts)
+```
+
 ### Bug fixes
 
 - Support appending events to a stream with `:any_version` concurrently ([#209](https://github.com/commanded/eventstore/pull/209)).
