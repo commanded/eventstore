@@ -52,30 +52,36 @@ defmodule EventStore.Supervisor do
       {:ok, config} ->
         config = validate_config!(event_store, name, config)
 
-        advisory_locks_name = Module.concat([name, AdvisoryLocks])
-        advisory_locks_postgrex_name = Module.concat([advisory_locks_name, Postgrex])
-        subscriptions_name = Module.concat([name, Subscriptions.Supervisor])
-        subscriptions_registry_name = Module.concat([name, Subscriptions.Registry])
         schema = Keyword.fetch!(config, :schema)
         conn = Keyword.fetch!(config, :conn)
+
+        advisory_locks_name = Module.concat([name, AdvisoryLocks])
+        advisory_locks_postgrex_conn = Module.concat([advisory_locks_name, Postgrex])
+        advisory_locks_config = Config.advisory_locks_postgrex_opts(config)
+
+        subscriptions_name = Module.concat([name, Subscriptions.Supervisor])
+        subscriptions_registry_name = Module.concat([name, Subscriptions.Registry])
+
+        postgrex_config = Config.postgrex_opts(config, conn)
 
         children =
           [
             Supervisor.child_spec(
               {MonitoredServer,
-               mfa: {Postgrex, :start_link, [Config.postgrex_opts(config, conn)]},
+               mfa: {Postgrex, :start_link, [postgrex_config]},
                name: Module.concat([name, Postgrex, MonitoredServer]),
                backoff_min: 0},
               id: Module.concat([conn, MonitoredServer])
             ),
             Supervisor.child_spec(
               {MonitoredServer,
-               mfa: {Postgrex, :start_link, [Config.sync_connect_postgrex_opts(config)]},
-               name: advisory_locks_postgrex_name},
-              id: Module.concat([advisory_locks_postgrex_name, MonitoredServer])
+               mfa: {Postgrex, :start_link, [advisory_locks_config]},
+               name: advisory_locks_postgrex_conn,
+               backoff_min: 30_000},
+              id: Module.concat([advisory_locks_postgrex_conn, MonitoredServer])
             ),
             {AdvisoryLocks,
-             conn: advisory_locks_postgrex_name, schema: schema, name: advisory_locks_name},
+             conn: advisory_locks_postgrex_conn, schema: schema, name: advisory_locks_name},
             {Subscriptions.Supervisor, name: subscriptions_name},
             Supervisor.child_spec({Registry, keys: :unique, name: subscriptions_registry_name},
               id: subscriptions_registry_name

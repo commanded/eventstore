@@ -153,9 +153,9 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   end
 
   defp lock_subscription(context) do
-    %{schema: schema} = context
+    %{config: config, schema: schema} = context
 
-    config = Map.fetch!(context, :config) |> Config.sync_connect_postgrex_opts()
+    config = Config.advisory_locks_postgrex_opts(config)
 
     conn = start_supervised!({Postgrex, config}, id: :subscription_conn)
 

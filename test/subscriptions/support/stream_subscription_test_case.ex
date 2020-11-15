@@ -506,7 +506,7 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
       config =
         @event_store
         |> EventStore.Config.parsed(:eventstore)
-        |> EventStore.Config.sync_connect_postgrex_opts()
+        |> EventStore.Config.advisory_locks_postgrex_opts()
 
       conn = start_supervised!({Postgrex, config})
 

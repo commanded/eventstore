@@ -7,7 +7,7 @@ defmodule EventStore.MonitoredServerTest do
     test "should start process" do
       start_monitored_process!()
 
-      assert_receive {:UP, MonitoredServer, pid}
+      assert_receive {:init, pid}
 
       assert Process.whereis(ObservedServer) == pid
       assert Process.alive?(pid)
@@ -16,7 +16,7 @@ defmodule EventStore.MonitoredServerTest do
     test "should stop observed process when monitored process stopped" do
       start_monitored_process!()
 
-      assert_receive {:UP, MonitoredServer, pid}
+      assert_receive {:init, pid}
 
       ref = Process.monitor(pid)
 
@@ -28,16 +28,15 @@ defmodule EventStore.MonitoredServerTest do
     test "should restart process after exit" do
       start_monitored_process!()
 
-      assert_receive {:UP, MonitoredServer, pid1}
+      assert_receive {:init, pid1}
 
       shutdown_observed_process()
 
-      assert_receive {:UP, MonitoredServer, pid2}
-
-      assert Process.whereis(ObservedServer) == pid2
+      assert_receive {:init, pid2}
 
       assert is_pid(pid2)
       assert pid1 != pid2
+      refute Process.alive?(pid1)
       assert Process.alive?(pid2)
     end
 
@@ -50,27 +49,14 @@ defmodule EventStore.MonitoredServerTest do
     end
 
     test "should send `:DOWN` message after process shutdown" do
-      start_monitored_process!()
+      {_pid, ref} = start_monitored_process!()
 
-      assert_receive {:UP, MonitoredServer, _pid1}
-      refute_receive {:DOWN, MonitoredServer, _pid, _reason}
-
-      shutdown_observed_process()
-
-      assert_receive {:DOWN, MonitoredServer, _pid, :shutdown}
-    end
-
-    test "should send `:UP` message after process restarted" do
-      start_monitored_process!()
-
-      assert_receive {:UP, MonitoredServer, pid1}
-      assert pid1 == Process.whereis(ObservedServer)
+      assert_receive {:init, pid}
+      refute_receive {:DOWN, _ref, :process, ^pid, _reason}
 
       shutdown_observed_process()
 
-      assert_receive {:UP, MonitoredServer, pid2}
-      assert pid2 == Process.whereis(ObservedServer)
-      assert pid1 != pid2
+      assert_receive {:DOWN, ^ref, :process, ^pid, :shutdown}
     end
 
     test "should forward calls to observed process using registered name" do
@@ -80,13 +66,13 @@ defmodule EventStore.MonitoredServerTest do
     end
 
     test "should forward calls to observed process using pid" do
-      pid = start_monitored_process!()
+      {pid, _ref} = start_monitored_process!()
 
       assert {:ok, :pong} = GenServer.call(pid, :ping)
     end
 
     test "should forward casts to observed process" do
-      pid = start_monitored_process!()
+      {pid, _ref} = start_monitored_process!()
 
       assert :ok = GenServer.cast(pid, :ping)
 
@@ -94,7 +80,7 @@ defmodule EventStore.MonitoredServerTest do
     end
 
     test "should forward info messages to observed process" do
-      pid = start_monitored_process!()
+      {pid, _ref} = start_monitored_process!()
 
       send(pid, :ping)
 
@@ -104,11 +90,11 @@ defmodule EventStore.MonitoredServerTest do
     test "allow monitored process to monitor an already started process" do
       pid = start_supervised!({ObservedServer, reply_to: self(), name: ObservedServer})
 
+      assert_receive {:init, ^pid}
+
       assert {:ok, :pong} = GenServer.call(pid, :ping)
 
-      monitor = start_monitored_process!()
-
-      assert_receive {:UP, MonitoredServer, ^pid}
+      {monitor, _ref} = start_monitored_process!()
 
       assert {:ok, :pong} = GenServer.call(monitor, :ping)
     end
@@ -118,7 +104,7 @@ defmodule EventStore.MonitoredServerTest do
 
       start_monitored_process!()
 
-      assert_receive {:UP, MonitoredServer, ^pid}
+      assert_receive {:init, ^pid}
 
       ref = Process.monitor(pid)
 
@@ -128,16 +114,18 @@ defmodule EventStore.MonitoredServerTest do
     end
 
     test "monitored observer should attempt to restart an already started process on exit" do
-      pid = start_supervised!({ObservedServer, reply_to: self(), name: ObservedServer})
+      pid1 = start_supervised!({ObservedServer, reply_to: self(), name: ObservedServer})
 
-      start_monitored_process!()
+      {_pid, ref} = start_monitored_process!()
 
-      assert_receive {:UP, MonitoredServer, ^pid}
+      assert_receive {:init, ^pid1}
 
       shutdown_observed_process()
 
-      assert_receive {:DOWN, MonitoredServer, ^pid, :shutdown}
-      assert_receive {:UP, MonitoredServer, _pid1}
+      assert_receive {:DOWN, ^ref, :process, ^pid1, :shutdown}
+      assert_receive {:init, pid2}
+
+      refute pid1 == pid2
     end
   end
 
@@ -156,9 +144,9 @@ defmodule EventStore.MonitoredServerTest do
 
     pid = start_supervised!(spec)
 
-    :ok = MonitoredServer.monitor(MonitoredServer)
+    {:ok, ref} = MonitoredServer.monitor(MonitoredServer)
 
-    pid
+    {pid, ref}
   end
 
   defp shutdown_observed_process do
