@@ -218,7 +218,7 @@ config :my_app, MyApp.EventStore,
   types: EventStore.PostgresTypes
 ```
 
-Finally, you need to include the Jason library as a depencency in `mix.exs` to enable Postgrex JSON support and then run `mix deps.get` to install.
+Finally, you need to include the Jason library as a dependency in `mix.exs` to enable Postgrex JSON support and then run `mix deps.get` to install.
 
 ```elixir
 # mix.exs

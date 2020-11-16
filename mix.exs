@@ -1,6 +1,7 @@
 defmodule EventStore.Mixfile do
   use Mix.Project
 
+  @source_url "https://github.com/commanded/eventstore"
   @version "1.2.0"
 
   def project do
@@ -20,7 +21,7 @@ defmodule EventStore.Mixfile do
       preferred_cli_env: preferred_cli_env(),
       dialyzer: dialyzer(),
       name: "EventStore",
-      source_url: "https://github.com/commanded/eventstore"
+      source_url: @source_url
     ]
   end
 
@@ -121,11 +122,12 @@ defmodule EventStore.Mixfile do
 
   defp package do
     [
-      files: ["lib", "priv/event_store", "guides", "mix.exs", "README*", "LICENSE*"],
+      files: ["lib", "priv/event_store", "guides", "mix.exs", "README*", "LICENSE*", "CHANGELOG*"],
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => "https://github.com/commanded/eventstore"
+        "Changelog" => "https://hexdocs.pm/eventstore/{@version}/changelog.html",
+        "GitHub" => @source_url
       }
     ]
   end
