@@ -126,7 +126,7 @@ defmodule EventStore.Mixfile do
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
       links: %{
-        "Changelog" => "https://hexdocs.pm/eventstore/{@version}/changelog.html",
+        "Changelog" => "https://hexdocs.pm/eventstore/#{@version}/changelog.html",
         "GitHub" => @source_url
       }
     ]
