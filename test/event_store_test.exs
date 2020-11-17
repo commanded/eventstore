@@ -13,7 +13,6 @@ defmodule EventStore.EventStoreTest do
   end
 
   describe "append to event store" do
-
     test "should use event_id from event to store recorded_event" do
       event_id = UUID.uuid4()
       stream_uuid = UUID.uuid4()
