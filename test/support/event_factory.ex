@@ -9,7 +9,6 @@ defmodule EventStore.EventFactory do
     defstruct [:event]
   end
 
-
   def create_event(event_id, number \\ 1) do
     correlation_id = UUID.uuid4()
     causation_id = UUID.uuid4()
