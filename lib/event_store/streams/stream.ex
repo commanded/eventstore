@@ -180,6 +180,7 @@ defmodule EventStore.Streams.Stream do
 
   defp map_to_recorded_event(%EventData{} = event_data, created_at, serializer) do
     %EventData{
+      event_id: event_id,
       causation_id: causation_id,
       correlation_id: correlation_id,
       event_type: event_type,
@@ -188,7 +189,7 @@ defmodule EventStore.Streams.Stream do
     } = event_data
 
     %RecordedEvent{
-      event_id: UUID.uuid4(),
+      event_id: event_id || UUID.uuid4(),
       causation_id: causation_id,
       correlation_id: correlation_id,
       event_type: event_type,

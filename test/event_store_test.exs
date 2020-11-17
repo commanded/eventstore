@@ -13,6 +13,19 @@ defmodule EventStore.EventStoreTest do
   end
 
   describe "append to event store" do
+
+    test "should use event_id from event to store recorded_event" do
+      event_id = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      event = EventFactory.create_event(event_id)
+      assert :ok = EventStore.append_to_stream(stream_uuid, 0, [event])
+
+      {:ok, recorded_events} = EventStore.read_stream_forward(stream_uuid)
+      recorded_event = hd(recorded_events)
+      assert recorded_event.event_id == event_id
+    end
+
     test "should append single event" do
       stream_uuid = UUID.uuid4()
       events = EventFactory.create_events(1)
