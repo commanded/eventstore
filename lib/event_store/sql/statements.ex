@@ -11,7 +11,6 @@ defmodule EventStore.Sql.Statements do
   for {fun, args} <- [
         {:create_stream, [:schema]},
         {:insert_events, [:schema, :number_of_events]},
-        {:insert_stream_events, [:schema, :number_of_events]},
         {:insert_link_events, [:schema, :number_of_events]},
         {:soft_delete_stream, [:schema]},
         {:hard_delete_stream, [:schema]},

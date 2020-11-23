@@ -6,8 +6,6 @@ defmodule EventStore.Storage.Appender do
   alias EventStore.RecordedEvent
   alias EventStore.Sql.Statements
 
-  @all_stream_id 0
-
   @doc """
   Append the given list of events to storage.
 
@@ -28,26 +26,8 @@ defmodule EventStore.Storage.Appender do
       |> Enum.each(fn batch ->
         event_count = length(batch)
 
-        stream_params =
-          Enum.flat_map(batch, fn
-            %RecordedEvent{event_id: event_id, stream_version: stream_version} ->
-              [event_id, stream_version]
-          end)
-
-        all_stream_params =
-          batch
-          |> Stream.with_index(1)
-          |> Enum.flat_map(fn {%RecordedEvent{event_id: event_id}, index} ->
-            [index, event_id]
-          end)
-
-        stream_params = [stream_id | [event_count | stream_params]]
-        all_stream_params = [@all_stream_id | [event_count | all_stream_params]]
-
-        with :ok <- insert_event_batch(conn, batch, schema, opts),
-             :ok <- insert_stream_events(conn, stream_params, event_count, schema, opts),
-             :ok <- insert_link_events(conn, all_stream_params, event_count, schema, opts) do
-          Logger.debug("Appended #{length(events)} event(s) to stream #{inspect(stream_uuid)}")
+        with :ok <- insert_event_batch(conn, stream_id, batch, event_count, schema, opts) do
+          Logger.debug("Appended #{event_count} event(s) to stream #{inspect(stream_uuid)}")
 
           :ok
         else
@@ -117,10 +97,9 @@ defmodule EventStore.Storage.Appender do
     event_id |> uuid()
   end
 
-  defp insert_event_batch(conn, events, schema, opts) do
-    event_count = length(events)
+  defp insert_event_batch(conn, stream_id, events, event_count, schema, opts) do
     statement = Statements.insert_events(schema, event_count)
-    parameters = build_insert_parameters(events)
+    parameters = [stream_id | [event_count | build_insert_parameters(events)]]
 
     conn
     |> Postgrex.query(statement, parameters, opts)
@@ -129,25 +108,31 @@ defmodule EventStore.Storage.Appender do
 
   defp build_insert_parameters(events) do
     events
-    |> Enum.flat_map(fn event ->
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {%RecordedEvent{} = event, index} ->
+      %RecordedEvent{
+        event_id: event_id,
+        event_type: event_type,
+        causation_id: causation_id,
+        correlation_id: correlation_id,
+        data: data,
+        metadata: metadata,
+        created_at: created_at,
+        stream_version: stream_version
+      } = event
+
       [
-        event.event_id,
-        event.event_type,
-        event.causation_id,
-        event.correlation_id,
-        event.data,
-        event.metadata,
-        event.created_at
+        event_id,
+        event_type,
+        causation_id,
+        correlation_id,
+        data,
+        metadata,
+        created_at,
+        index,
+        stream_version
       ]
     end)
-  end
-
-  defp insert_stream_events(conn, params, event_count, schema, opts) do
-    statement = Statements.insert_stream_events(schema, event_count)
-
-    conn
-    |> Postgrex.query(statement, params, opts)
-    |> handle_response()
   end
 
   defp insert_link_events(conn, params, event_count, schema, opts) do

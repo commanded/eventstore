@@ -1,15 +1,69 @@
-INSERT INTO <%= schema %>.events
-  (
-    event_id,
-    event_type,
-    causation_id,
-    correlation_id,
-    data,
-    metadata,
-    created_at
+WITH
+  new_events (event_id, event_type, causation_id, correlation_id, data, metadata, created_at, index, stream_version) AS (
+    VALUES
+    <%= for i <- 0..(number_of_events - 1) do %>
+      <%= unless i == 0 do %>,<% end %>
+      ($<%= i * 9 + 3 %>::uuid, $<%= i * 9 + 4 %>, $<%= i * 9 + 5 %>::uuid, $<%= i * 9 + 6 %>::uuid, $<%= i * 9 + 7 %>::bytea, $<%= i * 9 + 8 %>::bytea, $<%= i * 9 + 9 %>::timestamptz, $<%= i * 9 + 10 %>::int, $<%= i * 9 + 11 %>::bigint)
+    <% end %>
+  ),
+  events AS (
+    INSERT INTO <%= schema %>.events
+      (
+        event_id,
+        event_type,
+        causation_id,
+        correlation_id,
+        data,
+        metadata,
+        created_at
+      )
+    SELECT
+      event_id, event_type, causation_id, correlation_id, data, metadata, created_at
+    FROM new_events
+  ),
+  stream AS (
+    UPDATE <%= schema %>.streams
+    SET stream_version = stream_version + $2::bigint
+    WHERE stream_id = $1::bigint
+    RETURNING stream_id
+  ),
+  source_stream_events AS (
+    INSERT INTO <%= schema %>.stream_events
+      (
+        event_id,
+        stream_id,
+        stream_version,
+        original_stream_id,
+        original_stream_version
+      )
+    SELECT
+      new_events.event_id,
+      stream.stream_id,
+      new_events.stream_version,
+      stream.stream_id,
+      new_events.stream_version
+    FROM new_events, stream
+    RETURNING event_id, stream_id, stream_version
+  ),
+  linked_stream AS (
+    UPDATE <%= schema %>.streams
+    SET stream_version = stream_version + $2::bigint
+    WHERE stream_id = 0
+    RETURNING stream_id, stream_version - $2 as initial_stream_version
   )
-VALUES
-<%= for i <- 0..(number_of_events - 1) do %>
-  <%= unless i == 0 do %>,<% end %>
-  ($<%= i * 7 + 1 %>, $<%= i * 7 + 2 %>, $<%= i * 7 + 3 %>, $<%= i * 7 + 4 %>, $<%= i * 7 + 5 %>, $<%= i * 7 + 6 %>, $<%= i * 7 + 7 %>)
-<% end %>;
+INSERT INTO <%= schema %>.stream_events
+(
+  event_id,
+  stream_id,
+  stream_version,
+  original_stream_id,
+  original_stream_version
+)
+SELECT
+  new_events.event_id,
+  linked_stream.stream_id,
+  linked_stream.initial_stream_version + new_events.index,
+  $1::bigint,
+  new_events.stream_version
+FROM
+  new_events, linked_stream;
