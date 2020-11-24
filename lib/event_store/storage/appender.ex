@@ -26,7 +26,8 @@ defmodule EventStore.Storage.Appender do
       |> Enum.each(fn batch ->
         event_count = length(batch)
 
-        with :ok <- insert_event_batch(conn, stream_id, batch, event_count, schema, opts) do
+        with :ok <-
+               insert_event_batch(conn, stream_id, stream_uuid, batch, event_count, schema, opts) do
           Logger.debug("Appended #{event_count} event(s) to stream #{inspect(stream_uuid)}")
 
           :ok
@@ -97,9 +98,11 @@ defmodule EventStore.Storage.Appender do
     event_id |> uuid()
   end
 
-  defp insert_event_batch(conn, stream_id, events, event_count, schema, opts) do
-    statement = Statements.insert_events(schema, event_count)
-    parameters = [stream_id | [event_count | build_insert_parameters(events)]]
+  defp insert_event_batch(conn, stream_id, stream_uuid, events, event_count, schema, opts) do
+    statement = Statements.insert_events(schema, stream_id, event_count)
+
+    stream_id_or_uuid = stream_id || stream_uuid
+    parameters = [stream_id_or_uuid | [event_count | build_insert_parameters(events)]]
 
     conn
     |> Postgrex.query(statement, parameters, opts)
