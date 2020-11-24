@@ -4,7 +4,8 @@ defmodule EventStore.Streams.Stream do
   alias EventStore.{EventData, RecordedEvent, Storage}
   alias EventStore.Streams.StreamInfo
 
-  def append_to_stream(conn, stream_uuid, expected_version, events, opts) do
+  def append_to_stream(conn, stream_uuid, expected_version, events, opts)
+      when length(events) < 1000 do
     {serializer, opts} = Keyword.pop(opts, :serializer)
 
     with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, opts),
@@ -13,6 +14,24 @@ defmodule EventStore.Streams.Stream do
     else
       {:error, error} -> {:error, error}
     end
+  end
+
+  def append_to_stream(conn, stream_uuid, expected_version, events, opts) do
+    {serializer, opts} = Keyword.pop(opts, :serializer)
+
+    transaction(
+      conn,
+      fn transaction ->
+        with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, opts),
+             {:ok, stream} <- prepare_stream(transaction, stream, opts),
+             :ok <- do_append_to_storage(transaction, stream, events, serializer, opts) do
+          :ok
+        else
+          {:error, error} -> Postgrex.rollback(transaction, error)
+        end
+      end,
+      opts
+    )
   end
 
   def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts) do
