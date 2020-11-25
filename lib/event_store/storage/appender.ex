@@ -179,11 +179,27 @@ defmodule EventStore.Storage.Appender do
     %Postgrex.Error{postgres: %{code: error_code, constraint: constraint}} = error
 
     case {error_code, constraint} do
-      {:foreign_key_violation, _constraint} -> {:error, :not_found}
-      {:unique_violation, "events_pkey"} -> {:error, :duplicate_event}
-      {:unique_violation, "stream_events_pkey"} -> {:error, :duplicate_event}
-      {:unique_violation, _constraint} -> {:error, :wrong_expected_version}
-      {error_code, _constraint} -> {:error, error_code}
+      {:foreign_key_violation, _constraint} ->
+        {:error, :not_found}
+
+      {:unique_violation, "events_pkey"} ->
+        {:error, :duplicate_event}
+
+      {:unique_violation, "stream_events_pkey"} ->
+        {:error, :duplicate_event}
+
+      {:unique_violation, "ix_streams_stream_uuid"} ->
+        # EventStore.Streams.Stream will retry when it gets this
+        # error code. That will always work because on the second
+        # time around, the stream will have been made, so the
+        # race to create the stream will have been resolved.
+        {:error, :duplicate_stream_uuid}
+
+      {:unique_violation, constraint} ->
+        {:error, :wrong_expected_version}
+
+      {error_code, _constraint} ->
+        {:error, error_code}
     end
   end
 
