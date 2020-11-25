@@ -23,7 +23,7 @@ DO $migration$
     END;
     $func$ LANGUAGE plpgsql;
 
-    DROP RULE event_notification ON streams;
+    DROP TRIGGER event_notification ON streams;
 
     CREATE TRIGGER event_notification
     AFTER INSERT OR UPDATE ON streams
