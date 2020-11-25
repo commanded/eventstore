@@ -1,7 +1,7 @@
 DO $migration$
   BEGIN
     CREATE OR REPLACE FUNCTION notify_events()
-      RETURNS trigger AS $$
+      RETURNS trigger AS $func$
     DECLARE
       channel text;
       payload text;
@@ -21,6 +21,7 @@ DO $migration$
 
         RETURN NULL;
     END;
+    $func$ LANGUAGE plpgsql;
 
     DROP RULE event_notification ON streams;
 
