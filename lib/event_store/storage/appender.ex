@@ -195,7 +195,7 @@ defmodule EventStore.Storage.Appender do
         # race to create the stream will have been resolved.
         {:error, :duplicate_stream_uuid}
 
-      {:unique_violation, constraint} ->
+      {:unique_violation, _constraint} ->
         {:error, :wrong_expected_version}
 
       {error_code, _constraint} ->
