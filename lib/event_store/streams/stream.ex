@@ -9,7 +9,7 @@ defmodule EventStore.Streams.Stream do
     {serializer, opts} = Keyword.pop(opts, :serializer)
 
     with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, opts),
-         :ok <- do_append_to_storage(conn, stream, events, serializer, opts) do
+         :ok <- do_append_to_storage(conn, stream, events, expected_version, serializer, opts) do
       :ok
     else
       {:error, error} -> {:error, error}
@@ -23,8 +23,15 @@ defmodule EventStore.Streams.Stream do
       conn,
       fn transaction ->
         with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, opts),
-             {:ok, stream} <- prepare_stream(transaction, stream, opts),
-             :ok <- do_append_to_storage(transaction, stream, events, serializer, opts) do
+             :ok <-
+               do_append_to_storage(
+                 transaction,
+                 stream,
+                 events,
+                 expected_version,
+                 serializer,
+                 opts
+               ) do
           :ok
         else
           {:error, error} -> Postgrex.rollback(transaction, error)
@@ -112,10 +119,17 @@ defmodule EventStore.Streams.Stream do
   # Stream already exists, nothing to do.
   defp prepare_stream(_conn, %StreamInfo{} = stream, _opts), do: {:ok, stream}
 
-  defp do_append_to_storage(conn, %StreamInfo{} = stream, events, serializer, opts) do
+  defp do_append_to_storage(
+         conn,
+         %StreamInfo{} = stream,
+         events,
+         expected_version,
+         serializer,
+         opts
+       ) do
     prepared_events = prepare_events(events, stream, serializer)
 
-    write_to_stream(conn, prepared_events, stream, opts)
+    write_to_stream(conn, prepared_events, stream, expected_version, opts)
   end
 
   defp prepare_events(events, %StreamInfo{} = stream, serializer) do
@@ -177,8 +191,16 @@ defmodule EventStore.Streams.Stream do
     raise ArgumentError, message: "Invalid event id, expected a UUID but got: #{inspect(invalid)}"
   end
 
-  defp write_to_stream(conn, prepared_events, %StreamInfo{} = stream, opts) do
+  defp write_to_stream(conn, prepared_events, %StreamInfo{} = stream, expected_version, opts) do
     %StreamInfo{stream_id: stream_id} = stream
+
+    any_version =
+      case expected_version do
+        :any_version -> true
+        _ -> false
+      end
+
+    opts = Keyword.put(opts, :any_version, any_version)
 
     Storage.append_to_stream(conn, stream_id, prepared_events, opts)
   end

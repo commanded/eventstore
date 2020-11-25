@@ -16,6 +16,7 @@ defmodule EventStore.Storage.Appender do
   """
   def append(conn, stream_id, events, opts) do
     {schema, opts} = Keyword.pop(opts, :schema)
+    {any_version, opts} = Keyword.pop(opts, :any_version, false)
 
     stream_uuid = stream_uuid(events)
 
@@ -27,7 +28,16 @@ defmodule EventStore.Storage.Appender do
         event_count = length(batch)
 
         with :ok <-
-               insert_event_batch(conn, stream_id, stream_uuid, batch, event_count, schema, opts) do
+               insert_event_batch(
+                 conn,
+                 stream_id,
+                 stream_uuid,
+                 batch,
+                 event_count,
+                 schema,
+                 any_version,
+                 opts
+               ) do
           Logger.debug("Appended #{event_count} event(s) to stream #{inspect(stream_uuid)}")
 
           :ok
@@ -98,8 +108,21 @@ defmodule EventStore.Storage.Appender do
     event_id |> uuid()
   end
 
-  defp insert_event_batch(conn, stream_id, stream_uuid, events, event_count, schema, opts) do
-    statement = Statements.insert_events(schema, stream_id, event_count)
+  defp insert_event_batch(
+         conn,
+         stream_id,
+         stream_uuid,
+         events,
+         event_count,
+         schema,
+         any_version,
+         opts
+       ) do
+    statement =
+      case any_version do
+        true -> Statements.insert_events_any_version(schema, stream_id, event_count)
+        false -> Statements.insert_events(schema, stream_id, event_count)
+      end
 
     stream_id_or_uuid = stream_id || stream_uuid
     parameters = [stream_id_or_uuid | [event_count | build_insert_parameters(events)]]
