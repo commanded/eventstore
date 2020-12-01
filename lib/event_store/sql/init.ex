@@ -267,7 +267,7 @@ defmodule EventStore.Sql.Init do
   defp record_event_store_schema_version do
     """
     INSERT INTO schema_migrations (major_version, minor_version, patch_version)
-    VALUES (1, 2, 0);
+    VALUES (1, 2, 1);
     """
   end
 end
