@@ -11,11 +11,11 @@ WITH
       returning stream_id, stream_version - $2::bigint as initial_stream_version
     <% end %>
   ),
-  new_events (event_id, event_type, causation_id, correlation_id, data, metadata, created_at, index, stream_version) AS (
+  new_events_indexes (event_id, index, stream_version) AS (
     VALUES
     <%= for i <- 0..(number_of_events - 1) do %>
       <%= unless i == 0 do %>,<% end %>
-      ($<%= i * 9 + 3 %>::uuid, $<%= i * 9 + 4 %>, $<%= i * 9 + 5 %>::uuid, $<%= i * 9 + 6 %>::uuid, $<%= i * 9 + 7 %>::bytea, $<%= i * 9 + 8 %>::bytea, $<%= i * 9 + 9 %>::timestamptz, $<%= i * 9 + 10 %>::int, $<%= i * 9 + 11 %>::bigint)
+      ($<%= i*9+3 %>::uuid, $<%= i*9+10 %>::int, $<%= i*9+11 %>::bigint)
     <% end %>
   ),
   events AS (
@@ -29,9 +29,11 @@ WITH
         metadata,
         created_at
       )
-    SELECT
-      event_id, event_type, causation_id, correlation_id, data, metadata, created_at
-    FROM new_events
+    VALUES
+    <%= for i <- 0..(number_of_events - 1) do %>
+      <%= unless i == 0 do %>,<% end %>
+      ($<%= i*9+3 %>, $<%= i*9+4 %>, $<%= i*9+5 %>, $<%= i*9+6 %>, $<%= i*9+7 %>, $<%= i*9+8 %>, $<%= i*9+9 %>)
+    <% end %>
   ),
   source_stream_events AS (
     INSERT INTO <%= schema %>.stream_events
@@ -43,12 +45,12 @@ WITH
         original_stream_version
       )
     SELECT
-      new_events.event_id,
+      new_events_indexes.event_id,
       stream.stream_id,
-      stream.initial_stream_version + new_events.index,
+      stream.initial_stream_version + new_events_indexes.index,
       stream.stream_id,
-      stream.initial_stream_version + new_events.index
-    FROM new_events, stream
+      stream.initial_stream_version + new_events_indexes.index
+    FROM new_events_indexes, stream
   ),
   linked_stream AS (
     UPDATE <%= schema %>.streams
@@ -65,10 +67,10 @@ INSERT INTO <%= schema %>.stream_events
   original_stream_version
 )
 SELECT
-  new_events.event_id,
+  new_events_indexes.event_id,
   0,
-  linked_stream.initial_stream_version + new_events.index,
+  linked_stream.initial_stream_version + new_events_indexes.index,
   stream.stream_id,
-  stream.initial_stream_version + new_events.index
+  stream.initial_stream_version + new_events_indexes.index
 FROM
-  new_events, linked_stream, stream;
+  new_events_indexes, linked_stream, stream;
