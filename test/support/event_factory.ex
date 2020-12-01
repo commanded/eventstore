@@ -9,20 +9,23 @@ defmodule EventStore.EventFactory do
     defstruct [:event]
   end
 
-  def create_events(number_of_events, initial_event_number \\ 1) when number_of_events > 0 do
+  def create_event(event_id, number \\ 1) do
     correlation_id = UUID.uuid4()
     causation_id = UUID.uuid4()
 
+    %EventData{
+      event_id: event_id,
+      correlation_id: correlation_id,
+      causation_id: causation_id,
+      event_type: "Elixir.EventStore.EventFactory.Event",
+      data: %EventStore.EventFactory.Event{event: number - 1},
+      metadata: %{"user" => "user@example.com"}
+    }
+  end
+
+  def create_events(number_of_events, initial_event_number \\ 1) when number_of_events > 0 do
     1..number_of_events
-    |> Enum.map(fn number ->
-      %EventData{
-        correlation_id: correlation_id,
-        causation_id: causation_id,
-        event_type: "Elixir.EventStore.EventFactory.Event",
-        data: %EventStore.EventFactory.Event{event: initial_event_number + number - 1},
-        metadata: %{"user" => "user@example.com"}
-      }
-    end)
+    |> Enum.map(fn number -> create_event(nil, initial_event_number + number) end)
   end
 
   def create_recorded_events(

@@ -4,6 +4,7 @@ defmodule EventStore.EventData do
   """
 
   defstruct [
+    :event_id,
     :correlation_id,
     :causation_id,
     :event_type,
@@ -14,6 +15,7 @@ defmodule EventStore.EventData do
   @type uuid :: String.t()
 
   @type t :: %EventStore.EventData{
+          event_id: uuid() | nil,
           correlation_id: uuid() | nil,
           causation_id: uuid() | nil,
           event_type: String.t(),
