@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+- Allow optional `event_id` to be included in `EventStore.EventData` struct ([#229](https://github.com/commanded/eventstore/pull/229)).
+
 ## v1.2.0
 
 ### Enhancements
