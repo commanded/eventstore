@@ -77,7 +77,7 @@ defmodule EventStore.Storage.Appender do
           |> Stream.with_index(1)
           |> Enum.flat_map(fn {event_id, index} -> [index, event_id] end)
 
-        params = [stream_id | [event_count | parameters]]
+        params = [stream_id, event_count] ++ parameters
 
         with :ok <- insert_link_events(conn, params, event_count, schema, opts) do
           Logger.debug("Linked #{length(event_ids)} event(s) to stream")
@@ -125,7 +125,7 @@ defmodule EventStore.Storage.Appender do
       end
 
     stream_id_or_uuid = stream_id || stream_uuid
-    parameters = [stream_id_or_uuid | [event_count | build_insert_parameters(events)]]
+    parameters = [stream_id_or_uuid, event_count] ++ build_insert_parameters(events)
 
     conn
     |> Postgrex.query(statement, parameters, opts)
