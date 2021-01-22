@@ -410,7 +410,7 @@ defmodule EventStore do
       defp parse_opts(opts) do
         name = name(opts)
         config = Config.lookup(name)
-        conn = Keyword.fetch!(config, :conn)
+        conn = Keyword.get(opts, :conn) || Keyword.fetch!(config, :conn)
         timeout = timeout(opts, config)
 
         {conn, Keyword.put(config, :timeout, timeout)}
