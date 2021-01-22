@@ -45,6 +45,21 @@ defmodule EventStore.EventStoreTest do
       assert {:error, :cannot_append_to_all_stream} =
                EventStore.append_to_stream(@all_stream, 0, events)
     end
+
+    test "allows to supply a db connection, so we can append to a stream in a running transaction",
+         %{
+           conn: conn
+         } do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(1)
+
+      Postgrex.transaction(conn, fn conn ->
+        assert :ok = EventStore.append_to_stream(stream_uuid, 0, events, conn: conn)
+        DBConnection.rollback(conn, :no_effect_with_different_connections)
+      end)
+
+      assert {:error, :stream_not_found} = EventStore.read_stream_forward(stream_uuid)
+    end
   end
 
   describe "link to event store" do
@@ -92,6 +107,22 @@ defmodule EventStore.EventStoreTest do
     test "should fail attempting to link to `$all` stream", %{event_ids: event_ids} do
       assert {:error, :cannot_append_to_all_stream} =
                EventStore.link_to_stream(@all_stream, 0, event_ids)
+    end
+
+    test "allows to supply a db connection, so we can link to streams in a running transaction",
+         context do
+      %{
+        conn: conn,
+        target_stream_uuid: target_stream_uuid,
+        event_ids: event_ids
+      } = context
+
+      Postgrex.transaction(conn, fn conn ->
+        :ok = EventStore.link_to_stream(target_stream_uuid, 0, event_ids, conn: conn)
+        DBConnection.rollback(conn, :no_effect_with_different_connections)
+      end)
+
+      assert {:error, :stream_not_found} = EventStore.read_stream_forward(target_stream_uuid)
     end
   end
 
