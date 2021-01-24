@@ -7,6 +7,12 @@ defmodule EventStore.EventFactory do
   defmodule Event do
     @derive Jason.Encoder
     defstruct [:event]
+
+    def new(event_content) do
+      %__MODULE__{
+        event: event_content
+      }
+    end
   end
 
   def create_event(event_id, number \\ 1) do

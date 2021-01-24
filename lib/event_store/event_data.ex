@@ -23,6 +23,23 @@ defmodule EventStore.EventData do
           metadata: term | nil
         }
 
+  def new(event_id, %event_type{} = event, metadata)
+      when not is_nil(event_id) and not is_nil(metadata) do
+    {:ok, _} = UUID.info(event_id)
+
+    %__MODULE__{
+      event_id: event_id,
+      data: event,
+      event_type: Atom.to_string(event_type),
+      metadata: metadata
+    }
+  end
+
+  def new(event, metadata) do
+    event_id = UUID.uuid4()
+    new(event_id, event, metadata)
+  end
+
   def fetch(map, key) when is_map(map) do
     Map.fetch(map, key)
   end
