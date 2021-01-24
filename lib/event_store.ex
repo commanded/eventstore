@@ -10,8 +10,7 @@ defmodule EventStore do
   An event store module is defined in your own application as follows:
 
       defmodule MyApp.EventStore do
-        use EventStore,
-          otp_app: :my_app
+        use EventStore, otp_app: :my_app
 
         # Optional `init/1` function to modify config at runtime.
         def init(config) do
@@ -108,7 +107,7 @@ defmodule EventStore do
   Define an event store:
 
       defmodule MyApp.EventStore do
-        use EventStore, otp_app: :eventstore
+        use EventStore, otp_app: :my_app
       end
 
   Start multiple instances of the event store, each with a unique name:
@@ -135,7 +134,7 @@ defmodule EventStore do
 
       children =
         for tenant <- [:tenant1, :tenant2, :tenant3] do
-          {MyApp.EventStore, name: :tenant1, schema: Atom.to_string(tenant)}
+          {MyApp.EventStore, name: tenant, schema: "#\{tenant\}"}
         end
 
       opts = [strategy: :one_for_one, name: MyApp.Supervisor]
@@ -151,11 +150,11 @@ defmodule EventStore do
   pool. The size of the pool is configured with the `pool_size` config option.
 
   When you have multiple event stores running you will also end up with multiple
-  connection pools. If they are all to the same physical Postgres database then
-  it can be useful to share a single pool amongst all event stores. Use the
-  `shared_connection_pool` config option to specify a name for the shared connection
-  pool. Then configure the event stores you'd like to share the pool with the
-  same name.
+  connection pools. If they are all connecting to the same physical Postgres
+  database then it can be useful to share a single pool amongst all event
+  stores. Use the `shared_connection_pool` config option to specify a name for
+  the shared connection pool. Then configure the event stores you'd like to
+  share the pool with the same name.
 
   This can be done in config:
 
@@ -171,6 +170,31 @@ defmodule EventStore do
           {MyApp.EventStore, name: :eventstore3, shared_connection_pool: :shared_pool}
         ], opts)
 
+  ## Using an existing database connection or transaction
+
+  In some situations you might want to execute the event store operations using
+  an existing Postgres database connection or transaction. For instance, if you
+  want to persist changes to one or more other tables, such as a read-model
+  projection.
+
+  To do this you can provide a Postgrex connection process or transaction as a
+  `:conn` option to any of the supported `EventStore` functions.
+
+      {:ok, pid} = Postgrex.start_link(config)
+
+      Postgrex.transaction(pid, fn conn ->
+        :ok = EventStore.append_to_stream(stream_uuid, expected_version, events, conn: conn)
+      end)
+
+  This can also be used with an Ecto `Repo` which is configured to use the
+  Postgres SQL adapter. The connection process may be looked up as follows:
+
+      %{pid: pool} = Ecto.Adapter.lookup_meta(Repo)
+
+      conn = Process.get({Ecto.Adapters.SQL, pool})
+
+  ---
+
   ## Guides
 
   Please refer to the following guides to learn more:
@@ -182,13 +206,18 @@ defmodule EventStore do
   - [Event serialization](event-serialization.html)
   - [Upgrading an existing EventStore database](upgrades.html)
 
+  ---
+
   """
 
   @type t :: module
-  @type option :: {:name, atom} | {:timeout, timeout()}
+  @type option ::
+          {:name, atom}
+          | {:conn, Postgrex.conn() | DBConnection.t()}
+          | {:timeout, timeout()}
   @type options :: [option]
   @type transient_subscribe_option ::
-          option
+          {:name, atom}
           | {:selector, (EventStore.RecordedEvent.t() -> any())}
           | {:mapper, (EventStore.RecordedEvent.t() -> any())}
   @type transient_subscribe_options :: [transient_subscribe_option]

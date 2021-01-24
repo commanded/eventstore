@@ -3,6 +3,7 @@
 ## Next release
 
 - Allow optional `event_id` to be included in `EventStore.EventData` struct ([#229](https://github.com/commanded/eventstore/pull/229)).
+- Adds an option to supply a database connection to `EventStore` functions ([#231](https://github.com/commanded/eventstore/pull/231)).
 
 ## v1.2.0
 
