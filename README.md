@@ -245,6 +245,7 @@ You should include unit tests to cover any changes.
 
 EventStore exists thanks to the following people who have contributed.
 
+- [Andreas Riemer](https://github.com/arfl)
 - [Andrey Akulov](https://github.com/astery)
 - [Ben Smith](https://github.com/slashdotdash)
 - [Bruce Williams](https://github.com/bruce)
@@ -262,6 +263,7 @@ EventStore exists thanks to the following people who have contributed.
 - [Jan Vereecken](https://github.com/javereec)
 - [Kai Kuchenbecker](https://github.com/kaikuchn)
 - [Kaz Walker](https://github.com/KazW)
+- [Morten Berg Nissen](https://github.com/mbnissen)
 - [Nicholas Henry](https://github.com/nicholasjhenry)
 - [Olafur Arason](https://github.com/olafura)
 - [Ole Michaelis](https://github.com/OleMchls)
