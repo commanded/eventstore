@@ -2,6 +2,7 @@ defmodule EventStore.EventData do
   @moduledoc """
   EventData contains the data for a single event before being persisted to storage
   """
+  alias EventStore.RecordedEvent
 
   defstruct [
     :event_id,
@@ -38,6 +39,17 @@ defmodule EventStore.EventData do
   def new(event, metadata) do
     event_id = UUID.uuid4()
     new(event_id, event, metadata)
+  end
+
+  def caused_by(%__MODULE__{} = event_data, %RecordedEvent{
+        event_id: event_id,
+        correlation_id: correlation_id
+      }) do
+    %__MODULE__{
+      event_data
+      | causation_id: event_id,
+        correlation_id: correlation_id || event_id
+    }
   end
 
   def fetch(map, key) when is_map(map) do
