@@ -173,6 +173,25 @@ defmodule EventStore.AppendToStreamTest do
              Enum.to_list(1..8_001)
   end
 
+  test "should use given event id if provided" do
+    events = [
+      event_1 = EventFactory.create_event(UUID.uuid4()),
+      event_2 = EventFactory.create_event(UUID.uuid4())
+    ]
+
+    assert event_1.event_id
+    assert event_2.event_id
+
+    stream_uuid = UUID.uuid4()
+    assert :ok = EventStore.append_to_stream(stream_uuid, :any_version, events)
+
+    assert {:ok, [appended_event_1, appended_event_2]} =
+             EventStore.read_stream_forward(stream_uuid)
+
+    assert event_1.event_id == appended_event_1.event_id
+    assert event_2.event_id == appended_event_2.event_id
+  end
+
   defp append_events_to_stream(_context) do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
