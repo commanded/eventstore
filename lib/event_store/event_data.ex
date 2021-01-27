@@ -24,21 +24,51 @@ defmodule EventStore.EventData do
           metadata: term | nil
         }
 
-  def new(event_id, %event_type{} = event, metadata)
-      when not is_nil(event_id) and not is_nil(metadata) do
-    {:ok, _} = UUID.info(event_id)
-
-    %__MODULE__{
-      event_id: event_id,
-      data: event,
-      event_type: Atom.to_string(event_type),
-      metadata: metadata
-    }
+  def new(event_id, event, metadata) do
+    %__MODULE__{}
+    |> with_event_id(event_id)
+    |> for_event(event)
+    |> with_metadata(metadata)
   end
 
   def new(event, metadata) do
+    new(nil, event, metadata)
+  end
+
+  def with_event_id(%__MODULE__{} = event_data, nil) do
     event_id = UUID.uuid4()
-    new(event_id, event, metadata)
+    with_event_id(event_data, event_id)
+  end
+
+  def with_event_id(%__MODULE__{} = event_data, event_id) do
+    {:ok, _} = UUID.info(event_id)
+
+    %__MODULE__{
+      event_data
+      | event_id: event_id
+    }
+  end
+
+  def for_event(%__MODULE__{} = event_data, %event_type{} = event) do
+    %__MODULE__{
+      event_data
+      | event_type: Atom.to_string(event_type),
+        data: event
+    }
+  end
+
+  def for_event(%__MODULE__{} = event_data, event) when not is_nil(event) do
+    %__MODULE__{
+      event_data
+      | data: event
+    }
+  end
+
+  def with_metadata(%__MODULE__{} = event_data, metadata) do
+    %__MODULE__{
+      event_data
+      | metadata: metadata
+    }
   end
 
   def caused_by(%__MODULE__{} = event_data, %RecordedEvent{
