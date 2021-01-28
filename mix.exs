@@ -27,7 +27,7 @@ defmodule EventStore.Mixfile do
 
   def application do
     [
-      extra_applications: [:eex, :logger, :ssl],
+      extra_applications: [:crypto, :eex, :logger, :ssl],
       mod: {EventStore.Application, []}
     ]
   end
