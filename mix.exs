@@ -2,7 +2,7 @@ defmodule EventStore.Mixfile do
   use Mix.Project
 
   @source_url "https://github.com/commanded/eventstore"
-  @version "1.2.0"
+  @version "1.2.1"
 
   def project do
     [
@@ -27,7 +27,7 @@ defmodule EventStore.Mixfile do
 
   def application do
     [
-      extra_applications: [:eex, :logger, :ssl],
+      extra_applications: [:crypto, :eex, :logger, :ssl],
       mod: {EventStore.Application, []}
     ]
   end

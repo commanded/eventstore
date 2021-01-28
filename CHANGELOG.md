@@ -1,9 +1,9 @@
 # Changelog
 
-## Next release
+## v1.2.1
 
 - Allow optional `event_id` to be included in `EventStore.EventData` struct ([#229](https://github.com/commanded/eventstore/pull/229)).
-- Adds an option to supply a database connection to `EventStore` functions ([#231](https://github.com/commanded/eventstore/pull/231)).
+- Adds an option to supply an existing database connection or transaction to `EventStore` functions ([#231](https://github.com/commanded/eventstore/pull/231)).
 
 ## v1.2.0
 
@@ -43,6 +43,8 @@ Usage now:
 ### Bug fixes
 
 - Support appending events to a stream with `:any_version` concurrently ([#209](https://github.com/commanded/eventstore/pull/209)).
+
+---
 
 ## v1.1.0
 
@@ -93,6 +95,8 @@ EventStore.stream_all_forward(start_version, read_batch_size: read_batch_size, t
 
 This release requires a database migration to be run. Please read the [Upgrading an EventStore](https://hexdocs.pm/eventstore/upgrades.html) guide for details on how to migrate an existing database.
 
+---
+
 ## v1.0.3
 
 ### Bug fixes
@@ -127,6 +131,8 @@ This release requires a database migration to be run. Please read the [Upgrading
 ### Upgrading
 
 [Follow the upgrade guide](guides/upgrades/0.17-1.0.md) to define and use your own application specific event store].
+
+---
 
 ## v0.17.0
 

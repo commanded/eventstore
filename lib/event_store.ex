@@ -189,9 +189,13 @@ defmodule EventStore do
   This can also be used with an Ecto `Repo` which is configured to use the
   Postgres SQL adapter. The connection process may be looked up as follows:
 
-      %{pid: pool} = Ecto.Adapter.lookup_meta(Repo)
+      Repo.transaction(fn ->
+        %{pid: pool} = Ecto.Adapter.lookup_meta(Repo)
 
-      conn = Process.get({Ecto.Adapters.SQL, pool})
+        conn = Process.get({Ecto.Adapters.SQL, pool})
+
+        :ok = EventStore.append_to_stream(stream_uuid, expected_version, events, conn: conn)
+      end)
 
   ---
 
