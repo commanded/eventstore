@@ -329,6 +329,28 @@ defmodule EventStore do
       def read_all_streams_forward(start_version, count, opts),
         do: read_stream_forward(@all_stream, start_version, count, opts)
 
+      def read_stream_backward(
+            stream_uuid,
+            start_version \\ -1,
+            count \\ @default_count,
+            opts \\ []
+          )
+
+      def read_stream_backward(stream_uuid, start_version, count, opts) do
+        {conn, opts} = parse_opts(opts)
+
+        Stream.read_stream_backward(conn, stream_uuid, start_version, count, opts)
+      end
+
+      def read_all_streams_backward(
+            start_version \\ -1,
+            count \\ @default_count,
+            opts \\ []
+          )
+
+      def read_all_streams_backward(start_version, count, opts),
+        do: read_stream_backward(@all_stream, start_version, count, opts)
+
       def stream_forward(stream_uuid, start_version \\ 0, opts \\ [])
 
       def stream_forward(stream_uuid, start_version, read_batch_size)
@@ -348,6 +370,26 @@ defmodule EventStore do
 
       def stream_all_forward(start_version, opts),
         do: stream_forward(@all_stream, start_version, opts)
+
+      def stream_backward(stream_uuid, start_version \\ -1, opts \\ [])
+
+      def stream_backward(stream_uuid, start_version, read_batch_size)
+          when is_integer(start_version) and is_integer(read_batch_size) do
+        stream_backward(stream_uuid, start_version, read_batch_size: read_batch_size)
+      end
+
+      def stream_backward(stream_uuid, start_version, opts) do
+        {conn, opts} = parse_opts(opts)
+
+        opts = Keyword.put_new(opts, :read_batch_size, @default_batch_size)
+
+        Stream.stream_backward(conn, stream_uuid, start_version, opts)
+      end
+
+      def stream_all_backward(start_version \\ -1, opts \\ [])
+
+      def stream_all_backward(start_version, opts),
+        do: stream_backward(@all_stream, start_version, opts)
 
       def delete_stream(stream_uuid, expected_version, type \\ :soft, opts \\ [])
 
@@ -624,16 +666,16 @@ defmodule EventStore do
               | {:error, reason :: term}
 
   @doc """
-  Reads the requested number of events from the given stream, in the order in
+  Reads the requested number of events from the given stream in the order in
   which they were originally written.
 
     - `stream_uuid` is used to uniquely identify a stream.
 
-    - `start_version` optionally, the version number of the first event to read.
+    - `start_version` optionally, the stream version of the first event to read.
       Defaults to the beginning of the stream if not set.
 
     - `count` optionally, the maximum number of events to read.
-      If not set it will be limited to returning 1,000 events from the stream.
+      Defaults to to returning 1,000 events from the stream.
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
@@ -651,14 +693,14 @@ defmodule EventStore do
               | {:error, reason :: term}
 
   @doc """
-  Reads the requested number of events from all streams, in the order in which
+  Reads the requested number of events from all streams in the order in which
   they were originally written.
 
-    - `start_version` optionally, the number of the first event to read.
+    - `start_version` optionally, the stream version of the first event to read.
       Defaults to the beginning of the stream if not set.
 
     - `count` optionally, the maximum number of events to read.
-      If not set it will be limited to returning 1,000 events from all streams.
+      Defaults to returning 1,000 events from all streams.
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
@@ -672,10 +714,60 @@ defmodule EventStore do
             ) :: {:ok, list(EventStore.RecordedEvent.t())} | {:error, reason :: term}
 
   @doc """
-  Streams events from the given stream, in the order in which they were
+  Reads the requested number of events from the given stream in the reverse
+  order from which they were originally written.
+
+    - `stream_uuid` is used to uniquely identify a stream.
+
+    - `start_version` optionally, the stream version of the first event to read.
+      Use `-1` to indicate starting from the end of the stream. Defaults to the
+      end of the stream if not set.
+
+    - `count` optionally, the maximum number of events to read.
+      Defaults to to returning 1,000 events from the stream.
+
+    - `opts` an optional keyword list containing:
+      - `name` the name of the event store if provided to `start_link/1`.
+      - `timeout` an optional timeout for the database transaction, in
+        milliseconds. Defaults to 15,000ms.
+  """
+  @callback read_stream_backward(
+              stream_uuid :: String.t(),
+              start_version :: non_neg_integer,
+              count :: non_neg_integer,
+              opts :: options
+            ) ::
+              {:ok, list(EventStore.RecordedEvent.t())}
+              | {:error, :stream_deleted}
+              | {:error, reason :: term}
+
+  @doc """
+  Reads the requested number of events from all streams in the reverse order
+  from which they were originally written.
+
+    - `start_version` optionally, the stream version of the first event to read.
+      Use `-1` to indicate starting from the end of the stream. Defaults to the
+      end of the stream if not set.
+
+    - `count` optionally, the maximum number of events to read.
+      Defaults to returning 1,000 events from all streams.
+
+    - `opts` an optional keyword list containing:
+      - `name` the name of the event store if provided to `start_link/1`.
+      - `timeout` an optional timeout for the database transaction, in
+        milliseconds. Defaults to 15,000ms.
+  """
+  @callback read_all_streams_backward(
+              start_version :: integer,
+              count :: non_neg_integer,
+              opts :: options
+            ) :: {:ok, list(EventStore.RecordedEvent.t())} | {:error, reason :: term}
+
+  @doc """
+  Streams events from the given stream in the order in which they were
   originally written.
 
-    - `start_version` optionally, the version number of the first event to read.
+    - `start_version` optionally, the stream version of the first event to read.
       Defaults to the beginning of the stream if not set.
 
     - `opts` an optional keyword list containing:
@@ -687,15 +779,15 @@ defmodule EventStore do
   """
   @callback stream_forward(
               stream_uuid :: String.t(),
-              start_version :: non_neg_integer,
+              start_version :: integer,
               opts :: [options | {:read_batch_size, non_neg_integer}]
             ) :: Enumerable.t() | {:error, :stream_deleted} | {:error, reason :: term}
 
   @doc """
-  Streams events from all streams, in the order in which they were originally
+  Streams events from all streams in the order in which they were originally
   written.
 
-    - `start_version` optionally, the number of the first event to read.
+    - `start_version` optionally, the stream version of the first event to read.
       Defaults to the beginning of the stream if not set.
 
     - `opts` an optional keyword list containing:
@@ -706,6 +798,47 @@ defmodule EventStore do
         storage. Defaults to reading 1,000 events per batch.
   """
   @callback stream_all_forward(
+              start_version :: non_neg_integer,
+              opts :: [options | {:read_batch_size, non_neg_integer}]
+            ) :: Enumerable.t() | {:error, :stream_deleted} | {:error, reason :: term}
+
+  @doc """
+  Streams events from the given stream in the reverse order from which they
+  were originally written.
+
+    - `start_version` optionally, the stream version of the first event to read.
+      Use `-1` to indicate starting from the end of the stream. Defaults to the
+      end of the stream if not set.
+
+    - `opts` an optional keyword list containing:
+      - `name` the name of the event store if provided to `start_link/1`.
+      - `timeout` an optional timeout for the database transaction, in
+        milliseconds. Defaults to 15,000ms.
+      - `read_batch_size` optionally, the number of events to read at a time
+        from storage. Defaults to reading 1,000 events per batch.
+  """
+  @callback stream_backward(
+              stream_uuid :: String.t(),
+              start_version :: integer,
+              opts :: [options | {:read_batch_size, non_neg_integer}]
+            ) :: Enumerable.t() | {:error, :stream_deleted} | {:error, reason :: term}
+
+  @doc """
+  Streams events from all streams in the reverse order from which they were
+  originally written.
+
+    - `start_version` optionally, the stream version of the first event to read.
+      Use `-1` to indicate starting from the end of the stream. Defaults to the
+      end of the stream if not set.
+
+    - `opts` an optional keyword list containing:
+      - `name` the name of the event store if provided to `start_link/1`.
+      - `timeout` an optional timeout for the database transaction, in
+        milliseconds. Defaults to 15,000ms.
+      - `read_batch_size` optionally, the number of events to read at a time from
+        storage. Defaults to reading 1,000 events per batch.
+  """
+  @callback stream_all_backward(
               start_version :: non_neg_integer,
               opts :: [options | {:read_batch_size, non_neg_integer}]
             ) :: Enumerable.t() | {:error, :stream_deleted} | {:error, reason :: term}

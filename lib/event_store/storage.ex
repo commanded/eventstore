@@ -35,6 +35,14 @@ defmodule EventStore.Storage do
     as: :read_forward
 
   @doc """
+  Read events for the given stream backward from the starting version, use -1
+  for all events for the stream.
+  """
+  defdelegate read_stream_backward(conn, stream_id, start_version, count, opts),
+    to: Reader,
+    as: :read_backward
+
+  @doc """
   Get the id and version of the stream with the given `stream_uuid`.
   """
   defdelegate stream_info(conn, stream_uuid, opts), to: QueryStreamInfo, as: :execute

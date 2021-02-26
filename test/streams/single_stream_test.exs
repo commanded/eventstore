@@ -232,7 +232,7 @@ defmodule EventStore.Streams.SingleStreamTest do
   describe "read stream forward" do
     setup [:append_events_to_stream]
 
-    test "should fetch all events", %{
+    test "should fetch all events in chronological order", %{
       conn: conn,
       schema: schema,
       serializer: serializer,
@@ -245,6 +245,27 @@ defmodule EventStore.Streams.SingleStreamTest do
         )
 
       assert length(read_events) == 3
+      assert Enum.map(read_events, & &1.stream_version) == [1, 2, 3]
+    end
+  end
+
+  describe "read stream backward" do
+    setup [:append_events_to_stream]
+
+    test "should fetch all events in reverse chronological order", %{
+      conn: conn,
+      schema: schema,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      {:ok, read_events} =
+        Stream.read_stream_backward(conn, stream_uuid, -1, 1_000,
+          schema: schema,
+          serializer: serializer
+        )
+
+      assert length(read_events) == 3
+      assert Enum.map(read_events, & &1.stream_version) == [3, 2, 1]
     end
   end
 
@@ -287,7 +308,7 @@ defmodule EventStore.Streams.SingleStreamTest do
       assert length(read_events) == 3
     end
 
-    test "should stream events from single stream uisng large batch size", %{
+    test "should stream events from single stream using large batch size", %{
       conn: conn,
       schema: schema,
       serializer: serializer,
@@ -327,6 +348,99 @@ defmodule EventStore.Streams.SingleStreamTest do
          %{conn: conn, schema: schema, serializer: serializer, stream_uuid: stream_uuid} do
       read_events =
         Stream.stream_forward(conn, stream_uuid, 4,
+          read_batch_size: 1,
+          schema: schema,
+          serializer: serializer
+        )
+        |> Enum.to_list()
+
+      assert length(read_events) == 0
+    end
+  end
+
+  describe "stream backward" do
+    setup [:append_events_to_stream]
+
+    test "should stream events from single stream using single event batch size", %{
+      conn: conn,
+      schema: schema,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      read_events =
+        Stream.stream_backward(conn, stream_uuid, -1,
+          read_batch_size: 1,
+          schema: schema,
+          serializer: serializer
+        )
+        |> Enum.to_list()
+
+      assert length(read_events) == 3
+      assert pluck(read_events, :event_number) == [3, 2, 1]
+      assert pluck(read_events, :stream_version) == [3, 2, 1]
+    end
+
+    test "should stream events from single stream using two event batch size", %{
+      conn: conn,
+      schema: schema,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      read_events =
+        Stream.stream_backward(conn, stream_uuid, -1,
+          read_batch_size: 2,
+          schema: schema,
+          serializer: serializer
+        )
+        |> Enum.to_list()
+
+      assert length(read_events) == 3
+      assert pluck(read_events, :event_number) == [3, 2, 1]
+      assert pluck(read_events, :stream_version) == [3, 2, 1]
+    end
+
+    test "should stream events from single stream using large batch size", %{
+      conn: conn,
+      schema: schema,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      read_events =
+        Stream.stream_backward(conn, stream_uuid, -1,
+          read_batch_size: 1_000,
+          schema: schema,
+          serializer: serializer
+        )
+        |> Enum.to_list()
+
+      assert length(read_events) == 3
+      assert pluck(read_events, :event_number) == [3, 2, 1]
+      assert pluck(read_events, :stream_version) == [3, 2, 1]
+    end
+
+    test "should stream events from single stream with starting version offset", %{
+      conn: conn,
+      schema: schema,
+      serializer: serializer,
+      stream_uuid: stream_uuid
+    } do
+      read_events =
+        Stream.stream_backward(conn, stream_uuid, 2,
+          read_batch_size: 2,
+          schema: schema,
+          serializer: serializer
+        )
+        |> Enum.to_list()
+
+      assert length(read_events) == 2
+      assert pluck(read_events, :event_number) == [2, 1]
+      assert pluck(read_events, :stream_version) == [2, 1]
+    end
+
+    test "should stream events from single stream with starting version offset outside range",
+         %{conn: conn, schema: schema, serializer: serializer, stream_uuid: stream_uuid} do
+      read_events =
+        Stream.stream_backward(conn, stream_uuid, 0,
           read_batch_size: 1,
           schema: schema,
           serializer: serializer

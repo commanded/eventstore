@@ -26,7 +26,8 @@ defmodule EventStore.Sql.Statements do
         {:query_subscription, [:schema]},
         {:query_stream_info, [:schema]},
         {:query_snapshot, [:schema]},
-        {:query_stream_events, [:schema]}
+        {:query_stream_events_backward, [:schema]},
+        {:query_stream_events_forward, [:schema]}
       ] do
     file = Path.expand("statements/#{fun}.sql.eex", __DIR__)
 
