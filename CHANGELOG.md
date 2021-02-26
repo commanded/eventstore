@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+- Read stream and stream events backward ([#234](https://github.com/commanded/eventstore/pull/234)).
+
 ## v1.2.1
 
 - Allow optional `event_id` to be included in `EventStore.EventData` struct ([#229](https://github.com/commanded/eventstore/pull/229)).
