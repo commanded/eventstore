@@ -1,0 +1,19 @@
+SELECT
+  se.stream_version,
+  e.event_id,
+  s.stream_uuid,
+  se.original_stream_version,
+  e.event_type,
+  e.correlation_id,
+  e.causation_id,
+  e.data,
+  e.metadata,
+  e.created_at
+FROM <%= schema %>.stream_events se
+INNER JOIN <%= schema %>.streams s ON s.stream_id = se.original_stream_id
+INNER JOIN <%= schema %>.events e ON se.event_id = e.event_id
+WHERE
+  se.stream_id = $1 AND (se.stream_version <= $2 OR $2 = -1)
+ORDER BY
+  se.stream_version DESC
+LIMIT $3;

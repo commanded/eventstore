@@ -8,11 +8,21 @@ defmodule EventStore.Storage.Reader do
   alias EventStore.Storage.Reader
 
   @doc """
-  Read events appended to a single stream forward from the given starting version
+  Read events from a single stream forwards from the given starting version.
   """
-
   def read_forward(conn, stream_id, start_version, count, opts) do
     case Reader.Query.read_events_forward(conn, stream_id, start_version, count, opts) do
+      {:ok, []} = reply -> reply
+      {:ok, rows} -> map_rows_to_event_data(rows)
+      {:error, reason} -> failed_to_read(stream_id, reason)
+    end
+  end
+
+  @doc """
+  Read events from a single stream backwards from the given starting version.
+  """
+  def read_backward(conn, stream_id, start_version, count, opts) do
+    case Reader.Query.read_events_backward(conn, stream_id, start_version, count, opts) do
       {:ok, []} = reply -> reply
       {:ok, rows} -> map_rows_to_event_data(rows)
       {:error, reason} -> failed_to_read(stream_id, reason)
@@ -101,9 +111,21 @@ defmodule EventStore.Storage.Reader do
     def read_events_forward(conn, stream_id, start_version, count, opts) do
       {schema, opts} = Keyword.pop(opts, :schema)
 
-      query = Statements.query_stream_events(schema)
+      query = Statements.query_stream_events_forward(schema)
 
-      case Postgrex.query(conn, query, [stream_id, start_version, count], opts) do
+      do_query(conn, query, [stream_id, start_version, count], opts)
+    end
+
+    def read_events_backward(conn, stream_id, start_version, count, opts) do
+      {schema, opts} = Keyword.pop(opts, :schema)
+
+      query = Statements.query_stream_events_backward(schema)
+
+      do_query(conn, query, [stream_id, start_version, count], opts)
+    end
+
+    defp do_query(conn, query, params, opts) do
+      case Postgrex.query(conn, query, params, opts) do
         {:ok, %Postgrex.Result{num_rows: 0}} ->
           {:ok, []}
 

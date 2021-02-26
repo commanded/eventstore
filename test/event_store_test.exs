@@ -126,43 +126,63 @@ defmodule EventStore.EventStoreTest do
     end
   end
 
-  test "read stream forward from event store" do
-    stream_uuid = UUID.uuid4()
-    events = EventFactory.create_events(1)
+  describe "read events" do
+    setup do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(10)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-    {:ok, recorded_events} = EventStore.read_stream_forward(stream_uuid, 0)
+      [stream_uuid: stream_uuid, events: events]
+    end
 
-    created_event = hd(events)
-    recorded_event = hd(recorded_events)
+    test "read stream forward", %{stream_uuid: stream_uuid, events: events} do
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-    assert_recorded_event(stream_uuid, created_event, recorded_event)
-  end
+      {:ok, recorded_events} = EventStore.read_stream_forward(stream_uuid, 0)
 
-  test "stream forward from event store" do
-    stream_uuid = UUID.uuid4()
-    events = EventFactory.create_events(1)
+      assert_recorded_events(stream_uuid, 1..10, events, recorded_events)
+    end
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-    recorded_events = stream_uuid |> EventStore.stream_forward() |> Enum.to_list()
+    test "stream forward", %{stream_uuid: stream_uuid, events: events} do
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-    created_event = hd(events)
-    recorded_event = hd(recorded_events)
+      recorded_events =
+        EventStore.stream_forward(stream_uuid, 0, read_batch_size: 5) |> Enum.to_list()
 
-    assert_recorded_event(stream_uuid, created_event, recorded_event)
-  end
+      assert_recorded_events(stream_uuid, 1..10, events, recorded_events)
+    end
 
-  test "stream all forward from event store" do
-    stream_uuid = UUID.uuid4()
-    events = EventFactory.create_events(1)
+    test "stream all forward", %{stream_uuid: stream_uuid, events: events} do
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events)
-    recorded_events = EventStore.stream_all_forward() |> Enum.to_list()
+      recorded_events = EventStore.stream_all_forward(0, read_batch_size: 5) |> Enum.to_list()
 
-    created_event = hd(events)
-    recorded_event = hd(recorded_events)
+      assert_recorded_events(stream_uuid, 1..10, events, recorded_events)
+    end
 
-    assert_recorded_event(stream_uuid, created_event, recorded_event)
+    test "read stream backward", %{stream_uuid: stream_uuid, events: events} do
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      {:ok, recorded_events} = EventStore.read_stream_backward(stream_uuid)
+
+      assert_recorded_events(stream_uuid, 10..1, Enum.reverse(events), recorded_events)
+    end
+
+    test "stream backward", %{stream_uuid: stream_uuid, events: events} do
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      recorded_events =
+        EventStore.stream_backward(stream_uuid, -1, batch_size: 5) |> Enum.to_list()
+
+      assert_recorded_events(stream_uuid, 10..1, Enum.reverse(events), recorded_events)
+    end
+
+    test "stream all backward", %{stream_uuid: stream_uuid, events: events} do
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      recorded_events = EventStore.stream_all_backward(-1, batch_size: 5) |> Enum.to_list()
+
+      assert_recorded_events(stream_uuid, 10..1, Enum.reverse(events), recorded_events)
+    end
   end
 
   test "unicode character support" do
@@ -419,16 +439,34 @@ defmodule EventStore.EventStoreTest do
     snapshot
   end
 
+  defp assert_recorded_events(
+         expected_stream_uuid,
+         expected_stream_versions,
+         expected_events,
+         actual_events
+       ) do
+    assert length(expected_events) == length(actual_events)
+    assert length(expected_events) == Enum.count(expected_stream_versions)
+
+    [expected_events, actual_events, expected_stream_versions]
+    |> Enum.zip()
+    |> Enum.each(fn {expected, actual, expected_stream_version} ->
+      assert_recorded_event(expected_stream_uuid, expected, actual, expected_stream_version)
+    end)
+  end
+
   defp assert_recorded_event(
          expected_stream_uuid,
          expected_event,
-         %RecordedEvent{} = recorded_event
+         %RecordedEvent{} = recorded_event,
+         expected_stream_version
        ) do
     assert_is_uuid(recorded_event.event_id)
     assert_is_uuid(recorded_event.causation_id)
     assert_is_uuid(recorded_event.correlation_id)
+
     assert recorded_event.stream_uuid == expected_stream_uuid
-    assert recorded_event.stream_version == 1
+    assert recorded_event.stream_version == expected_stream_version
     assert recorded_event.event_type == expected_event.event_type
     assert recorded_event.data == expected_event.data
     assert recorded_event.metadata == expected_event.metadata
