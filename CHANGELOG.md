@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## v1.2.2
 
 - Read stream and stream events backward ([#234](https://github.com/commanded/eventstore/pull/234)).
 
