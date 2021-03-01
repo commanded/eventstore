@@ -69,6 +69,7 @@ defmodule EventStore.Config do
     :password,
     :database,
     :hostname,
+    :configure,
     :port,
     :types,
     :socket,
