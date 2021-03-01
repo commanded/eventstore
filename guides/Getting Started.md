@@ -155,7 +155,7 @@ defmodule MyApp.ReleaseTasks do
     config = MyApp.EventStore.config()
 
     :ok = EventStore.Tasks.Create.exec(config, [])
-    :ok = EventStore.Tasks.Init.exec(MyApp.EventStore, config, [])
+    :ok = EventStore.Tasks.Init.exec(config, [])
   end
 end
 ```
