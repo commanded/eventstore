@@ -247,6 +247,7 @@ EventStore exists thanks to the following people who have contributed.
 
 - [Andreas Riemer](https://github.com/arfl)
 - [Andrey Akulov](https://github.com/astery)
+- [Basile Nouvellet](https://github.com/BasileNouvellet)
 - [Ben Smith](https://github.com/slashdotdash)
 - [Bruce Williams](https://github.com/bruce)
 - [Chris Brodt](https://github.com/uberbrodt)
