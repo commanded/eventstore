@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## v1.2.3
 
 - Add `:configure` to postgrex connection options ([#233](https://github.com/commanded/eventstore/pull/233)).
 - Use runtime configuration in Mix tasks ([#236](https://github.com/commanded/eventstore/pull/236)).
