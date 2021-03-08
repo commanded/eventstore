@@ -2,7 +2,7 @@ defmodule EventStore.Mixfile do
   use Mix.Project
 
   @source_url "https://github.com/commanded/eventstore"
-  @version "1.2.2"
+  @version "1.2.3"
 
   def project do
     [
