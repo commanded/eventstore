@@ -130,23 +130,13 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       stream2_uuid = append_events_to_stream(event_store, 2)
 
       # Subscriber should now start receiving events
-      assert_receive {:events, received_events}
-      assert length(received_events) == 1
+      received_events = wait_for_events(subscription, 3)
 
-      for event <- received_events do
-        assert event.stream_uuid == stream1_uuid
-      end
-
-      :ok = Subscription.ack(subscription, received_events)
-
-      assert_receive {:events, received_events}, 5_000
-      assert length(received_events) == 2
-
-      Enum.each(received_events, fn event ->
-        assert event.stream_uuid == stream2_uuid
-      end)
-
-      :ok = Subscription.ack(subscription, received_events)
+      assert Enum.map(received_events, & &1.stream_uuid) == [
+               stream1_uuid,
+               stream2_uuid,
+               stream2_uuid
+             ]
 
       refute_receive {:events, _received_events}
     end
@@ -221,5 +211,19 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
   defp pluck(enumerable, field) do
     Enum.map(enumerable, &Map.get(&1, field))
+  end
+
+  defp wait_for_events(subscription, expected_count, events \\ []) do
+    assert_receive {:events, received_events}
+
+    :ok = Subscription.ack(subscription, received_events)
+
+    events = events ++ received_events
+
+    if length(events) == expected_count do
+      events
+    else
+      wait_for_events(subscription, expected_count, events)
+    end
   end
 end
