@@ -4,23 +4,64 @@ defmodule EventStore.Streams.Stream do
   alias EventStore.{EventData, RecordedEvent, Storage}
   alias EventStore.Streams.StreamInfo
 
+  def append_to_stream(conn, stream_uuid, expected_version, events, opts)
+      when length(events) < 1000 do
+    {serializer, new_opts} = Keyword.pop(opts, :serializer)
+
+    with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, new_opts),
+         :ok <- do_append_to_storage(conn, stream, events, expected_version, serializer, new_opts) do
+      :ok
+    else
+      {:error, error} -> {:error, error}
+    end
+    |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
+  end
+
   def append_to_stream(conn, stream_uuid, expected_version, events, opts) do
-    {serializer, opts} = Keyword.pop(opts, :serializer)
+    {serializer, new_opts} = Keyword.pop(opts, :serializer)
 
     transaction(
       conn,
       fn transaction ->
-        with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, opts),
-             {:ok, stream} <- prepare_stream(transaction, stream, opts),
-             :ok <- do_append_to_storage(transaction, stream, events, serializer, opts) do
+        with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, new_opts),
+             :ok <-
+               do_append_to_storage(
+                 transaction,
+                 stream,
+                 events,
+                 expected_version,
+                 serializer,
+                 new_opts
+               ) do
           :ok
         else
           {:error, error} -> Postgrex.rollback(transaction, error)
         end
       end,
-      opts
+      new_opts
     )
+    |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
   end
+
+  defp maybe_retry_once(
+         {:error, :duplicate_stream_uuid},
+         conn,
+         stream_uuid,
+         expected_version,
+         events,
+         opts
+       ) do
+    if Keyword.has_key?(opts, :retried_once) do
+      # we should never get here, but just in case we break
+      # something in another part of the app, this will give
+      # us better output in the tests
+      {:error, :already_retried_once}
+    else
+      append_to_stream(conn, stream_uuid, expected_version, events, opts)
+    end
+  end
+
+  defp maybe_retry_once(error, _conn, _stream_uuid, _expected_version, _events, _opts), do: error
 
   def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts) do
     transaction(
@@ -112,10 +153,17 @@ defmodule EventStore.Streams.Stream do
   # Stream already exists, nothing to do.
   defp prepare_stream(_conn, %StreamInfo{} = stream, _opts), do: {:ok, stream}
 
-  defp do_append_to_storage(conn, %StreamInfo{} = stream, events, serializer, opts) do
+  defp do_append_to_storage(
+         conn,
+         %StreamInfo{} = stream,
+         events,
+         expected_version,
+         serializer,
+         opts
+       ) do
     prepared_events = prepare_events(events, stream, serializer)
 
-    write_to_stream(conn, prepared_events, stream, opts)
+    write_to_stream(conn, prepared_events, stream, expected_version, opts)
   end
 
   defp prepare_events(events, %StreamInfo{} = stream, serializer) do
@@ -178,8 +226,16 @@ defmodule EventStore.Streams.Stream do
     raise ArgumentError, message: "Invalid event id, expected a UUID but got: #{inspect(invalid)}"
   end
 
-  defp write_to_stream(conn, prepared_events, %StreamInfo{} = stream, opts) do
+  defp write_to_stream(conn, prepared_events, %StreamInfo{} = stream, expected_version, opts) do
     %StreamInfo{stream_id: stream_id} = stream
+
+    any_version =
+      case expected_version do
+        :any_version -> true
+        _ -> false
+      end
+
+    opts = Keyword.put(opts, :any_version, any_version)
 
     Storage.append_to_stream(conn, stream_id, prepared_events, opts)
   end

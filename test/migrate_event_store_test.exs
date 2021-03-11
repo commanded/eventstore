@@ -84,6 +84,7 @@ defmodule EventStore.MigrateEventStoreTest do
     |> Enum.reject(fn
       "0\t17\t0\tNOW" -> true
       "1\t1\t0\tNOW" -> true
+      "1\t2\t0\tNOW" -> true
       _line -> false
     end)
   end

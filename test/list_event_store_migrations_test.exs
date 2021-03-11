@@ -24,6 +24,7 @@ defmodule EventStore.ListEventStoreMigrationsTest do
         0.17.0    \tcompleted\t2020-04-28 22:15:48.922963Z
         1.1.0     \tpending
         1.2.0     \tpending
+        1.2.1     \tpending
 
       """
 

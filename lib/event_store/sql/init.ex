@@ -197,7 +197,7 @@ defmodule EventStore.Sql.Init do
         -- Each separated by a comma (e.g. 'stream-12345,1,1,5')
 
         channel := TG_TABLE_SCHEMA || '.events';
-        payload := NEW.stream_uuid || ',' || NEW.stream_id || ',' || (OLD.stream_version + 1) || ',' || NEW.stream_version;
+        payload := NEW.stream_uuid || ',' || NEW.stream_id || ',' || COALESCE(OLD.stream_version, 0) + 1 || ',' || NEW.stream_version;
 
         -- Notify events to listeners
         PERFORM pg_notify(channel, payload);
@@ -211,7 +211,7 @@ defmodule EventStore.Sql.Init do
   defp create_event_notification_trigger do
     """
     CREATE TRIGGER event_notification
-    AFTER UPDATE ON streams
+    AFTER INSERT OR UPDATE ON streams
     FOR EACH ROW EXECUTE PROCEDURE notify_events();
     """
   end
@@ -267,7 +267,7 @@ defmodule EventStore.Sql.Init do
   defp record_event_store_schema_version do
     """
     INSERT INTO schema_migrations (major_version, minor_version, patch_version)
-    VALUES (1, 2, 0);
+    VALUES (1, 2, 1);
     """
   end
 end

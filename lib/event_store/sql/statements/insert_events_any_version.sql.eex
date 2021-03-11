@@ -1,4 +1,16 @@
 WITH
+  stream AS (
+    <%= if stream_id do %>
+      UPDATE <%= schema %>.streams
+      SET stream_version = stream_version + $2::bigint
+      WHERE stream_id = $1::bigint
+      returning stream_id, stream_version - $2::bigint as initial_stream_version
+    <% else %>
+      INSERT INTO <%= schema %>.streams (stream_uuid, stream_version)
+      VALUES ($1, $2::bigint)
+      returning stream_id, stream_version - $2::bigint as initial_stream_version
+    <% end %>
+  ),
   new_events_indexes (event_id, index, stream_version) AS (
     VALUES
     <%= for i <- 0..(number_of_events - 1) do %>
@@ -23,18 +35,6 @@ WITH
       ($<%= i*9+3 %>, $<%= i*9+4 %>, $<%= i*9+5 %>, $<%= i*9+6 %>, $<%= i*9+7 %>, $<%= i*9+8 %>, $<%= i*9+9 %>)
     <% end %>
   ),
-  stream AS (
-    <%= if stream_id do %>
-      UPDATE <%= schema %>.streams
-      SET stream_version = stream_version + $2::bigint
-      WHERE stream_id = $1::bigint
-      returning stream_id
-    <% else %>
-      INSERT INTO <%= schema %>.streams (stream_uuid, stream_version)
-      VALUES ($1, $2::bigint)
-      returning stream_id
-    <% end %>
-  ),
   source_stream_events AS (
     INSERT INTO <%= schema %>.stream_events
       (
@@ -47,9 +47,9 @@ WITH
     SELECT
       new_events_indexes.event_id,
       stream.stream_id,
-      new_events_indexes.stream_version,
+      stream.initial_stream_version + new_events_indexes.index,
       stream.stream_id,
-      new_events_indexes.stream_version
+      stream.initial_stream_version + new_events_indexes.index
     FROM new_events_indexes, stream
   ),
   linked_stream AS (
@@ -71,6 +71,6 @@ SELECT
   0,
   linked_stream.initial_stream_version + new_events_indexes.index,
   stream.stream_id,
-  new_events_indexes.stream_version
+  stream.initial_stream_version + new_events_indexes.index
 FROM
   new_events_indexes, linked_stream, stream;
