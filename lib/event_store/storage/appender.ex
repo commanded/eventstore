@@ -15,9 +15,6 @@ defmodule EventStore.Storage.Appender do
   Returns `:ok` on success, `{:error, reason}` on failure.
   """
   def append(conn, stream_id, events, opts) do
-    {schema, opts} = Keyword.pop(opts, :schema)
-    {any_version, opts} = Keyword.pop(opts, :any_version, false)
-
     stream_uuid = stream_uuid(events)
 
     try do
@@ -27,17 +24,7 @@ defmodule EventStore.Storage.Appender do
       |> Enum.each(fn batch ->
         event_count = length(batch)
 
-        with :ok <-
-               insert_event_batch(
-                 conn,
-                 stream_id,
-                 stream_uuid,
-                 batch,
-                 event_count,
-                 schema,
-                 any_version,
-                 opts
-               ) do
+        with :ok <- insert_event_batch(conn, stream_id, stream_uuid, batch, event_count, opts) do
           Logger.debug("Appended #{event_count} event(s) to stream #{inspect(stream_uuid)}")
 
           :ok
@@ -96,32 +83,28 @@ defmodule EventStore.Storage.Appender do
   end
 
   defp encode_uuids(%RecordedEvent{} = event) do
+    %RecordedEvent{event_id: event_id, causation_id: causation_id, correlation_id: correlation_id} =
+      event
+
     %RecordedEvent{
       event
-      | event_id: event.event_id |> uuid(),
-        causation_id: event.causation_id |> uuid(),
-        correlation_id: event.correlation_id |> uuid()
+      | event_id: encode_uuid(event_id),
+        causation_id: encode_uuid(causation_id),
+        correlation_id: encode_uuid(correlation_id)
     }
   end
 
-  defp encode_uuid(event_id) when is_bitstring(event_id) do
-    event_id |> uuid()
-  end
+  defp encode_uuid(nil), do: nil
+  defp encode_uuid(value), do: UUID.string_to_binary!(value)
 
-  defp insert_event_batch(
-         conn,
-         stream_id,
-         stream_uuid,
-         events,
-         event_count,
-         schema,
-         any_version,
-         opts
-       ) do
+  defp insert_event_batch(conn, stream_id, stream_uuid, events, event_count, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
+    {expected_version, opts} = Keyword.pop(opts, :expected_version)
+
     statement =
-      case any_version do
-        true -> Statements.insert_events_any_version(schema, stream_id, event_count)
-        false -> Statements.insert_events(schema, stream_id, event_count)
+      case expected_version do
+        :any_version -> Statements.insert_events_any_version(schema, stream_id, event_count)
+        _expected_version -> Statements.insert_events(schema, stream_id, event_count)
       end
 
     stream_id_or_uuid = stream_id || stream_uuid
@@ -168,9 +151,6 @@ defmodule EventStore.Storage.Appender do
     |> Postgrex.query(statement, params, opts)
     |> handle_response()
   end
-
-  defp uuid(nil), do: nil
-  defp uuid(uuid), do: UUID.string_to_binary!(uuid)
 
   defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}), do: {:error, :not_found}
   defp handle_response({:ok, %Postgrex.Result{}}), do: :ok

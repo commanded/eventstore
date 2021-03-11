@@ -11,8 +11,6 @@ defmodule EventStore.Streams.Stream do
     with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, new_opts),
          :ok <- do_append_to_storage(conn, stream, events, expected_version, serializer, new_opts) do
       :ok
-    else
-      {:error, error} -> {:error, error}
     end
     |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
   end
@@ -51,13 +49,14 @@ defmodule EventStore.Streams.Stream do
          events,
          opts
        ) do
-    if Keyword.has_key?(opts, :retried_once) do
-      # we should never get here, but just in case we break
-      # something in another part of the app, this will give
-      # us better output in the tests
-      {:error, :already_retried_once}
-    else
+    unless Keyword.has_key?(opts, :retried_once) do
+      opts = Keyword.put(opts, :retried_once, true)
+
       append_to_stream(conn, stream_uuid, expected_version, events, opts)
+    else
+      # We should never get here, but just in case we break something in another
+      # part of the app, this will give us better output in the tests.
+      {:error, :already_retried_once}
     end
   end
 
@@ -229,13 +228,7 @@ defmodule EventStore.Streams.Stream do
   defp write_to_stream(conn, prepared_events, %StreamInfo{} = stream, expected_version, opts) do
     %StreamInfo{stream_id: stream_id} = stream
 
-    any_version =
-      case expected_version do
-        :any_version -> true
-        _ -> false
-      end
-
-    opts = Keyword.put(opts, :any_version, any_version)
+    opts = Keyword.put(opts, :expected_version, expected_version)
 
     Storage.append_to_stream(conn, stream_id, prepared_events, opts)
   end
