@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+- Improve performance of appending events under normal and degraded network conditions ([#230](https://github.com/commanded/eventstore/pull/230)).
+
 ## v1.2.3
 
 - Add `:configure` to postgrex connection options ([#233](https://github.com/commanded/eventstore/pull/233)).

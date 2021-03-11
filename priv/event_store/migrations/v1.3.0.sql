@@ -30,6 +30,6 @@ BEGIN
   FOR EACH ROW EXECUTE PROCEDURE notify_events();
 
   -- Record schema migration
-  INSERT INTO schema_migrations (major_version, minor_version, patch_version) VALUES (1, 2, 1);
+  INSERT INTO schema_migrations (major_version, minor_version, patch_version) VALUES (1, 3, 0);
 END;
 $migration$ LANGUAGE plpgsql;
