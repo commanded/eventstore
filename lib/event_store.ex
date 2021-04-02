@@ -227,10 +227,12 @@ defmodule EventStore do
   @type transient_subscribe_options :: [transient_subscribe_option]
   @type persistent_subscription_option ::
           transient_subscribe_option
-          | {:concurrency_limit, pos_integer()}
           | {:buffer_size, pos_integer()}
-          | {:start_from, :origin | :current | non_neg_integer()}
+          | {:checkpoint_after, non_neg_integer()}
+          | {:checkpoint_threshold, pos_integer()}
+          | {:concurrency_limit, pos_integer()}
           | {:partition_by, (EventStore.RecordedEvent.t() -> any())}
+          | {:start_from, :origin | :current | non_neg_integer()}
   @type persistent_subscription_options :: [persistent_subscription_option]
   @type expected_version :: :any_version | :no_stream | :stream_exists | non_neg_integer
   @type start_from :: :origin | :current | non_neg_integer
@@ -1022,6 +1024,20 @@ defmodule EventStore do
         message queue from getting filled with events. Defaults to one in-flight
         event.
 
+      - `checkpoint_threshold` determines how frequently a checkpoint is written
+        to the database for the subscription after events are acknowledged.
+        Increasing the threshold will reduce the number of database writes for
+        busy subscriptions, but means that events might be replayed when the
+        subscription resumes if the checkpoint cannot be written.
+        The default is to persist the checkpoint after each acknowledgement.
+
+      - `checkpoint_after` (milliseconds) used to ensure a checkpoint is written
+        after a period of inactivity even if the checkpoint threshold has not
+        been met. This ensures checkpoints are consistently written during
+        less busy periods. It is only applicable when a checkpoint threshold has
+        been set as the default subscription behaviour is to checkpoint after
+        each acknowledgement.
+
       - `partition_by` is an optional function used to partition events to
         subscribers. It can be used to guarantee processing order when multiple
         subscribers have subscribed to a single subscription. The function is
@@ -1087,6 +1103,23 @@ defmodule EventStore do
           # acknowledge receipt
           EventStore.ack(subscription, events)
       end
+
+  ## Subscription tuning
+
+  Use the `checkpoint_threshold` and `checkpoint_after` options to configure how
+  frequently checkpoints are written to the database. By default a subscription
+  will persist a checkpoint after each acknowledgement. This can cause high
+  write load on the database for busy subscriptions which receive a large number
+  of events. This problem is known as write amplification where each event
+  written to a stream causes many additional writes as subscriptions acknowledge
+  processing of the event.
+
+  The `checkpoint_threshold` controls how frequently checkpoints are persisted.
+  Increasing the threshold reduces the number of database writes. For example
+  using a threshold of 100 means that a checkpoint is written at most once for
+  every 100 events processed. The `checkpoint_after` ensures that a checkpoint
+  will still be written after a period of inactivity even when the threshold has
+  not been met. This ensures bursts of event processing can be safely handled.
 
   """
   @callback subscribe_to_stream(
