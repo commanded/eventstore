@@ -22,8 +22,12 @@ defmodule SubscribeToStreamBench do
     ProcessHelper.shutdown(pid)
   end
 
-  bench "subscribe to stream, 1 subscription" do
+  bench "subscribe to stream, 1 subscription, default checkpoint threshold" do
     subscribe_to_stream(bench_context, 1)
+  end
+
+  bench "subscribe to stream, 1 subscription, checkpoint_threshold=100" do
+    subscribe_to_stream(bench_context, 1, checkpoint_threshold: 100)
   end
 
   bench "subscribe to stream, 10 subscriptions" do
@@ -38,20 +42,26 @@ defmodule SubscribeToStreamBench do
     subscribe_to_stream(bench_context, 50)
   end
 
-  defp subscribe_to_stream(context, concurrency) do
+  defp subscribe_to_stream(context, concurrency, opts \\ []) do
     events = Keyword.fetch!(context, :events)
     stream_uuid = UUID.uuid4()
 
     tasks =
       Enum.map(1..concurrency, fn index ->
         Task.async(fn ->
-          {:ok, _subscription} =
-            EventStore.subscribe_to_stream(stream_uuid, "subscription-#{index}", self())
+          subscription_name = "subscription-#{index}"
 
-          receive do
-            {:events, _events} ->
-              :ok = EventStore.unsubscribe_from_stream(stream_uuid, "subscription-#{index}")
+          {:ok, subscription} =
+            EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), opts)
+
+          for _i <- 1..100 do
+            receive do
+              {:events, events} ->
+                :ok = EventStore.ack(subscription, events)
+            end
           end
+
+          :ok = EventStore.unsubscribe_from_stream(stream_uuid, subscription_name)
         end)
       end)
 
