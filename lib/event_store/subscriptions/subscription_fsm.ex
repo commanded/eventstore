@@ -23,6 +23,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         selector: opts[:selector],
         partition_by: opts[:partition_by],
         buffer_size: opts[:buffer_size] || 1,
+        checkpoint_after: opts[:checkpoint_after] || 0,
+        checkpoint_threshold: opts[:checkpoint_threshold] || 1,
         max_size: opts[:max_size] || 1_000,
         transient: Keyword.get(opts, :transient, false)
       }
@@ -40,7 +42,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         data
         | queue_size: 0,
           partitions: %{},
-          processed_event_numbers: MapSet.new()
+          processed_event_numbers: MapSet.new(),
+          checkpoints_pending: 0
       }
 
       with :ok <- subscribe_to_events(data) do
@@ -69,7 +72,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         data
         | queue_size: 0,
           partitions: %{},
-          processed_event_numbers: MapSet.new()
+          processed_event_numbers: MapSet.new(),
+          checkpoints_pending: 0
       }
 
       with {:ok, subscription} <- create_subscription(data),
@@ -112,6 +116,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         reply -> respond(reply)
       end
     end
+
+    defevent checkpoint(), data: %SubscriptionState{} = data do
+      next_state(:subscribed, persist_checkpoint(data))
+    end
   end
 
   defstate catching_up do
@@ -121,6 +129,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       else
         reply -> respond(reply)
       end
+    end
+
+    defevent checkpoint(), data: %SubscriptionState{} = data do
+      next_state(:subscribed, persist_checkpoint(data))
     end
   end
 
@@ -178,6 +190,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     defevent catch_up, data: %SubscriptionState{} = data do
       next_state(:request_catch_up, data)
     end
+
+    defevent checkpoint(), data: %SubscriptionState{} = data do
+      next_state(:subscribed, persist_checkpoint(data))
+    end
   end
 
   defstate max_capacity do
@@ -193,6 +209,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       else
         reply -> respond(reply)
       end
+    end
+
+    defevent checkpoint(), data: %SubscriptionState{} = data do
+      next_state(:subscribed, persist_checkpoint(data))
     end
   end
 
@@ -236,10 +256,17 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     next_state(state, data)
   end
 
+  defevent checkpoint(), data: %SubscriptionState{} = data, state: state do
+    next_state(state, data)
+  end
+
   defevent connect_subscriber(subscriber, opts),
     data: %SubscriptionState{} = data,
     state: state do
-    data = data |> monitor_subscriber(subscriber, opts) |> notify_subscribers()
+    data =
+      data
+      |> monitor_subscriber(subscriber, opts)
+      |> notify_subscribers()
 
     unless state == :initial do
       notify_subscribed(subscriber)
@@ -268,7 +295,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         | lock_ref: nil,
           queue_size: 0,
           partitions: %{},
-          processed_event_numbers: MapSet.new()
+          processed_event_numbers: MapSet.new(),
+          checkpoints_pending: 0
       }
       |> purge_in_flight_events()
 
@@ -276,15 +304,24 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defevent unsubscribe(pid), data: %SubscriptionState{} = data, state: state do
-    data = data |> remove_subscriber(pid) |> notify_subscribers()
+    data =
+      data
+      |> remove_subscriber(pid)
+      |> notify_subscribers()
 
     case has_subscribers?(data) do
       true ->
         next_state(state, data)
 
       false ->
+        data = persist_checkpoint(data)
+
         next_state(:unsubscribed, data)
     end
+  end
+
+  defevent terminate, data: %SubscriptionState{} = data, state: state do
+    next_state(state, data)
   end
 
   defp create_subscription(%SubscriptionState{} = data) do
@@ -638,11 +675,11 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   defp checkpoint_last_seen(%SubscriptionState{} = data, persist \\ false) do
     %SubscriptionState{
-      conn: conn,
-      schema: schema,
-      stream_uuid: stream_uuid,
-      subscription_name: subscription_name,
       processed_event_numbers: processed_event_numbers,
+      checkpoint_after: checkpoint_after,
+      checkpoint_threshold: checkpoint_threshold,
+      checkpoint_timer_ref: checkpoint_timer_ref,
+      checkpoints_pending: checkpoints_pending,
       last_ack: last_ack
     } = data
 
@@ -650,25 +687,47 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
     cond do
       MapSet.member?(processed_event_numbers, ack) ->
-        persist_if_not_transient = not data.transient
-
         %SubscriptionState{
           data
           | processed_event_numbers: MapSet.delete(processed_event_numbers, ack),
+            checkpoints_pending: checkpoints_pending + 1,
             last_ack: ack
         }
-        |> checkpoint_last_seen(persist_if_not_transient)
+        |> checkpoint_last_seen(true)
 
-      persist ->
-        Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, last_ack,
-          schema: schema
-        )
+      persist and checkpoints_pending >= checkpoint_threshold ->
+        persist_checkpoint(data)
 
-        data
+      persist and checkpoint_after > 0 ->
+        if checkpoint_timer_ref, do: Process.cancel_timer(checkpoint_timer_ref)
+
+        checkpoint_timer_ref = Process.send_after(self(), :checkpoint, checkpoint_after)
+
+        %SubscriptionState{data | checkpoint_timer_ref: checkpoint_timer_ref}
 
       true ->
         data
     end
+  end
+
+  defp persist_checkpoint(%SubscriptionState{} = data) do
+    %SubscriptionState{
+      conn: conn,
+      schema: schema,
+      stream_uuid: stream_uuid,
+      subscription_name: subscription_name,
+      transient: transient,
+      last_ack: last_ack,
+      checkpoints_pending: checkpoints_pending
+    } = data
+
+    if checkpoints_pending > 0 and !transient do
+      Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, last_ack,
+        schema: schema
+      )
+    end
+
+    %SubscriptionState{data | checkpoints_pending: 0}
   end
 
   # Purge all subscriber in-flight events and subscription event queue.

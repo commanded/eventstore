@@ -18,6 +18,10 @@ defmodule EventStore.Storage.Subscription do
 
   defdelegate subscriptions(conn, opts), to: Subscription.All, as: :execute
 
+  defdelegate subscription(conn, stream_uuid, subscription_name, opts),
+    to: Subscription.Query,
+    as: :execute
+
   def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from, opts) do
     with {:ok, %Subscription{} = subscription} <-
            Subscription.Query.execute(conn, stream_uuid, subscription_name, opts) do

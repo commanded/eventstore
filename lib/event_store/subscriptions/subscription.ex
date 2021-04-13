@@ -90,12 +90,18 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @doc false
+  @impl GenServer
   def init(%Subscription{} = state) do
+    Process.flag(:trap_exit, true)
+
     {:ok, state}
   end
 
-  def handle_info(:subscribe_to_stream, %Subscription{subscription: subscription} = state) do
+  @impl GenServer
+  def handle_info(:subscribe_to_stream, %Subscription{} = state) do
     Logger.debug(describe(state) <> " subscribe to stream")
+
+    %Subscription{subscription: subscription} = state
 
     state =
       subscription
@@ -105,8 +111,11 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, state}
   end
 
-  def handle_info({:events, events}, %Subscription{subscription: subscription} = state) do
+  @impl GenServer
+  def handle_info({:events, events}, %Subscription{} = state) do
     Logger.debug(describe(state) <> " received #{length(events)} event(s)")
+
+    %Subscription{subscription: subscription} = state
 
     state =
       subscription
@@ -116,6 +125,19 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, state}
   end
 
+  @impl GenServer
+  def handle_info(:checkpoint, %Subscription{} = state) do
+    %Subscription{subscription: subscription} = state
+
+    state =
+      subscription
+      |> SubscriptionFsm.checkpoint()
+      |> apply_subscription_to_state(state)
+
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_info(
         {EventStore.AdvisoryLocks, :lock_released, lock_ref, reason},
         %Subscription{} = state
@@ -132,6 +154,7 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, state}
   end
 
+  @impl GenServer
   def handle_info({:DOWN, _ref, :process, pid, reason}, %Subscription{} = state) do
     %Subscription{subscription: subscription} = state
 
@@ -149,6 +172,12 @@ defmodule EventStore.Subscriptions.Subscription do
     end
   end
 
+  @impl GenServer
+  def handle_info({:EXIT, _from, reason}, %Subscription{} = state) do
+    {:stop, reason, state}
+  end
+
+  @impl GenServer
   def handle_cast(:catch_up, %Subscription{} = state) do
     %Subscription{subscription: subscription} = state
 
@@ -160,6 +189,7 @@ defmodule EventStore.Subscriptions.Subscription do
     {:noreply, state}
   end
 
+  @impl GenServer
   def handle_call({:ack, ack, subscriber}, _from, %Subscription{} = state) do
     %Subscription{subscription: subscription} = state
 
@@ -174,6 +204,7 @@ defmodule EventStore.Subscriptions.Subscription do
     {:reply, reply, state}
   end
 
+  @impl GenServer
   def handle_call({:connect, subscriber, opts}, _from, %Subscription{} = state) do
     %Subscription{
       subscription:
@@ -197,6 +228,7 @@ defmodule EventStore.Subscriptions.Subscription do
     end
   end
 
+  @impl GenServer
   def handle_call({:unsubscribe, pid}, _from, %Subscription{} = state) do
     %Subscription{subscription: subscription} = state
 
@@ -212,10 +244,21 @@ defmodule EventStore.Subscriptions.Subscription do
     end
   end
 
+  @impl GenServer
   def handle_call(:last_seen, _from, %Subscription{subscription: subscription} = state) do
     %SubscriptionFsm{data: %SubscriptionState{last_ack: last_seen}} = subscription
 
     {:reply, last_seen, state}
+  end
+
+  @impl GenServer
+  def terminate(_reason, state) do
+    %Subscription{subscription: subscription} = state
+
+    # Checkpoint subscription if needed before terminating
+    SubscriptionFsm.checkpoint(subscription)
+
+    state
   end
 
   defp apply_subscription_to_state(%SubscriptionFsm{} = subscription, %Subscription{} = state) do

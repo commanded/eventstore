@@ -11,15 +11,12 @@ defmodule EventStore.Notifications.NotificationsReconnectTest do
 
       shutdown_postgrex_notifications_connection(TestEventStore.Postgrex.Notifications)
 
-      assert {:eventually, ref} =
-               Postgrex.Notifications.listen(TestEventStore.Postgrex.Notifications, "channel")
-
-      assert is_reference(ref)
-
       # Wait for notifications to reconnect
       Wait.until(fn ->
-        assert {:ok, _ref} =
+        assert {:ok, ref} =
                  Postgrex.Notifications.listen(TestEventStore.Postgrex.Notifications, "channel")
+
+        assert is_reference(ref)
       end)
 
       :ok = append_events(stream_uuid, 3)
