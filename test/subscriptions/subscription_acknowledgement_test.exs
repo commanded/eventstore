@@ -60,7 +60,7 @@ defmodule EventStore.Subscriptions.SubscriptionAcknowledgementTest do
 
     test "should checkpoint after inactivity", %{conn: conn} do
       {:ok, subscription} =
-        subscribe_to_all_streams(buffer_size: 3, checkpoint_after: 10, checkpoint_threshold: 100)
+        subscribe_to_all_streams(buffer_size: 3, checkpoint_after: 25, checkpoint_threshold: 100)
 
       :ok = append_to_stream("stream1", 3)
       :ok = receive_and_ack(subscription, "stream1", [1, 2, 3])
