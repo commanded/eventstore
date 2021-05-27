@@ -5,6 +5,10 @@
 - Improve performance of appending events under normal and degraded network conditions ([#230](https://github.com/commanded/eventstore/pull/230)).
 - Subscription checkpoint tuning ([#237](https://github.com/commanded/eventstore/pull/237)).
 
+## Bug fixes
+
+- Fix bug with catch-up all streams subscription where the checkpoint is not committed for hard deleted streams ([#238](https://github.com/commanded/eventstore/pull/238)).
+
 ## v1.2.3
 
 - Add `:configure` to postgrex connection options ([#233](https://github.com/commanded/eventstore/pull/233)).
