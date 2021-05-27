@@ -36,7 +36,7 @@ defmodule EventStore.Tasks.Migrate do
       with :ok <- acquire_migration_lock(lock_conn, schema) do
         migrations = available_migrations(config, schema)
 
-        migrate(config, opts, migrations)
+        migrate(config, schema, opts, migrations)
       else
         {:error, :lock_already_taken} ->
           write_info("EventStore database migration already in progress.", opts)
@@ -73,19 +73,21 @@ defmodule EventStore.Tasks.Migrate do
     end
   end
 
-  defp migrate(_config, opts, []) do
+  defp migrate(_config, _schema, opts, []) do
     write_info("The EventStore database is already migrated.", opts)
   end
 
-  defp migrate(config, opts, migrations) do
+  defp migrate(config, schema, opts, migrations) do
     for migration <- migrations do
       write_info("Running migration v#{migration}...", opts)
 
       path = Application.app_dir(:eventstore, "priv/event_store/migrations/v#{migration}.sql")
       script = File.read!(path)
 
-      case Database.execute(config, script) do
-        :ok ->
+      statements = ["SET LOCAL search_path TO #{schema}; ", script]
+
+      case transaction(config, statements) do
+        {:ok, :ok} ->
           :ok
 
         {:error, error} ->
@@ -129,6 +131,20 @@ defmodule EventStore.Tasks.Migrate do
     after
       GenServer.stop(conn)
     end
+  end
+
+  defp transaction(config, statements) do
+    opts = Keyword.put(config, :timeout, :infinity)
+
+    {:ok, conn} = Postgrex.start_link(config)
+
+    Postgrex.transaction(
+      conn,
+      fn transaction ->
+        Enum.each(statements, &Postgrex.query!(transaction, &1, [], opts))
+      end,
+      opts
+    )
   end
 
   defp handle_response(%Postgrex.Result{num_rows: 0}), do: []
