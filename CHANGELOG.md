@@ -1,8 +1,8 @@
 # Changelog
 
-## Next release
+## v1.3.1
 
-### Bug fixes
+### Bug fixes
 
 - Support running event store migrations when using a schema ([#239](https://github.com/commanded/eventstore/pull/239)).
 
