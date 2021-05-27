@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## v1.3.0
 
 - Improve performance of appending events under normal and degraded network conditions ([#230](https://github.com/commanded/eventstore/pull/230)).
 - Subscription checkpoint tuning ([#237](https://github.com/commanded/eventstore/pull/237)).

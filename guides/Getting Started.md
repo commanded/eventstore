@@ -6,7 +6,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       ```elixir
       def deps do
-        [{:eventstore, "~> 1.2"}]
+        [{:eventstore, "~> 1.3"}]
       end
       ```
 
