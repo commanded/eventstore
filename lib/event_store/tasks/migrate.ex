@@ -5,9 +5,7 @@ defmodule EventStore.Tasks.Migrate do
 
   import EventStore.Tasks.Output
 
-  alias EventStore.Storage
-  alias EventStore.Config
-  alias EventStore.Storage.Database
+  alias EventStore.{Config, Storage}
   alias EventStore.Tasks.Migrations
 
   @dialyzer {:no_return, exec: 2, handle_response: 1}
@@ -30,13 +28,27 @@ defmodule EventStore.Tasks.Migrate do
     schema = Keyword.fetch!(config, :schema)
     config = Config.default_postgrex_opts(config)
 
+    with_migration_lock(config, schema, opts, fn ->
+      {:ok, conn} = Postgrex.start_link(config)
+
+      try do
+        migrations = available_migrations(conn, schema)
+
+        migrate(conn, schema, opts, migrations)
+      after
+        GenServer.stop(conn)
+      end
+    end)
+  end
+
+  # Prevent database migrations from running concurrently by acquiring a
+  # Postgres advisory lock.
+  defp with_migration_lock(config, schema, opts, callback) do
     {:ok, lock_conn} = Postgrex.start_link(config)
 
     try do
       with :ok <- acquire_migration_lock(lock_conn, schema) do
-        migrations = available_migrations(config, schema)
-
-        migrate(config, opts, migrations)
+        callback.()
       else
         {:error, :lock_already_taken} ->
           write_info("EventStore database migration already in progress.", opts)
@@ -53,14 +65,12 @@ defmodule EventStore.Tasks.Migrate do
     end
   end
 
-  # Prevent database migrations from running concurrently by acquiring a
-  # Postgres advisory lock.
   defp acquire_migration_lock(conn, schema) do
     Storage.Lock.try_acquire_exclusive_lock(conn, -1, schema: schema)
   end
 
-  defp available_migrations(config, schema) do
-    case event_store_schema_version(config, schema) do
+  defp available_migrations(conn, schema) do
+    case event_store_schema_version(conn, schema) do
       %Version{} = event_store_version ->
         # Only run newer migrations
         Enum.filter(Migrations.available_migrations(), fn migration_version ->
@@ -73,19 +83,21 @@ defmodule EventStore.Tasks.Migrate do
     end
   end
 
-  defp migrate(_config, opts, []) do
+  defp migrate(_conn, _schema, opts, []) do
     write_info("The EventStore database is already migrated.", opts)
   end
 
-  defp migrate(config, opts, migrations) do
+  defp migrate(conn, schema, opts, migrations) do
     for migration <- migrations do
       write_info("Running migration v#{migration}...", opts)
 
       path = Application.app_dir(:eventstore, "priv/event_store/migrations/v#{migration}.sql")
       script = File.read!(path)
 
-      case Database.execute(config, script) do
-        :ok ->
+      statements = ["SET LOCAL search_path TO #{schema}; ", script]
+
+      case transaction(conn, statements) do
+        {:ok, :ok} ->
           :ok
 
         {:error, error} ->
@@ -100,8 +112,8 @@ defmodule EventStore.Tasks.Migrate do
     write_info("The EventStore database has been migrated.", opts)
   end
 
-  defp event_store_schema_version(config, schema) do
-    config
+  defp event_store_schema_version(conn, schema) do
+    conn
     |> query_schema_migrations(schema)
     |> Enum.sort(fn left, right ->
       case Version.compare(left, right) do
@@ -112,23 +124,28 @@ defmodule EventStore.Tasks.Migrate do
     |> Enum.at(0)
   end
 
-  defp query_schema_migrations(config, schema) do
-    config
-    |> run_query("""
-      SELECT major_version, minor_version, patch_version
-      FROM #{schema}.schema_migrations
-    """)
+  defp query_schema_migrations(conn, schema) do
+    Postgrex.query!(
+      conn,
+      """
+        SELECT major_version, minor_version, patch_version
+        FROM #{schema}.schema_migrations
+      """,
+      []
+    )
     |> handle_response()
   end
 
-  defp run_query(config, query) do
-    {:ok, conn} = Postgrex.start_link(config)
+  defp transaction(conn, statements) do
+    opts = [timeout: :infinity]
 
-    try do
-      Postgrex.query!(conn, query, [])
-    after
-      GenServer.stop(conn)
-    end
+    Postgrex.transaction(
+      conn,
+      fn transaction ->
+        Enum.each(statements, &Postgrex.query!(transaction, &1, [], opts))
+      end,
+      opts
+    )
   end
 
   defp handle_response(%Postgrex.Result{num_rows: 0}), do: []

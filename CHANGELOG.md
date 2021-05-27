@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Bug fixes
+
+- Support running event store migrations when using a schema ([#239](https://github.com/commanded/eventstore/pull/239)).
+
 ## v1.3.0
 
 - Improve performance of appending events under normal and degraded network conditions ([#230](https://github.com/commanded/eventstore/pull/230)).
