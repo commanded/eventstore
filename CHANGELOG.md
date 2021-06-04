@@ -15,6 +15,12 @@
 
 - Fix bug with catch-up all streams subscription where the checkpoint is not committed for hard deleted streams ([#238](https://github.com/commanded/eventstore/pull/238)).
 
+### Upgrading
+
+This release requires a database migration to be run. Please read the [Upgrading an EventStore](https://hexdocs.pm/eventstore/upgrades.html) guide for details on how to migrate an existing database.
+
+---
+
 ## v1.2.3
 
 - Add `:configure` to postgrex connection options ([#233](https://github.com/commanded/eventstore/pull/233)).
