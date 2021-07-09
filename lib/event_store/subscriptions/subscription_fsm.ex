@@ -18,6 +18,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         subscription_name: subscription_name,
         registry: Keyword.fetch!(opts, :registry),
         serializer: Keyword.fetch!(opts, :serializer),
+        metadata_serializer: Keyword.fetch!(opts, :metadata_serializer),
         start_from: opts[:start_from] || 0,
         mapper: opts[:mapper],
         selector: opts[:selector],
@@ -402,12 +403,16 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     %SubscriptionState{
       conn: conn,
       serializer: serializer,
+      metadata_serializer: metadata_serializer,
       stream_uuid: stream_uuid,
       last_sent: last_sent,
       max_size: max_size
     } = data
 
-    Stream.read_stream_forward(conn, stream_uuid, last_sent + 1, max_size, serializer: serializer)
+    Stream.read_stream_forward(conn, stream_uuid, last_sent + 1, max_size,
+      serializer: serializer,
+      metadata_serializer: metadata_serializer
+    )
   end
 
   defp enqueue_events(%SubscriptionState{} = data, []), do: data

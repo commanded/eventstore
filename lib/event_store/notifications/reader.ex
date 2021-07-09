@@ -9,13 +9,14 @@ defmodule EventStore.Notifications.Reader do
   alias EventStore.Storage
 
   defmodule State do
-    defstruct [:conn, :serializer, :subscribe_to]
+    defstruct [:conn, :serializer, :metadata_serializer, :subscribe_to]
   end
 
   def start_link(opts \\ []) do
     state = %State{
       conn: Keyword.fetch!(opts, :conn),
       serializer: Keyword.fetch!(opts, :serializer),
+      metadata_serializer: Keyword.fetch!(opts, :metadata_serializer),
       subscribe_to: Keyword.fetch!(opts, :subscribe_to)
     }
 
@@ -45,18 +46,19 @@ defmodule EventStore.Notifications.Reader do
 
   defp read_events(event, %State{} = state) do
     {stream_uuid, stream_id, from_stream_version, to_stream_version} = event
-    %State{conn: conn, serializer: serializer} = state
+    %State{conn: conn, serializer: serializer, metadata_serializer: metadata_serializer} = state
 
     count = to_stream_version - from_stream_version + 1
 
     with {:ok, events} <-
            Storage.read_stream_forward(conn, stream_id, from_stream_version, count),
-         deserialized_events <- deserialize_recorded_events(events, serializer) do
+         deserialized_events <-
+           deserialize_recorded_events(events, serializer, metadata_serializer) do
       {stream_uuid, deserialized_events}
     end
   end
 
-  defp deserialize_recorded_events(recorded_events, serializer) do
-    Enum.map(recorded_events, &RecordedEvent.deserialize(&1, serializer))
+  defp deserialize_recorded_events(recorded_events, serializer, metadata_serializer) do
+    Enum.map(recorded_events, &RecordedEvent.deserialize(&1, serializer, metadata_serializer))
   end
 end

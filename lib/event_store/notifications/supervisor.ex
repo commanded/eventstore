@@ -15,7 +15,7 @@ defmodule EventStore.Notifications.Supervisor do
   alias EventStore.MonitoredServer
   alias EventStore.Notifications.{Listener, Reader, Broadcaster}
 
-  def child_spec({name, _registry, _serializer, _config} = init_arg) do
+  def child_spec({name, _registry, _serializer, _metadata_serializer, _config} = init_arg) do
     %{id: Module.concat(name, __MODULE__), start: {__MODULE__, :start_link, [init_arg]}}
   end
 
@@ -24,7 +24,7 @@ defmodule EventStore.Notifications.Supervisor do
   end
 
   @impl Supervisor
-  def init({event_store, registry, serializer, config}) do
+  def init({event_store, registry, serializer, metadata_serializer, config}) do
     schema = Keyword.fetch!(config, :schema)
 
     postgrex_config = Config.sync_connect_postgrex_opts(config)
@@ -52,6 +52,7 @@ defmodule EventStore.Notifications.Supervisor do
         {Reader,
          conn: postgrex_reader_name,
          serializer: serializer,
+         metadata_serializer: metadata_serializer,
          subscribe_to: listener_name,
          name: reader_name},
         {Broadcaster,

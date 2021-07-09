@@ -6,6 +6,7 @@ defmodule EventStore.Subscriptions.SubscriptionState do
     :event_store,
     :registry,
     :serializer,
+    :metadata_serializer,
     :stream_uuid,
     :start_from,
     :subscription_name,

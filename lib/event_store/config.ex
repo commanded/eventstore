@@ -57,6 +57,19 @@ defmodule EventStore.Config do
     end
   end
 
+  def metadata_column_data_type(event_store, config) do
+    case Keyword.get(config, :metadata_column_data_type, column_data_type(event_store, config)) do
+      valid when valid in ["bytea", "jsonb"] ->
+        valid
+
+      invalid ->
+        raise ArgumentError,
+              inspect(event_store) <>
+                " `:column_data_type` expects either \"bytea\" or \"jsonb\" but got: " <>
+                inspect(invalid)
+    end
+  end
+
   @postgrex_connection_opts [
     :username,
     :password,

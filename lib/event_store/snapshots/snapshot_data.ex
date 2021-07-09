@@ -16,23 +16,23 @@ defmodule EventStore.Snapshots.SnapshotData do
           created_at: DateTime.t()
         }
 
-  def serialize(%SnapshotData{} = snapshot, serializer) do
+  def serialize(%SnapshotData{} = snapshot, serializer, metadata_serializer) do
     %SnapshotData{data: data, metadata: metadata} = snapshot
 
     %SnapshotData{
       snapshot
       | data: serializer.serialize(data),
-        metadata: serializer.serialize(metadata)
+        metadata: metadata_serializer.serialize(metadata)
     }
   end
 
-  def deserialize(%SnapshotData{} = snapshot, serializer) do
+  def deserialize(%SnapshotData{} = snapshot, serializer, metadata_serializer) do
     %SnapshotData{source_type: source_type, data: data, metadata: metadata} = snapshot
 
     %SnapshotData{
       snapshot
       | data: serializer.deserialize(data, type: source_type),
-        metadata: serializer.deserialize(metadata, [])
+        metadata: metadata_serializer.deserialize(metadata, [])
     }
   end
 end

@@ -9,15 +9,17 @@ defmodule EventStore.Streams.Stream do
 
   def append_to_stream(conn, stream_uuid, expected_version, events, opts \\ []) do
     {serializer, opts} = Keyword.pop(opts, :serializer)
+    {metadata_serializer, opts} = Keyword.pop(opts, :metadata_serializer)
 
     with {:ok, stream} <- stream_info(conn, stream_uuid, opts),
          {:ok, stream} <- prepare_stream(conn, expected_version, stream, opts) do
-      do_append_to_storage(conn, events, stream, serializer, opts)
+      do_append_to_storage(conn, events, stream, serializer, metadata_serializer, opts)
     end
   end
 
   def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts \\ []) do
     {_serializer, opts} = Keyword.pop(opts, :serializer)
+    {_metadata_serializer, opts} = Keyword.pop(opts, :metadata_serializer)
 
     with {:ok, stream} <- stream_info(conn, stream_uuid, opts),
          {:ok, stream} <- prepare_stream(conn, expected_version, stream, opts) do
@@ -139,17 +141,24 @@ defmodule EventStore.Streams.Stream do
   defp prepare_stream(_conn, _expected_version, _state, _opts),
     do: {:error, :wrong_expected_version}
 
-  defp do_append_to_storage(conn, events, %Stream{} = stream, serializer, opts) do
-    prepared_events = prepare_events(events, stream, serializer)
+  defp do_append_to_storage(
+         conn,
+         events,
+         %Stream{} = stream,
+         serializer,
+         metadata_serializer,
+         opts
+       ) do
+    prepared_events = prepare_events(events, stream, serializer, metadata_serializer)
 
     write_to_stream(conn, prepared_events, stream, opts)
   end
 
-  defp prepare_events(events, %Stream{} = stream, serializer) do
+  defp prepare_events(events, %Stream{} = stream, serializer, metadata_serializer) do
     %Stream{stream_uuid: stream_uuid, stream_version: stream_version} = stream
 
     events
-    |> Enum.map(&map_to_recorded_event(&1, utc_now(), serializer))
+    |> Enum.map(&map_to_recorded_event(&1, utc_now(), serializer, metadata_serializer))
     |> Enum.with_index(1)
     |> Enum.map(fn {recorded_event, index} ->
       %RecordedEvent{
@@ -166,13 +175,19 @@ defmodule EventStore.Streams.Stream do
            event_type: nil
          } = event,
          created_at,
-         serializer
+         serializer,
+         metadata_serializer
        ) do
     %{event | event_type: Atom.to_string(event_type)}
-    |> map_to_recorded_event(created_at, serializer)
+    |> map_to_recorded_event(created_at, serializer, metadata_serializer)
   end
 
-  defp map_to_recorded_event(%EventData{} = event_data, created_at, serializer) do
+  defp map_to_recorded_event(
+         %EventData{} = event_data,
+         created_at,
+         serializer,
+         metadata_serializer
+       ) do
     %EventData{
       causation_id: causation_id,
       correlation_id: correlation_id,
@@ -187,7 +202,7 @@ defmodule EventStore.Streams.Stream do
       correlation_id: correlation_id,
       event_type: event_type,
       data: serializer.serialize(data),
-      metadata: serializer.serialize(metadata),
+      metadata: metadata_serializer.serialize(metadata),
       created_at: created_at
     }
   end
@@ -220,10 +235,12 @@ defmodule EventStore.Streams.Stream do
 
   defp read_storage_forward(conn, stream_id, start_version, count, opts) do
     {serializer, opts} = Keyword.pop(opts, :serializer)
+    {metadata_serializer, opts} = Keyword.pop(opts, :metadata_serializer)
 
     case Storage.read_stream_forward(conn, stream_id, start_version, count, opts) do
       {:ok, recorded_events} ->
-        deserialized_events = deserialize_recorded_events(recorded_events, serializer)
+        deserialized_events =
+          deserialize_recorded_events(recorded_events, serializer, metadata_serializer)
 
         {:ok, deserialized_events}
 
@@ -254,8 +271,8 @@ defmodule EventStore.Streams.Stream do
     )
   end
 
-  defp deserialize_recorded_events(recorded_events, serializer),
-    do: Enum.map(recorded_events, &RecordedEvent.deserialize(&1, serializer))
+  defp deserialize_recorded_events(recorded_events, serializer, metadata_serializer),
+    do: Enum.map(recorded_events, &RecordedEvent.deserialize(&1, serializer, metadata_serializer))
 
   defp query_opts(opts), do: Keyword.take(opts, [:timeout])
 end

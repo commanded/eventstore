@@ -24,6 +24,7 @@ defmodule EventStore do
 
       config :my_app, MyApp.EventStore,
         serializer: EventStore.JsonSerializer,
+        metadata_serializer: EventStore.JsonSerializer,
         username: "postgres",
         password: "postgres",
         database: "eventstore",
@@ -188,12 +189,14 @@ defmodule EventStore do
       {otp_app, config} = EventStore.Supervisor.compile_config(__MODULE__, opts)
 
       serializer = Serializer.serializer(__MODULE__, config)
+      metadata_serializer = Serializer.metadata_serializer(__MODULE__, config)
       registry = Registration.registry(__MODULE__, config)
       subscription_retry_interval = Subscriptions.retry_interval(__MODULE__, config)
 
       @otp_app otp_app
       @config config
       @serializer serializer
+      @metadata_serializer metadata_serializer
       @registry registry
       @subscription_retry_interval subscription_retry_interval
 
@@ -223,7 +226,15 @@ defmodule EventStore do
         opts = Keyword.merge(unquote(opts), opts)
         name = name(opts)
 
-        EventStore.Supervisor.start_link(__MODULE__, @otp_app, @serializer, @registry, name, opts)
+        EventStore.Supervisor.start_link(
+          __MODULE__,
+          @otp_app,
+          @serializer,
+          @metadata_serializer,
+          @registry,
+          name,
+          opts
+        )
       end
 
       def stop(supervisor, timeout \\ 5000) do
@@ -321,6 +332,7 @@ defmodule EventStore do
               event_store: name,
               registry: @registry,
               serializer: @serializer,
+              metadata_serializer: @metadata_serializer,
               retry_interval: @subscription_retry_interval,
               stream_uuid: stream_uuid,
               subscription_name: subscription_name,
@@ -366,13 +378,13 @@ defmodule EventStore do
       def read_snapshot(source_uuid, opts \\ []) do
         {conn, opts} = opts(opts)
 
-        Snapshotter.read_snapshot(conn, source_uuid, @serializer, opts)
+        Snapshotter.read_snapshot(conn, source_uuid, @serializer, @metadata_serializer, opts)
       end
 
       def record_snapshot(%SnapshotData{} = snapshot, opts \\ []) do
         {conn, opts} = opts(opts)
 
-        Snapshotter.record_snapshot(conn, snapshot, @serializer, opts)
+        Snapshotter.record_snapshot(conn, snapshot, @serializer, @metadata_serializer, opts)
       end
 
       def delete_snapshot(source_uuid, opts \\ []) do
@@ -387,7 +399,8 @@ defmodule EventStore do
 
         timeout = timeout(opts)
 
-        {conn, [timeout: timeout, serializer: @serializer]}
+        {conn,
+         [timeout: timeout, serializer: @serializer, metadata_serializer: @metadata_serializer]}
       end
 
       defp name(opts) do
