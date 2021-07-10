@@ -85,6 +85,7 @@ defmodule EventStore.MigrateEventStoreTest do
       "0\t17\t0\tNOW" -> true
       "1\t1\t0\tNOW" -> true
       "1\t2\t0\tNOW" -> true
+      "1\t3\t0\tNOW" -> true
       _line -> false
     end)
   end

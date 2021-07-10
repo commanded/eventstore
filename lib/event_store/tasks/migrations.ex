@@ -18,7 +18,8 @@ defmodule EventStore.Tasks.Migrations do
     "0.17.0",
     "1.1.0",
     "1.2.0",
-    "1.3.0"
+    "1.3.0",
+    "1.3.2"
   ]
 
   @dialyzer {:no_return, exec: 2, handle_response: 1}
