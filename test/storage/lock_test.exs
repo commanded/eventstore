@@ -41,5 +41,5 @@ defmodule EventStore.Storage.LockTest do
     ProcessHelper.shutdown(conn2)
   end
 
-  def random_key, do: :random.uniform(2_147_483_647)
+  def random_key, do: :rand.uniform(2_147_483_647)
 end

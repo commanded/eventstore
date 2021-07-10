@@ -1,35 +1,35 @@
 defmodule EventStore.EExIOListEngine do
+  @moduledoc false
   @behaviour EEx.Engine
 
-  @impl true
   def init(_opts) do
     %{iodata: [], dynamic: [], vars_count: 0}
   end
 
-  @impl true
   def handle_begin(state) do
     %{state | iodata: [], dynamic: []}
   end
 
-  @impl true
   def handle_end(quoted) do
     handle_body(quoted)
   end
 
-  @impl true
   def handle_body(state) do
     %{iodata: iodata, dynamic: dynamic} = state
     iodata = Enum.reverse(iodata)
     {:__block__, [], Enum.reverse([iodata | dynamic])}
   end
 
-  @impl true
+  # Required for Elixir versions older than v1.12.0
   def handle_text(state, text) do
+    handle_text(state, [], text)
+  end
+
+  def handle_text(state, _meta, text) do
     %{iodata: iodata} = state
     %{state | iodata: [text | iodata]}
   end
 
-  @impl true
   def handle_expr(state, "=", ast) do
     %{iodata: iodata, dynamic: dynamic, vars_count: vars_count} = state
 
