@@ -111,18 +111,15 @@ defmodule EventStore.Storage.Subscription do
 
         {:error, %Postgrex.Error{postgres: %{code: :unique_violation}}} ->
           Logger.debug(
-            "Failed to create subscription on stream \"#{stream_uuid}\" named \"#{
-              subscription_name
-            }\", already exists"
+            "Failed to create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\", already exists"
           )
 
           {:error, :subscription_already_exists}
 
         {:error, error} = reply ->
           Logger.warn(
-            "Failed to create stream create subscription on stream \"#{stream_uuid}\" named \"#{
-              subscription_name
-            }\" due to: " <> inspect(error)
+            "Failed to create stream create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: " <>
+              inspect(error)
           )
 
           reply
@@ -144,9 +141,8 @@ defmodule EventStore.Storage.Subscription do
 
         {:error, error} = reply ->
           Logger.warn(
-            "Failed to ack last seen event on stream \"#{stream_uuid}\" named \"#{
-              subscription_name
-            }\" due to: " <> inspect(error)
+            "Failed to ack last seen event on stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: " <>
+              inspect(error)
           )
 
           reply
@@ -159,9 +155,7 @@ defmodule EventStore.Storage.Subscription do
 
     def execute(conn, stream_uuid, subscription_name, opts) do
       Logger.debug(
-        "Attempting to delete subscription on stream \"#{stream_uuid}\" named \"#{
-          subscription_name
-        }\""
+        "Attempting to delete subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\""
       )
 
       {schema, opts} = Keyword.pop(opts, :schema)
@@ -178,9 +172,8 @@ defmodule EventStore.Storage.Subscription do
 
         {:error, error} = reply ->
           Logger.warn(
-            "Failed to delete subscription to stream \"#{stream_uuid}\" named \"#{
-              subscription_name
-            }\" due to: " <> inspect(error)
+            "Failed to delete subscription to stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: " <>
+              inspect(error)
           )
 
           reply
