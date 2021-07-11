@@ -155,6 +155,7 @@ defmodule EventStore.Mixfile do
 
   defp dialyzer do
     [
+      ignore_warnings: ".dialyzer_ignore.exs",
       plt_add_apps: [:ex_unit, :jason, :mix],
       plt_add_deps: :app_tree,
       plt_file: {:no_warn, "priv/plts/eventstore.plt"}
