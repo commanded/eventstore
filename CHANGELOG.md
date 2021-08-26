@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Bug fixes
+
+- Fix bug with subscriptions trigger in older Postgres versions ([#241](https://github.com/commanded/eventstore/pull/241)).
+
 ## v1.3.1
 
 ### Bug fixes
