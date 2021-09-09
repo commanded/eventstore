@@ -10,6 +10,10 @@
 
 - Fix bug with subscriptions trigger in older Postgres versions ([#241](https://github.com/commanded/eventstore/pull/241)).
 
+### Upgrading
+
+This release includes a database migration to be run. Please read the [Upgrading an EventStore](https://hexdocs.pm/eventstore/upgrades.html) guide for details on how to migrate an existing database.
+
 ## v1.3.1
 
 ### Bug fixes
