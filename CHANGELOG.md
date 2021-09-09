@@ -2,6 +2,10 @@
 
 ## Next release
 
+### Enhancements
+
+- Add postgrex `socket_options` option ([#242](https://github.com/commanded/eventstore/pull/242)).
+
 ### Bug fixes
 
 - Fix bug with subscriptions trigger in older Postgres versions ([#241](https://github.com/commanded/eventstore/pull/241)).
