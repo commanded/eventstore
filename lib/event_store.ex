@@ -529,7 +529,7 @@ defmodule EventStore do
     end
   end
 
-  alias EventStore.EventData
+  alias EventStore.{Config, EventData}
   alias EventStore.Snapshots.SnapshotData
 
   ## User callbacks
@@ -1299,4 +1299,13 @@ defmodule EventStore do
   """
   @callback delete_snapshot(source_uuid :: String.t(), opts :: options) ::
               :ok | {:error, reason :: term}
+
+  @doc """
+  Returns all running EventStore instances.
+
+  Note that order is not guaranteed.
+  """
+  def all_instances do
+    for {event_store, _config} <- Config.all(), Process.whereis(event_store), do: event_store
+  end
 end

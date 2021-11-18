@@ -33,6 +33,9 @@ defmodule EventStore.Config do
   defdelegate parse(config), to: EventStore.Config.Parser
 
   @doc false
+  defdelegate all, to: EventStore.Config.Store
+
+  @doc false
   defdelegate associate(event_store, pid, config), to: EventStore.Config.Store
 
   @doc false

@@ -47,6 +47,13 @@ defmodule EventStore.RuntimeConfigTest do
           fn -> Config.lookup(TestEventStore) end
         )
       end)
+
+      assert EventStore.all_instances() == [:test_event_store]
+    end
+
+    test "should list all running instances" do
+      all_instances = EventStore.all_instances() |> Enum.sort()
+      assert all_instances == [TestEventStore, :test_event_store]
     end
 
     # EventStore has no compile-time configuration

@@ -14,6 +14,14 @@ defmodule EventStore.Config.Store do
   end
 
   @doc """
+  Get the configuration associated with all running event store instances.
+  """
+  def all do
+    :ets.tab2list(__MODULE__)
+    |> Enum.map(fn {event_store, _pid, _ref, config} -> {event_store, config} end)
+  end
+
+  @doc """
   Get the configuration associated with the given event store.
   """
   def get(event_store) when is_atom(event_store), do: lookup(event_store)
