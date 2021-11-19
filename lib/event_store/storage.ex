@@ -5,9 +5,9 @@ defmodule EventStore.Storage do
     Appender,
     CreateStream,
     DeleteStream,
-    QueryStreamInfo,
     Reader,
     Snapshot,
+    Stream,
     Subscription
   }
 
@@ -43,9 +43,14 @@ defmodule EventStore.Storage do
     as: :read_backward
 
   @doc """
+  Get a `StreamInfo` struct for the stream identified by the `stream_uuid`.
+  """
+  defdelegate stream_info(conn, stream_uuid, opts), to: Stream
+
+  @doc """
   Get the id and version of the stream with the given `stream_uuid`.
   """
-  defdelegate stream_info(conn, stream_uuid, opts), to: QueryStreamInfo, as: :execute
+  defdelegate paginate_streams(conn, opts), to: Stream
 
   @doc """
   Soft delete a stream by marking it as deleted.

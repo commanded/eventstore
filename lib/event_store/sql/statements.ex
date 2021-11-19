@@ -9,6 +9,7 @@ defmodule EventStore.Sql.Statements do
   defdelegate reset(config), to: Reset, as: :statements
 
   for {fun, args} <- [
+        {:count_streams, [:schema]},
         {:create_stream, [:schema]},
         {:insert_events, [:schema, :stream_id, :number_of_events]},
         {:insert_events_any_version, [:schema, :stream_id, :number_of_events]},
@@ -23,11 +24,12 @@ defmodule EventStore.Sql.Statements do
         {:insert_snapshot, [:schema]},
         {:delete_snapshot, [:schema]},
         {:query_all_subscriptions, [:schema]},
-        {:query_subscription, [:schema]},
-        {:query_stream_info, [:schema]},
         {:query_snapshot, [:schema]},
+        {:query_stream_info, [:schema]},
         {:query_stream_events_backward, [:schema]},
-        {:query_stream_events_forward, [:schema]}
+        {:query_stream_events_forward, [:schema]},
+        {:query_streams, [:schema, :sort_by, :sort_dir]},
+        {:query_subscription, [:schema]}
       ] do
     file = Path.expand("statements/#{fun}.sql.eex", __DIR__)
 

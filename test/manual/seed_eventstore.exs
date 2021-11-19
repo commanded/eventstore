@@ -22,17 +22,20 @@ defmodule Seed do
   alias EventStore.EventData
   alias EventStore.Snapshots.SnapshotData
 
-  def run do
-    append_events()
-    link_events()
-    record_snapshots()
+  def run(opts \\ []) do
+    append_events(opts)
+    link_events(opts)
+    record_snapshots(opts)
     subscribe_to_streams()
   end
 
-  defp append_events do
-    for stream_index <- 1..10 do
+  defp append_events(opts) do
+    stream_count = Keyword.get(opts, :stream_count, 10)
+    event_count = Keyword.get(opts, :event_count, 10)
+
+    for stream_index <- 1..stream_count do
       events =
-        for event_number <- 1..10 do
+        for event_number <- 1..event_count do
           %EventData{
             correlation_id: UUID.uuid4(),
             causation_id: UUID.uuid4(),
@@ -46,16 +49,20 @@ defmodule Seed do
     end
   end
 
-  defp link_events do
-    for i <- 1..10 do
-      {:ok, events} = TestEventStore.read_stream_forward("stream-#{i}", 0, 1)
+  defp link_events(opts) do
+    stream_count = Keyword.get(opts, :stream_count, 10)
 
-      :ok = TestEventStore.link_to_stream("linked-stream", i - 1, events)
+    for stream_index <- 1..stream_count do
+      {:ok, events} = TestEventStore.read_stream_forward("stream-#{stream_index}", 0, 1)
+
+      :ok = TestEventStore.link_to_stream("linked-stream", stream_index - 1, events)
     end
   end
 
-  defp record_snapshots do
-    for i <- 1..10 do
+  defp record_snapshots(opts) do
+    snapshot_count = Keyword.get(opts, :snapshot_count, 10)
+
+    for i <- 1..snapshot_count do
       snapshot = %SnapshotData{
         source_uuid: "snapshot-#{i}",
         source_version: 1,
@@ -92,4 +99,5 @@ end
 
 {:ok, _pid} = TestEventStore.start_link()
 
+# Seed.run(stream_count: 1_000, event_count: 100, snapshot_count: 1_000)
 Seed.run()

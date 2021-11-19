@@ -41,27 +41,6 @@ defmodule EventStore.Streams.Stream do
     |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
   end
 
-  defp maybe_retry_once(
-         {:error, :duplicate_stream_uuid},
-         conn,
-         stream_uuid,
-         expected_version,
-         events,
-         opts
-       ) do
-    unless Keyword.has_key?(opts, :retried_once) do
-      opts = Keyword.put(opts, :retried_once, true)
-
-      append_to_stream(conn, stream_uuid, expected_version, events, opts)
-    else
-      # We should never get here, but just in case we break something in another
-      # part of the app, this will give us better output in the tests.
-      {:error, :already_retried_once}
-    end
-  end
-
-  defp maybe_retry_once(error, _conn, _stream_uuid, _expected_version, _events, _opts), do: error
-
   def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts) do
     transaction(
       conn,
@@ -77,6 +56,8 @@ defmodule EventStore.Streams.Stream do
       opts
     )
   end
+
+  def paginate_streams(conn, opts), do: Storage.paginate_streams(conn, opts)
 
   def read_stream_forward(conn, stream_uuid, start_version, count, opts) do
     with {:ok, stream} <- stream_info(conn, stream_uuid, :stream_exists, opts) do
@@ -114,8 +95,9 @@ defmodule EventStore.Streams.Stream do
     do: {:error, :invalid_start_from}
 
   def stream_version(conn, stream_uuid, opts) do
-    with {:ok, %StreamInfo{stream_version: stream_version}} <-
-           stream_info(conn, stream_uuid, :any_version, opts) do
+    with {:ok, stream} <- stream_info(conn, stream_uuid, :any_version, opts) do
+      %StreamInfo{stream_version: stream_version} = stream
+
       {:ok, stream_version}
     end
   end
@@ -135,7 +117,10 @@ defmodule EventStore.Streams.Stream do
   defp stream_info(conn, stream_uuid, expected_version, opts) do
     opts = query_opts(opts)
 
-    StreamInfo.read(conn, stream_uuid, expected_version, opts)
+    with {:ok, stream_info} <- Storage.stream_info(conn, stream_uuid, opts),
+         :ok <- StreamInfo.validate_expected_version(stream_info, expected_version) do
+      {:ok, stream_info}
+    end
   end
 
   # Create stream when it doesn't yet exist.
@@ -345,6 +330,27 @@ defmodule EventStore.Streams.Stream do
       :ok
     end
   end
+
+  defp maybe_retry_once(
+         {:error, :duplicate_stream_uuid},
+         conn,
+         stream_uuid,
+         expected_version,
+         events,
+         opts
+       ) do
+    unless Keyword.has_key?(opts, :retried_once) do
+      opts = Keyword.put(opts, :retried_once, true)
+
+      append_to_stream(conn, stream_uuid, expected_version, events, opts)
+    else
+      # We should never get here, but just in case we break something in another
+      # part of the app, this will give us better output in the tests.
+      {:error, :already_retried_once}
+    end
+  end
+
+  defp maybe_retry_once(error, _conn, _stream_uuid, _expected_version, _events, _opts), do: error
 
   defp transaction(conn, transaction_fun, opts) do
     case Postgrex.transaction(conn, transaction_fun, opts) do
