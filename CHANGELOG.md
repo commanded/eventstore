@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+-  List running event store instances ([#244](https://github.com/commanded/eventstore/pull/244)).
+
 ## v1.3.2
 
 ### Enhancements
