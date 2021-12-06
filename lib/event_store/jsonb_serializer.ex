@@ -30,9 +30,11 @@ defmodule EventStore.JsonbSerializer do
     struct(type, keys_to_atoms(term))
   end
 
+  defp keys_to_atoms(list) when is_list(list), do: list |> Enum.map(&keys_to_atoms/1)
+
   defp keys_to_atoms(map) when is_map(map) do
     for {key, value} <- map, into: %{} do
-      {String.to_existing_atom(key), keys_to_atoms(value)}
+      {String.to_atom(key), keys_to_atoms(value)}
     end
   end
 
