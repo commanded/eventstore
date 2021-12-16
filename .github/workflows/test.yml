@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         otp: ['23.3']
-        elixir: ['1.12.2']
+        elixir: ['1.13.1']
 
     services:
       postgres:
