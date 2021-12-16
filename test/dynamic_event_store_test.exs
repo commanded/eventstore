@@ -13,13 +13,19 @@ defmodule EventStore.DynamicEventStoreTest do
 
     test "should list all running instances" do
       all_instances = EventStore.all_instances() |> Enum.sort()
-      assert all_instances == [TestEventStore, :eventstore1, :eventstore2, :schema_eventstore]
+
+      assert all_instances == [
+               TestEventStore,
+               {TestEventStore, :eventstore1},
+               {TestEventStore, :eventstore2},
+               {TestEventStore, :schema_eventstore}
+             ]
 
       stop_supervised!(:eventstore1)
       stop_supervised!(:eventstore2)
 
       all_instances = EventStore.all_instances() |> Enum.sort()
-      assert all_instances == [TestEventStore, :schema_eventstore]
+      assert all_instances == [TestEventStore, {TestEventStore, :schema_eventstore}]
     end
 
     test "should ensure name is an atom" do
