@@ -33,13 +33,16 @@ defmodule EventStore.Config do
   defdelegate parse(config), to: EventStore.Config.Parser
 
   @doc false
-  defdelegate associate(event_store, pid, config), to: EventStore.Config.Store
+  defdelegate all, to: EventStore.Config.Store
 
   @doc false
-  defdelegate lookup(event_store), to: EventStore.Config.Store, as: :get
+  defdelegate associate(name, pid, event_store, config), to: EventStore.Config.Store
 
   @doc false
-  defdelegate lookup(event_store, setting), to: EventStore.Config.Store, as: :get
+  defdelegate lookup(name), to: EventStore.Config.Store, as: :get
+
+  @doc false
+  defdelegate lookup(name, setting), to: EventStore.Config.Store, as: :get
 
   @doc """
   Get the data type used to store event data and metadata.

@@ -89,7 +89,7 @@ defmodule EventStore.Supervisor do
             {Notifications.Supervisor, {name, config}}
           ] ++ PubSub.child_spec(name)
 
-        :ok = Config.associate(name, self(), config)
+        :ok = Config.associate(name, self(), event_store, config)
 
         Supervisor.init(children, strategy: :one_for_all)
 

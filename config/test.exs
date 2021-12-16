@@ -3,7 +3,7 @@ use Mix.Config
 config :logger, backends: []
 
 config :ex_unit,
-  capture_log: true,
+  capture_log: [level: :warn],
   assert_receive_timeout: 2_000,
   refute_receive_timeout: 100
 

@@ -9,20 +9,29 @@ defmodule EventStore.Config.Store do
     GenServer.start_link(__MODULE__, init_arg, name: __MODULE__)
   end
 
-  def associate(event_store, pid, config) when is_atom(event_store) and is_pid(pid) do
-    GenServer.call(__MODULE__, {:associate, event_store, pid, config})
+  def associate(name, pid, event_store, config)
+      when is_atom(name) and is_pid(pid) and is_atom(event_store) do
+    GenServer.call(__MODULE__, {:associate, name, pid, event_store, config})
+  end
+
+  @doc """
+  Get the configuration associated with all running event store instances.
+  """
+  def all do
+    :ets.tab2list(__MODULE__)
+    |> Enum.map(fn {name, _pid, _ref, event_store, _config} -> {event_store, name} end)
   end
 
   @doc """
   Get the configuration associated with the given event store.
   """
-  def get(event_store) when is_atom(event_store), do: lookup(event_store)
+  def get(name) when is_atom(name), do: lookup(name)
 
   @doc """
   Get the value of the config setting for the given event store.
   """
-  def get(event_store, setting) when is_atom(event_store) and is_atom(setting) do
-    event_store |> lookup() |> Keyword.get(setting)
+  def get(name, setting) when is_atom(name) and is_atom(setting) do
+    lookup(name) |> Keyword.get(setting)
   end
 
   @impl GenServer
@@ -33,26 +42,26 @@ defmodule EventStore.Config.Store do
   end
 
   @impl GenServer
-  def handle_call({:associate, event_store, pid, config}, _from, table) do
+  def handle_call({:associate, name, pid, event_store, config}, _from, table) do
     ref = Process.monitor(pid)
-    true = :ets.insert(table, {event_store, pid, ref, config})
+    true = :ets.insert(table, {name, pid, ref, event_store, config})
 
     {:reply, :ok, table}
   end
 
   @impl GenServer
   def handle_info({:DOWN, ref, _type, pid, _reason}, table) do
-    [[event_store]] = :ets.match(table, {:"$1", pid, ref, :_})
+    [[name]] = :ets.match(table, {:"$1", pid, ref, :_, :_})
 
-    :ets.delete(table, event_store)
+    :ets.delete(table, name)
 
     {:noreply, table}
   end
 
-  defp lookup(event_store) do
-    :ets.lookup_element(__MODULE__, event_store, 4)
+  defp lookup(name) do
+    :ets.lookup_element(__MODULE__, name, 5)
   rescue
     ArgumentError ->
-      raise "could not lookup #{inspect(event_store)} because it was not started or it does not exist"
+      raise "could not lookup #{inspect(name)} because it was not started or it does not exist"
   end
 end
