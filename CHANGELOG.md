@@ -2,7 +2,8 @@
 
 ## Next release
 
--  List running event store instances ([#244](https://github.com/commanded/eventstore/pull/244)).
+- List running event store instances ([#244](https://github.com/commanded/eventstore/pull/244)).
+- Paginate streams ([#246](https://github.com/commanded/eventstore/pull/246)).
 
 ## v1.3.2
 
