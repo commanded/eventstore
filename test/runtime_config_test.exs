@@ -48,12 +48,16 @@ defmodule EventStore.RuntimeConfigTest do
         )
       end)
 
-      assert EventStore.all_instances() == [{TestEventStore, :test_event_store}]
+      assert EventStore.all_instances() == [{TestEventStore, name: :test_event_store}]
     end
 
     test "should list all running instances" do
       all_instances = EventStore.all_instances() |> Enum.sort()
-      assert all_instances == [TestEventStore, {TestEventStore, :test_event_store}]
+
+      assert all_instances == [
+               {TestEventStore, name: TestEventStore},
+               {TestEventStore, name: :test_event_store}
+             ]
     end
 
     # EventStore has no compile-time configuration

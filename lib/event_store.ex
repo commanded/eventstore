@@ -1305,10 +1305,10 @@ defmodule EventStore do
 
   Note that order is not guaranteed.
   """
-  @spec all_instances :: list(event_store :: module() | {event_store :: module(), name :: atom()})
+  @spec all_instances :: list({event_store :: module(), [{:name, atom()}]})
   def all_instances do
     for {event_store, name} <- Config.all(), Process.whereis(name) do
-      if event_store == name, do: event_store, else: {event_store, name}
+      {event_store, [name: name]}
     end
   end
 end
