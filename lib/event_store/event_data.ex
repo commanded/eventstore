@@ -12,9 +12,11 @@ defmodule EventStore.EventData do
     :metadata
   ]
 
+  alias EventStore.EventData
+
   @type uuid :: String.t()
 
-  @type t :: %EventStore.EventData{
+  @type t :: %EventData{
           event_id: uuid() | nil,
           correlation_id: uuid() | nil,
           causation_id: uuid() | nil,

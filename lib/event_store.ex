@@ -220,6 +220,15 @@ defmodule EventStore do
           | {:conn, Postgrex.conn() | DBConnection.t()}
           | {:timeout, timeout()}
   @type options :: [option]
+  @type pagination_option ::
+          option
+          | {:page_size, pos_integer()}
+          | {:page_number, pos_integer()}
+          | {:search, String.t()}
+          | {:sort_by,
+             :stream_uuid | :stream_id | :stream_version | :created_at | :deleted_at | :status}
+          | {:sort_dir, :asc | :desc}
+  @type pagination_options :: [pagination_option]
   @type transient_subscribe_option ::
           {:name, atom}
           | {:selector, (EventStore.RecordedEvent.t() -> any())}
@@ -404,6 +413,17 @@ defmodule EventStore do
         Stream.delete(conn, stream_uuid, expected_version, type, opts)
       end
 
+      def paginate_streams(opts \\ []) do
+        pagination_opts =
+          Keyword.take(opts, [:page_size, :page_number, :search, :sort_by, :sort_dir])
+
+        {conn, opts} = parse_opts(opts)
+
+        opts = Keyword.merge(opts, pagination_opts)
+
+        Stream.paginate_streams(conn, opts)
+      end
+
       def subscribe(stream_uuid, opts \\ []) do
         name = name(opts)
 
@@ -529,8 +549,9 @@ defmodule EventStore do
     end
   end
 
-  alias EventStore.{Config, EventData}
+  alias EventStore.{Config, EventData, Page}
   alias EventStore.Snapshots.SnapshotData
+  alias EventStore.Streams.StreamInfo
 
   ## User callbacks
   @optional_callbacks init: 1
@@ -940,6 +961,40 @@ defmodule EventStore do
               | {:error, :stream_not_found}
               | {:error, :stream_deleted}
               | {:error, term}
+
+  @doc """
+  Paginate all streams.
+
+    - `opts` an optional keyword list containing:
+
+      - `page_size` the total number of streams per page. Defaults to 50.
+
+      - `page_number` the current page number. Defaults to page 1.
+
+      - `search` search for a stream by its identity.
+
+      - `sort_by` sort the streams by the given field.
+        Defaults to sorting by the stream's internal id (`:stream_id` field)
+
+      - `sort_dir` direction to sort streams by, either `:asc` or `:desc`.
+        Defaults to `:asc`.
+
+      - `name` the name of the event store if provided to `start_link/1`.
+        Defaults to the event store module name (e.g. `MyApp.EventStore`).
+
+      - `timeout` an optional timeout for the database transaction, in
+        milliseconds. Defaults to 15,000ms.
+
+  Returns an `{:ok, page}` result containing a list of `StreamInfo` structs, or
+  an error tagged tuple on failure.
+
+  ### Example
+
+      {:ok, %EventStore.Page{entries: streams}} = MyApp.EventStore.paginate_streams()
+
+  """
+  @callback paginate_streams(opts :: pagination_options()) ::
+              {:ok, Page.t(StreamInfo.t())} | {:error, any()}
 
   @doc """
   Create a transient subscription to a given stream.

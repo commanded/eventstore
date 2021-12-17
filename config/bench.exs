@@ -1,4 +1,4 @@
-use Mix.Config
+import Config
 
 # no logging for benchmarking
 config :logger, backends: []
