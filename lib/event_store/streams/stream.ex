@@ -114,7 +114,7 @@ defmodule EventStore.Streams.Stream do
     end
   end
 
-  defp stream_info(conn, stream_uuid, expected_version, opts) do
+  def stream_info(conn, stream_uuid, expected_version, opts) do
     opts = query_opts(opts)
 
     with {:ok, stream_info} <- Storage.stream_info(conn, stream_uuid, opts),
