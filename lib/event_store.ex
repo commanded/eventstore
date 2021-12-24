@@ -424,6 +424,15 @@ defmodule EventStore do
         Stream.paginate_streams(conn, opts)
       end
 
+      def stream_info(stream_uuid, opts \\ [])
+      def stream_info(:all, opts), do: stream_info(@all_stream, opts)
+
+      def stream_info(stream_uuid, opts) do
+        {conn, opts} = parse_opts(opts)
+
+        Stream.stream_info(conn, stream_uuid, :stream_exists, opts)
+      end
+
       def subscribe(stream_uuid, opts \\ []) do
         name = name(opts)
 
@@ -990,11 +999,42 @@ defmodule EventStore do
 
   ### Example
 
-      {:ok, %EventStore.Page{entries: streams}} = MyApp.EventStore.paginate_streams()
+      alias EventStore.Page
+
+      {:ok, %Page{entries: streams}} = MyApp.EventStore.paginate_streams()
 
   """
   @callback paginate_streams(opts :: pagination_options()) ::
               {:ok, Page.t(StreamInfo.t())} | {:error, any()}
+
+  @doc """
+  Get basic information about a stream, including its version, status, and
+  created date.
+
+    - `opts` an optional keyword list containing:
+      - `name` the name of the event store if provided to `start_link/1`.
+      - `timeout` an optional timeout for the database transaction, in
+        milliseconds. Defaults to 15,000ms.
+
+    Returns `{:ok, StreamInfo.t()}` on success, or an `{:error, reason}` tagged
+    tuple. The returned error may be due to one of the following reasons:
+
+      - `{:error, :stream_not_found}` when the stream does not exist.
+      - `{:error, :stream_deleted}` when the stream was soft deleted.
+
+  ### Example
+
+      alias EventStore.Streams.StreamInfo
+
+      {:ok, %StreamInfo{stream_version: stream_version}} =
+        MyApp.EventStore.stream_info("stream-1234")
+
+  """
+  @callback stream_info(stream_uuid :: String.t() | :all, opts :: options()) ::
+              {:ok, StreamInfo.t()}
+              | {:error, :stream_not_found}
+              | {:error, :stream_deleted}
+              | {:error, reason :: term}
 
   @doc """
   Create a transient subscription to a given stream.

@@ -41,18 +41,17 @@ defmodule EventStore.Mixfile do
     [
       {:elixir_uuid, "~> 1.2"},
       {:fsm, "~> 0.3"},
-      {:gen_stage, "~> 1.0"},
+      {:gen_stage, "~> 1.1"},
       {:postgrex, "~> 0.15"},
 
       # Optional dependencies
-      {:jason, "~> 1.2", optional: true},
+      {:jason, "~> 1.3", optional: true},
       {:poolboy, "~> 1.5", optional: true},
 
       # Development and test tooling
       {:benchfella, "~> 0.3", only: :bench},
-      {:dialyxir, "~> 1.0", only: :dev, runtime: false},
-      {:ex_doc, "~> 0.23", only: :dev},
-      {:mix_test_watch, "~> 1.0", only: :dev}
+      {:dialyxir, "~> 1.1", only: :dev, runtime: false},
+      {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
 
