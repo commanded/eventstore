@@ -1,10 +1,12 @@
 # Changelog
 
-## Next release
+## v1.4.0
 
 - List running event store instances ([#244](https://github.com/commanded/eventstore/pull/244)).
 - Paginate streams ([#246](https://github.com/commanded/eventstore/pull/246)).
 - Add `stream_info/2` function ([#247](https://github.com/commanded/eventstore/pull/247)).
+
+---
 
 ## v1.3.2
 
