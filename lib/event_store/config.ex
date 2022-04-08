@@ -105,6 +105,7 @@ defmodule EventStore.Config do
 
   def postgrex_notifications_opts(config, name) do
     config
+    |> Keyword.get(:notification_pool, config)
     |> default_postgrex_opts()
     |> Keyword.put(:auto_reconnect, true)
     |> Keyword.put(:backoff_type, :exp)
