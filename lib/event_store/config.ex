@@ -105,7 +105,7 @@ defmodule EventStore.Config do
 
   def postgrex_notifications_opts(config, name) do
     config
-    |> Keyword.get(:notification_pool, config)
+    |> Keyword.get(:session_mode_pool, config)
     |> default_postgrex_opts()
     |> Keyword.put(:auto_reconnect, true)
     |> Keyword.put(:backoff_type, :exp)
@@ -122,6 +122,7 @@ defmodule EventStore.Config do
   """
   def advisory_locks_postgrex_opts(config) do
     config
+    |> Keyword.get(:session_mode_pool, config)
     |> default_postgrex_opts()
     |> Keyword.put(:backoff_type, :stop)
     |> Keyword.put(:pool_size, 1)
