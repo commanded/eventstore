@@ -113,6 +113,24 @@ defmodule EventStore.ConfigTest do
              ]
   end
 
+  test "parse session_mode_url" do
+    config = [session_mode_url: "postgres://username:password@localhost/database"]
+
+    assert Config.parse(config) ==
+             [
+               enable_hard_deletes: false,
+               column_data_type: "bytea",
+               schema: "public",
+               pool: DBConnection.ConnectionPool,
+               session_mode_pool: [
+                 username: "username",
+                 password: "password",
+                 database: "database",
+                 hostname: "localhost"
+               ]
+             ]
+  end
+
   test "parse url with query parameters" do
     config = [
       url: "postgres://username:password@localhost/database?ssl=true&pool_size=5&timeout=120000"

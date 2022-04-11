@@ -37,7 +37,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       # OR use a URL to connect instead
       config :my_app, MyApp.EventStore,
-        serializer: EventStore.JsonSerializer,          
+        serializer: EventStore.JsonSerializer,
         url: "postgres://postgres:postgres@localhost/eventstore"
       ```
 
@@ -228,3 +228,16 @@ end
 ```
 
 These settings must be configured *before* creating the EventStore database. It's not possible to migrate between `bytea` and `jsonb` data types once you've created the database. This must be decided in advance.
+
+## Using with Pgbouncer
+
+Eventstore uses `LISTEN/NOTIFY` and `pg_advisory_locks` Postgres capabalities. Unfortunately, they are not compatible with PGBouncer running in transaction (most typical) mode.
+As a possible workaround, you can provide additional parameter to config:
+
+```
+config :my_app, MyApp.EventStore,
+  url: "postgres://postgres:pgbouncer-in-transaction-mode@localhost/eventstore"
+  session_mode_url: "postgres://postgres:pgbouncer-in-session-mode@localhost/eventstore"
+```
+
+And it will use your regular pool settings to connect to database defined `url` and it will establish two connections to `session_mode_url` - which you should point to PGBouncer in session mode or regular postgres instance.

@@ -30,6 +30,7 @@ MIT License
   - [Using Postgres schemas](guides/Getting%20Started.md#using-postgres-schemas)
   - [Event data and metadata data type](guides/Getting%20Started.md#event-data-and-metadata-data-type)
     - [Using the `jsonb` data type](guides/Getting%20Started.md#using-the-jsonb-data-type)
+  - [Using with Pgbouncer](guides/Getting%20Started.md#using-with-pg-bouncer)
 - [Using the EventStore](guides/Usage.md)
   - [Writing to a stream](guides/Usage.md#writing-to-a-stream)
     - [Appending events to an existing stream](guides/Usage.md#appending-events-to-an-existing-stream)
