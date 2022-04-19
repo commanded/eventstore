@@ -8,7 +8,7 @@ defmodule EventStore.Config.Parser do
         Keyword.merge(config, value |> get_config_value() |> parse_url())
 
       {:session_mode_url, value}, config ->
-        Keyword.merge(config, [session_mode_pool: value |> get_config_value() |> parse_url()])
+        Keyword.merge(config, session_mode_pool: value |> get_config_value() |> parse_url())
 
       {key, value}, config when key in [:port, :timeout] ->
         Keyword.put(config, key, get_config_integer(value))
