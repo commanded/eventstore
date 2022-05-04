@@ -64,6 +64,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
     test "should not send events ack'd by another subscription during disconnect", %{
       event_store: event_store,
+      schema: schema,
       subscription: subscription,
       subscription_name: subscription_name
     } do
@@ -76,7 +77,10 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
       :ok = disconnect(subscription)
 
-      :ok = Storage.Subscription.ack_last_seen_event(@conn, "$all", subscription_name, 2)
+      :ok =
+        Storage.Subscription.ack_last_seen_event(@conn, "$all", subscription_name, 2,
+          schema: schema
+        )
 
       :ok = reconnect(subscription)
 
@@ -126,34 +130,26 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       stream2_uuid = append_events_to_stream(event_store, 2)
 
       # Subscriber should now start receiving events
-      assert_receive {:events, received_events}
-      assert length(received_events) == 1
+      received_events = wait_for_events(subscription, 3)
 
-      for event <- received_events do
-        assert event.stream_uuid == stream1_uuid
-      end
-
-      :ok = Subscription.ack(subscription, received_events)
-
-      assert_receive {:events, received_events}, 5_000
-      assert length(received_events) == 2
-
-      Enum.each(received_events, fn event ->
-        assert event.stream_uuid == stream2_uuid
-      end)
-
-      :ok = Subscription.ack(subscription, received_events)
+      assert Enum.map(received_events, & &1.stream_uuid) == [
+               stream1_uuid,
+               stream2_uuid,
+               stream2_uuid
+             ]
 
       refute_receive {:events, _received_events}
     end
   end
 
   defp lock_subscription(context) do
-    config = Map.fetch!(context, :config) |> Config.sync_connect_postgrex_opts()
+    %{config: config, schema: schema} = context
+
+    config = Config.advisory_locks_postgrex_opts(config)
 
     conn = start_supervised!({Postgrex, config}, id: :subscription_conn)
 
-    :ok = EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1)
+    :ok = EventStore.Storage.Lock.try_acquire_exclusive_lock(conn, 1, schema: schema)
 
     [conn2: conn]
   end
@@ -161,8 +157,8 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   defp create_subscription(context) do
     %{
       conn: conn,
+      schema: schema,
       event_store: event_store,
-      registry: registry,
       serializer: serializer,
       subscription_name: subscription_name
     } = context
@@ -171,7 +167,7 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       Subscription.start_link(
         event_store: event_store,
         conn: conn,
-        registry: registry,
+        schema: schema,
         serializer: serializer,
         retry_interval: 1_000,
         stream_uuid: "$all",
@@ -215,5 +211,19 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
   defp pluck(enumerable, field) do
     Enum.map(enumerable, &Map.get(&1, field))
+  end
+
+  defp wait_for_events(subscription, expected_count, events \\ []) do
+    assert_receive {:events, received_events}
+
+    :ok = Subscription.ack(subscription, received_events)
+
+    events = events ++ received_events
+
+    if length(events) == expected_count do
+      events
+    else
+      wait_for_events(subscription, expected_count, events)
+    end
   end
 end

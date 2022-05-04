@@ -14,6 +14,24 @@ defmodule EventStore.AppendToStreamTest do
       assert {:ok, events} = EventStore.read_stream_forward(stream_uuid)
       assert length(events) == 3
     end
+
+    test "concurrently should succeed" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(1)
+
+      results =
+        1..4
+        |> Enum.map(fn _ ->
+          Task.async(fn -> EventStore.append_to_stream(stream_uuid, :any_version, events) end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      # All concurrent writes should succeed
+      assert Enum.all?(results, fn result -> result == :ok end)
+
+      assert {:ok, events} = EventStore.read_stream_forward(stream_uuid)
+      assert length(events) == 4
+    end
   end
 
   describe "append to existing stream using `:any_version`" do
@@ -26,6 +44,23 @@ defmodule EventStore.AppendToStreamTest do
 
       assert {:ok, events} = EventStore.read_stream_forward(stream_uuid)
       assert length(events) == 4
+    end
+
+    test "concurrently should succeed", %{stream_uuid: stream_uuid} do
+      events = EventFactory.create_events(1)
+
+      results =
+        1..4
+        |> Enum.map(fn _ ->
+          Task.async(fn -> EventStore.append_to_stream(stream_uuid, :any_version, events) end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      # All concurrent writes should succeed
+      assert Enum.all?(results, fn result -> result == :ok end)
+
+      assert {:ok, events} = EventStore.read_stream_forward(stream_uuid)
+      assert length(events) == 7
     end
   end
 
@@ -53,11 +88,11 @@ defmodule EventStore.AppendToStreamTest do
   end
 
   describe "append to new stream using `:stream_exists`" do
-    test "should return `{:error, :stream_does_not_exist}`" do
+    test "should return `{:error, :stream_not_found}`" do
       stream_uuid = UUID.uuid4()
       events = EventFactory.create_events(3)
 
-      assert {:error, :stream_does_not_exist} =
+      assert {:error, :stream_not_found} =
                EventStore.append_to_stream(stream_uuid, :stream_exists, events)
     end
   end
@@ -87,8 +122,8 @@ defmodule EventStore.AppendToStreamTest do
       assert length(events) == 4
     end
 
-    test "should return `{:error, :wrong_expected_version}` with incorrect stream version" do
-      stream_uuid = UUID.uuid4()
+    test "should return `{:error, :wrong_expected_version}` with incorrect stream version",
+         %{stream_uuid: stream_uuid} do
       events = EventFactory.create_events(3)
 
       assert {:error, :wrong_expected_version} =

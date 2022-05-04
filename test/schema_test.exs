@@ -1,4 +1,4 @@
-defmodule SchemaTest do
+defmodule EventStore.SchemaTest do
   use EventStore.StorageCase
 
   alias EventStore.Config
@@ -11,14 +11,12 @@ defmodule SchemaTest do
 
     conn = start_supervised!({Postgrex, postgrex_config}, id: :schema_conn)
 
-    [schema_conn: conn]
+    [schema_conn: conn, config: config]
   end
 
-  setup %{schema_conn: conn} do
-    Initializer.reset!(conn)
-
+  setup %{schema_conn: conn, config: config} do
+    Initializer.reset!(conn, config)
     start_supervised!(SchemaEventStore)
-
     :ok
   end
 

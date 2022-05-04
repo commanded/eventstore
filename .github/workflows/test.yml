@@ -1,0 +1,76 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    name: Build and test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        otp: ['23.3', '24.2']
+        elixir: ['1.13.1']
+
+    services:
+      postgres:
+        image: postgres:12
+        ports: ['5432:5432']
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Elixir
+      id: beam
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: ${{ matrix.elixir }}
+        otp-version: ${{ matrix.otp }}
+
+    - name: Restore dependencies cache
+      uses: actions/cache@v2
+      with:
+        path: deps
+        key: ${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-mix-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-mix-
+
+    - name: Install dependencies
+      run: mix deps.get
+
+    - name: Check formatting
+      run: mix format --check-formatted
+
+    - name: Start epmd
+      run: epmd -daemon
+
+    - name: Setup EventStore test databases
+      run: |
+        MIX_ENV=test mix event_store.setup
+        MIX_ENV=jsonb mix event_store.setup
+
+    - name: Run tests
+      run: mix test.all
+
+    - name: Retrieve Dialyzer PLT cache
+      uses: actions/cache@v1
+      id: plt-cache
+      with:
+        path: priv/plts
+        key: ${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-plts-${{ hashFiles('**/mix.lock') }}
+
+    - name: Create Dialyzer PLTs
+      if: steps.plt-cache.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p priv/plts
+        mix dialyzer --plt
+
+    - name: Run Dialyzer
+      run: mix dialyzer --no-check

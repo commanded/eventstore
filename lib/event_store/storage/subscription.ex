@@ -10,24 +10,20 @@ defmodule EventStore.Storage.Subscription do
           subscription_id: non_neg_integer(),
           stream_uuid: String.t(),
           subscription_name: String.t(),
-          last_seen: non_neg_integer(),
+          last_seen: non_neg_integer() | nil,
           created_at: DateTime.t()
         }
 
-  defstruct subscription_id: nil,
-            stream_uuid: nil,
-            subscription_name: nil,
-            last_seen: nil,
-            created_at: nil
+  defstruct [:subscription_id, :stream_uuid, :subscription_name, :last_seen, :created_at]
 
-  @doc """
-  List all known subscriptions
-  """
-  def subscriptions(conn, opts \\ []),
-    do: Subscription.All.execute(conn, opts)
+  defdelegate subscriptions(conn, opts), to: Subscription.All, as: :execute
 
-  def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from, opts \\ []) do
-    with {:ok, subscription} <-
+  defdelegate subscription(conn, stream_uuid, subscription_name, opts),
+    to: Subscription.Query,
+    as: :execute
+
+  def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from, opts) do
+    with {:ok, %Subscription{} = subscription} <-
            Subscription.Query.execute(conn, stream_uuid, subscription_name, opts) do
       {:ok, subscription}
     else
@@ -39,15 +35,18 @@ defmodule EventStore.Storage.Subscription do
     end
   end
 
-  def ack_last_seen_event(conn, stream_uuid, subscription_name, last_seen, opts \\ []) do
+  def ack_last_seen_event(conn, stream_uuid, subscription_name, last_seen, opts) do
     Subscription.Ack.execute(conn, stream_uuid, subscription_name, last_seen, opts)
   end
 
-  def delete_subscription(conn, stream_uuid, subscription_name, opts \\ []),
+  def delete_subscription(conn, stream_uuid, subscription_name, opts),
     do: Subscription.Delete.execute(conn, stream_uuid, subscription_name, opts)
 
   defp create_subscription(conn, stream_uuid, subscription_name, start_from, opts) do
-    case Subscription.Subscribe.execute(conn, stream_uuid, subscription_name, start_from, opts) do
+    with {:ok, %Subscription{} = subscription} <-
+           Subscription.Subscribe.execute(conn, stream_uuid, subscription_name, start_from, opts) do
+      {:ok, subscription}
+    else
       {:error, :subscription_already_exists} ->
         Subscription.Query.execute(conn, stream_uuid, subscription_name, opts)
 
@@ -60,93 +59,71 @@ defmodule EventStore.Storage.Subscription do
     @moduledoc false
 
     def execute(conn, opts) do
-      conn
-      |> Postgrex.query(Statements.query_all_subscriptions(), [], opts)
-      |> handle_response()
+      {schema, opts} = Keyword.pop(opts, :schema)
+
+      query = Statements.query_all_subscriptions(schema)
+
+      case Postgrex.query(conn, query, [], opts) do
+        {:ok, %Postgrex.Result{num_rows: 0}} -> {:ok, []}
+        {:ok, %Postgrex.Result{rows: rows}} -> {:ok, Subscription.Adapter.to_subscriptions(rows)}
+        {:error, _error} = reply -> reply
+      end
     end
-
-    defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}),
-      do: {:ok, []}
-
-    defp handle_response({:ok, %Postgrex.Result{rows: rows}}),
-      do: {:ok, Subscription.Adapter.to_subscriptions(rows)}
-
-    defp handle_response({:error, error}), do: {:error, error}
   end
 
   defmodule Query do
     @moduledoc false
 
     def execute(conn, stream_uuid, subscription_name, opts) do
-      conn
-      |> Postgrex.query(
-        Statements.query_get_subscription(),
-        [stream_uuid, subscription_name],
-        opts
-      )
-      |> handle_response()
+      {schema, opts} = Keyword.pop(opts, :schema)
+
+      query = Statements.query_subscription(schema)
+
+      case Postgrex.query(conn, query, [stream_uuid, subscription_name], opts) do
+        {:ok, %Postgrex.Result{num_rows: 0}} -> {:error, :subscription_not_found}
+        {:ok, %Postgrex.Result{rows: rows}} -> {:ok, Subscription.Adapter.to_subscription(rows)}
+        {:error, _error} = reply -> reply
+      end
     end
-
-    defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}),
-      do: {:error, :subscription_not_found}
-
-    defp handle_response({:ok, %Postgrex.Result{rows: rows}}),
-      do: {:ok, Subscription.Adapter.to_subscription(rows)}
-
-    defp handle_response({:error, error}), do: {:error, error}
   end
 
   defmodule Subscribe do
     @moduledoc false
 
     def execute(conn, stream_uuid, subscription_name, start_from, opts) do
-      _ =
-        Logger.debug(fn ->
-          "Attempting to create subscription on stream " <>
-            inspect(stream_uuid) <>
-            " named " <> inspect(subscription_name) <> " starting from #" <> inspect(start_from)
-        end)
-
-      conn
-      |> Postgrex.query(
-        Statements.create_subscription(),
-        [stream_uuid, subscription_name, start_from],
-        opts
+      Logger.debug(
+        "Attempting to create subscription on stream " <>
+          inspect(stream_uuid) <>
+          " named " <> inspect(subscription_name) <> " starting from #" <> inspect(start_from)
       )
-      |> handle_response(stream_uuid, subscription_name)
-    end
 
-    defp handle_response({:ok, %Postgrex.Result{rows: rows}}, stream_uuid, subscription_name) do
-      _ =
-        Logger.debug(fn ->
-          "Created subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\""
-        end)
+      {schema, opts} = Keyword.pop(opts, :schema)
 
-      {:ok, Subscription.Adapter.to_subscription(rows)}
-    end
+      query = Statements.insert_subscription(schema)
 
-    defp handle_response(
-           {:error, %Postgrex.Error{postgres: %{code: :unique_violation}}},
-           stream_uuid,
-           subscription_name
-         ) do
-      _ =
-        Logger.debug(fn ->
-          "Failed to create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\", already exists"
-        end)
+      case Postgrex.query(conn, query, [stream_uuid, subscription_name, start_from], opts) do
+        {:ok, %Postgrex.Result{rows: rows}} ->
+          Logger.debug(
+            "Created subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\""
+          )
 
-      {:error, :subscription_already_exists}
-    end
+          {:ok, Subscription.Adapter.to_subscription(rows)}
 
-    defp handle_response({:error, error}, stream_uuid, subscription_name) do
-      _ =
-        Logger.warn(fn ->
-          "Failed to create stream create subscription on stream \"#{stream_uuid}\" named \"#{
-            subscription_name
-          }\" due to: #{error}"
-        end)
+        {:error, %Postgrex.Error{postgres: %{code: :unique_violation}}} ->
+          Logger.debug(
+            "Failed to create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\", already exists"
+          )
 
-      {:error, error}
+          {:error, :subscription_already_exists}
+
+        {:error, error} = reply ->
+          Logger.warn(
+            "Failed to create stream create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: " <>
+              inspect(error)
+          )
+
+          reply
+      end
     end
   end
 
@@ -154,28 +131,22 @@ defmodule EventStore.Storage.Subscription do
     @moduledoc false
 
     def execute(conn, stream_uuid, subscription_name, last_seen, opts) do
-      conn
-      |> Postgrex.query(
-        Statements.ack_last_seen_event(),
-        [stream_uuid, subscription_name, last_seen],
-        opts
-      )
-      |> handle_response(stream_uuid, subscription_name)
-    end
+      {schema, opts} = Keyword.pop(opts, :schema)
 
-    defp handle_response({:ok, _result}, _stream_uuid, _subscription_name) do
-      :ok
-    end
+      query = Statements.subscription_ack(schema)
 
-    defp handle_response({:error, error}, stream_uuid, subscription_name) do
-      _ =
-        Logger.warn(fn ->
-          "Failed to ack last seen event on stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: #{
-            error
-          }"
-        end)
+      case Postgrex.query(conn, query, [stream_uuid, subscription_name, last_seen], opts) do
+        {:ok, _result} ->
+          :ok
 
-      {:error, error}
+        {:error, error} = reply ->
+          Logger.warn(
+            "Failed to ack last seen event on stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: " <>
+              inspect(error)
+          )
+
+          reply
+      end
     end
   end
 
@@ -183,36 +154,30 @@ defmodule EventStore.Storage.Subscription do
     @moduledoc false
 
     def execute(conn, stream_uuid, subscription_name, opts) do
-      _ =
-        Logger.debug(fn ->
-          "Attempting to delete subscription on stream \"#{stream_uuid}\" named \"#{
-            subscription_name
-          }\""
-        end)
+      Logger.debug(
+        "Attempting to delete subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\""
+      )
 
-      conn
-      |> Postgrex.query(Statements.delete_subscription(), [stream_uuid, subscription_name], opts)
-      |> handle_response(stream_uuid, subscription_name)
-    end
+      {schema, opts} = Keyword.pop(opts, :schema)
 
-    defp handle_response({:ok, _result}, stream_uuid, subscription_name) do
-      _ =
-        Logger.debug(fn ->
-          "Deleted subscription to stream \"#{stream_uuid}\" named \"#{subscription_name}\""
-        end)
+      query = Statements.delete_subscription(schema)
 
-      :ok
-    end
+      case Postgrex.query(conn, query, [stream_uuid, subscription_name], opts) do
+        {:ok, _result} ->
+          Logger.debug(
+            "Deleted subscription to stream \"#{stream_uuid}\" named \"#{subscription_name}\""
+          )
 
-    defp handle_response({:error, error}, stream_uuid, subscription_name) do
-      _ =
-        Logger.warn(fn ->
-          "Failed to delete subscription to stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: #{
-            error
-          }"
-        end)
+          :ok
 
-      {:error, error}
+        {:error, error} = reply ->
+          Logger.warn(
+            "Failed to delete subscription to stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: " <>
+              inspect(error)
+          )
+
+          reply
+      end
     end
   end
 

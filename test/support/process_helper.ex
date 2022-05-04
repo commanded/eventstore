@@ -11,10 +11,11 @@ defmodule EventStore.ProcessHelper do
   end
 
   def shutdown(pid) when is_pid(pid) do
+    ref = Process.monitor(pid)
+
     Process.unlink(pid)
     Process.exit(pid, :shutdown)
 
-    ref = Process.monitor(pid)
-    assert_receive {:DOWN, ^ref, _, _, _}, 1_000
+    assert_receive {:DOWN, ^ref, :process, _object, _reason}, 1_000
   end
 end

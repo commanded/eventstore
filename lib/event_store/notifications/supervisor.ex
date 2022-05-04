@@ -1,67 +1,89 @@
 defmodule EventStore.Notifications.Supervisor do
   @moduledoc false
 
-  # Supervises the individual `GenStage` stages used to listen to and broadcast
-  # all events appended to storage.
-  #
-  # Erlang's global module is used to ensure only a single instance of this
-  # supervisor process, and its children including the PostgreSQL listener
-  # process, runs on a cluster of nodes. This minimises connections to the event
-  # store database. There will be at most one `LISTEN` connection per cluster.
+  # Supervises the individual `GenStage` stages used to listen to, read, and
+  # publish all events appended to storage.
 
   use Supervisor
 
-  alias EventStore.Config
-  alias EventStore.MonitoredServer
-  alias EventStore.Notifications.{Listener, Reader, Broadcaster}
+  alias EventStore.{Config, MonitoredServer, Subscriptions}
+  alias EventStore.Notifications.{Listener, Publisher}
 
+<<<<<<< HEAD
   def child_spec({name, _registry, _serializer, _metadata_serializer, _config} = init_arg) do
+||||||| acd4ea9
+  def child_spec({name, _registry, _serializer, _config} = init_arg) do
+=======
+  def child_spec({name, _config} = init_arg) do
+>>>>>>> commanded/master
     %{id: Module.concat(name, __MODULE__), start: {__MODULE__, :start_link, [init_arg]}}
   end
 
-  def start_link(arg) do
-    Supervisor.start_link(__MODULE__, arg)
+  def start_link(init_arg) do
+    Supervisor.start_link(__MODULE__, init_arg)
   end
 
   @impl Supervisor
+<<<<<<< HEAD
   def init({event_store, registry, serializer, metadata_serializer, config}) do
+||||||| acd4ea9
+  def init({event_store, registry, serializer, config}) do
+=======
+  def init({event_store, config}) do
+>>>>>>> commanded/master
     schema = Keyword.fetch!(config, :schema)
-
-    postgrex_config = Config.sync_connect_postgrex_opts(config)
+    serializer = Keyword.fetch!(config, :serializer)
+    conn = Keyword.fetch!(config, :conn)
 
     listener_name = Module.concat([event_store, Listener])
-    reader_name = Module.concat([event_store, Reader])
-    broadcaster_name = Module.concat([event_store, Broadcaster])
-    postgrex_listener_name = Module.concat([listener_name, Postgrex])
-    postgrex_reader_name = Module.concat([reader_name, Postgrex])
+    publisher_name = Module.concat([event_store, Publisher])
+    postgrex_notifications_conn = postgrex_notifications_conn(event_store, config)
+
+    postgrex_notifications_config =
+      Config.postgrex_notifications_opts(config, postgrex_notifications_conn)
+
+    hibernate_after = Subscriptions.hibernate_after(event_store, config)
 
     Supervisor.init(
       [
         Supervisor.child_spec(
           {MonitoredServer,
-           mfa: {Postgrex.Notifications, :start_link, [postgrex_config]},
-           name: postgrex_listener_name},
-          id: Module.concat([postgrex_listener_name, MonitoredServer])
+           mfa: {Postgrex.Notifications, :start_link, [postgrex_notifications_config]},
+           name: Module.concat([event_store, Postgrex, Notifications, MonitoredServer]),
+           backoff_min: 0},
+          id: Module.concat([postgrex_notifications_conn, MonitoredServer])
         ),
-        Supervisor.child_spec(
-          {MonitoredServer,
-           mfa: {Postgrex, :start_link, [postgrex_config]}, name: postgrex_reader_name},
-          id: Module.concat([postgrex_reader_name, MonitoredServer])
-        ),
-        {Listener, listen_to: postgrex_listener_name, schema: schema, name: listener_name},
-        {Reader,
-         conn: postgrex_reader_name,
+        {Listener,
+         listen_to: postgrex_notifications_conn,
+         schema: schema,
+         name: listener_name,
+         hibernate_after: hibernate_after},
+        {Publisher,
+         conn: conn,
+         event_store: event_store,
+         schema: schema,
          serializer: serializer,
          metadata_serializer: metadata_serializer,
          subscribe_to: listener_name,
-         name: reader_name},
-        {Broadcaster,
-         event_store: event_store,
-         registry: registry,
-         subscribe_to: reader_name,
-         name: broadcaster_name}
+         name: publisher_name,
+         hibernate_after: hibernate_after}
       ],
       strategy: :one_for_all
     )
+  end
+
+  defp postgrex_notifications_conn(name, config) do
+    case Keyword.get(config, :shared_connection_pool) do
+      nil ->
+        Module.concat([name, Postgrex, Notifications])
+
+      shared_connection_pool when is_atom(shared_connection_pool) ->
+        Module.concat([shared_connection_pool, Postgrex, Notifications])
+
+      invalid ->
+        raise ArgumentError,
+              "Invalid `:shared_connection_pool` specified, expected an atom but got: " <>
+                inspect(invalid)
+    end
   end
 end

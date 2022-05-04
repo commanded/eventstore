@@ -8,7 +8,7 @@ defmodule Snapshot do
   defstruct [:data, version: "1"]
 end
 
-defmodule MigratedEventStoreTest do
+defmodule EventStore.MigratedEventStoreTest do
   use ExUnit.Case
 
   alias EventStore.RecordedEvent
@@ -22,7 +22,7 @@ defmodule MigratedEventStoreTest do
     recreate_database(config)
     migrate_eventstore(config)
 
-    {:ok, _pid} = TestEventStore.start_link()
+    start_supervised!(TestEventStore)
 
     :ok
   end

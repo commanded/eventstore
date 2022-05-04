@@ -1,9 +1,9 @@
-use Mix.Config
+import Config
 
 config :logger, backends: []
 
 config :ex_unit,
-  capture_log: true,
+  capture_log: [level: :warn],
   assert_receive_timeout: 2_000,
   refute_receive_timeout: 100
 
@@ -13,8 +13,6 @@ default_config = [
   database: "eventstore_test",
   hostname: "localhost",
   pool_size: 1,
-  pool_overflow: 0,
-  registry: :local,
   serializer: EventStore.JsonSerializer,
   subscription_retry_interval: 1_000
 ]
@@ -22,6 +20,5 @@ default_config = [
 config :eventstore, TestEventStore, default_config
 config :eventstore, SecondEventStore, Keyword.put(default_config, :database, "eventstore_test_2")
 config :eventstore, SchemaEventStore, default_config
-config :eventstore, DistributedEventStore, Keyword.put(default_config, :registry, :distributed)
 
 config :eventstore, event_stores: [TestEventStore, SecondEventStore, SchemaEventStore]

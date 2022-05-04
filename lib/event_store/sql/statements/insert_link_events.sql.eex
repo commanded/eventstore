@@ -1,0 +1,33 @@
+WITH
+  stream AS (
+    UPDATE <%= schema %>.streams
+    SET stream_version = stream_version + $2::bigint
+    WHERE stream_id = $1::bigint
+    RETURNING stream_version - $2 as initial_stream_version
+  ),
+  linked_events (index, event_id) AS (
+    VALUES
+    <%= for i <- 0..(number_of_events - 1) do %>
+      <%= unless i == 0 do %>,<% end %>    
+      ($<%= i * 2 + 3 %>::bigint, $<%= i * 2 + 4 %>::uuid)
+    <% end %>
+  )
+INSERT INTO <%= schema %>.stream_events
+  (
+    stream_id,
+    stream_version,
+    event_id,
+    original_stream_id,
+    original_stream_version
+  )
+SELECT
+  $1,
+  stream.initial_stream_version + linked_events.index,
+  linked_events.event_id,
+  original_stream_events.original_stream_id,
+  original_stream_events.stream_version
+FROM linked_events
+CROSS JOIN stream
+INNER JOIN <%= schema %>.stream_events as original_stream_events
+  ON original_stream_events.event_id = linked_events.event_id
+    AND original_stream_events.stream_id = original_stream_events.original_stream_id;

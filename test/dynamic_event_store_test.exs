@@ -1,21 +1,41 @@
-defmodule DynamicEventStoreTest do
+defmodule EventStore.DynamicEventStoreTest do
   use EventStore.StorageCase
 
   alias EventStore.EventFactory
-  alias TestEventStore, as: EventStore
 
   describe "dynamic event store" do
     setup do
-      start_supervised!({EventStore, name: :eventstore1, schema: "public"})
-      start_supervised!({EventStore, name: :eventstore2, schema: "public"})
-      start_supervised!({EventStore, name: :schema_eventstore, schema: "example"})
+      start_supervised!({TestEventStore, name: :eventstore1, schema: "public"})
+      start_supervised!({TestEventStore, name: :eventstore2, schema: "public"})
+      start_supervised!({TestEventStore, name: :schema_eventstore, schema: "example"})
       :ok
     end
 
+    test "should list all running instances" do
+      all_instances = EventStore.all_instances() |> Enum.sort()
+
+      assert all_instances == [
+               {TestEventStore, name: TestEventStore},
+               {TestEventStore, name: :eventstore1},
+               {TestEventStore, name: :eventstore2},
+               {TestEventStore, name: :schema_eventstore}
+             ]
+
+      stop_supervised!(:eventstore1)
+      stop_supervised!(:eventstore2)
+
+      all_instances = EventStore.all_instances() |> Enum.sort()
+
+      assert all_instances == [
+               {TestEventStore, name: TestEventStore},
+               {TestEventStore, name: :schema_eventstore}
+             ]
+    end
+
     test "should ensure name is an atom" do
-      assert_raise ArgumentError,
-                   "expected :name option to be an atom but got: \"invalid\"",
-                   fn -> {:ok, _pid} = EventStore.start_link(name: "invalid") end
+      assert_raise ArgumentError, "expected `:name` to be an atom, got: \"invalid\"", fn ->
+        TestEventStore.start_link(name: "invalid")
+      end
     end
 
     test "should append and read events" do
@@ -26,7 +46,7 @@ defmodule DynamicEventStoreTest do
       assert_recorded_events(:eventstore1, stream_uuid, events)
       assert_recorded_events(:eventstore2, stream_uuid, events)
 
-      assert EventStore.stream_forward(stream_uuid, 0, name: :schema_eventstore) ==
+      assert TestEventStore.stream_forward(stream_uuid, 0, name: :schema_eventstore) ==
                {:error, :stream_not_found}
     end
 
@@ -34,13 +54,13 @@ defmodule DynamicEventStoreTest do
       stream_uuid = UUID.uuid4()
 
       {:ok, subscription1} =
-        EventStore.subscribe_to_stream(stream_uuid, "test1", self(), name: :eventstore1)
+        TestEventStore.subscribe_to_stream(stream_uuid, "test1", self(), name: :eventstore1)
 
       {:ok, subscription2} =
-        EventStore.subscribe_to_stream(stream_uuid, "test2", self(), name: :eventstore2)
+        TestEventStore.subscribe_to_stream(stream_uuid, "test2", self(), name: :eventstore2)
 
       {:ok, subscription3} =
-        EventStore.subscribe_to_stream(stream_uuid, "test3", self(), name: :schema_eventstore)
+        TestEventStore.subscribe_to_stream(stream_uuid, "test3", self(), name: :schema_eventstore)
 
       assert [subscription1, subscription2, subscription3] |> Enum.uniq() |> length() == 3
 
@@ -63,10 +83,10 @@ defmodule DynamicEventStoreTest do
       stream_uuid = UUID.uuid4()
 
       {:ok, subscription1} =
-        EventStore.subscribe_to_stream(stream_uuid, "test1", self(), name: :eventstore1)
+        TestEventStore.subscribe_to_stream(stream_uuid, "test1", self(), name: :eventstore1)
 
       {:ok, subscription2} =
-        EventStore.subscribe_to_stream(stream_uuid, "test2", self(), name: :eventstore2)
+        TestEventStore.subscribe_to_stream(stream_uuid, "test2", self(), name: :eventstore2)
 
       assert_receive {:subscribed, ^subscription1}
       assert_receive {:subscribed, ^subscription2}
@@ -81,12 +101,14 @@ defmodule DynamicEventStoreTest do
 
       refute_receive {:events, _received_events}
 
-      assert :ok = EventStore.unsubscribe_from_stream(stream_uuid, "test1", name: :eventstore1)
-      assert :ok = EventStore.delete_subscription(stream_uuid, "test1", name: :eventstore1)
+      assert :ok =
+               TestEventStore.unsubscribe_from_stream(stream_uuid, "test1", name: :eventstore1)
+
+      assert :ok = TestEventStore.delete_subscription(stream_uuid, "test1", name: :eventstore1)
 
       # Recreate subscription from `:origin` should receive all events again
       {:ok, subscription1} =
-        EventStore.subscribe_to_stream(stream_uuid, "test1", self(), name: :eventstore1)
+        TestEventStore.subscribe_to_stream(stream_uuid, "test1", self(), name: :eventstore1)
 
       assert_receive {:subscribed, ^subscription1}
       assert_receive {:events, received_events}
@@ -100,14 +122,16 @@ defmodule DynamicEventStoreTest do
     events = EventFactory.create_events(count, expected_version + 1)
 
     :ok =
-      EventStore.append_to_stream(stream_uuid, expected_version, events, name: event_store_name)
+      TestEventStore.append_to_stream(stream_uuid, expected_version, events,
+        name: event_store_name
+      )
 
     {:ok, events}
   end
 
   defp assert_recorded_events(event_store_name, stream_uuid, expected_events) do
     actual_events =
-      EventStore.stream_forward(stream_uuid, 0, name: event_store_name) |> Enum.to_list()
+      TestEventStore.stream_forward(stream_uuid, 0, name: event_store_name) |> Enum.to_list()
 
     assert_events(expected_events, actual_events)
   end

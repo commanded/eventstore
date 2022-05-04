@@ -1,11 +1,12 @@
 defmodule EventStore.Subscriptions do
   @moduledoc false
 
-  alias EventStore.{Storage, Subscriptions}
+  alias EventStore.Storage
   alias EventStore.Subscriptions.Subscription
+  alias EventStore.Subscriptions.Supervisor, as: SubscriptionsSupervisor
 
   def subscribe_to_stream(subscriber, opts \\ []) do
-    case Subscriptions.Supervisor.start_subscription(opts) do
+    case SubscriptionsSupervisor.start_subscription(opts) do
       {:ok, subscription} ->
         Subscription.connect(subscription, subscriber, opts)
 
@@ -20,18 +21,9 @@ defmodule EventStore.Subscriptions do
     end
   end
 
-  def unsubscribe_from_stream(event_store, stream_uuid, subscription_name) do
-    Subscriptions.Supervisor.unsubscribe_from_stream(event_store, stream_uuid, subscription_name)
-  end
-
-  def delete_subscription(event_store, stream_uuid, subscription_name, opts \\ []) do
-    :ok =
-      Subscriptions.Supervisor.shutdown_subscription(event_store, stream_uuid, subscription_name)
-
-    conn = Module.concat(event_store, Postgrex)
-
-    Storage.delete_subscription(conn, stream_uuid, subscription_name, opts)
-  end
+  defdelegate unsubscribe_from_stream(event_store, stream_uuid, name), to: SubscriptionsSupervisor
+  defdelegate stop_subscription(event_store, stream_uuid, name), to: SubscriptionsSupervisor
+  defdelegate delete_subscription(conn, stream_uuid, subscription_name, opts), to: Storage
 
   @doc """
   Get the delay between subscription retry attempts, in milliseconds, from the
@@ -55,6 +47,39 @@ defmodule EventStore.Subscriptions do
             "Invalid `:subscription_retry_interval` setting in " <>
               inspect(event_store) <>
               " config. Expected an integer in milliseconds but got: " <> inspect(invalid)
+    end
+  end
+
+  @doc """
+  Get the inactivity period, in milliseconds, after which a subscription process
+  will be automatically hibernated.
+
+  From Erlang/OTP 20, subscription processes will automatically hibernate to
+  save memory after `15_000` milliseconds of inactivity. This can be changed by
+  configuring the `:subscription_hibernate_after` option for the event store
+  module.
+
+  You can also set it to `:infinity` to fully disable it.
+  """
+  def hibernate_after(event_store, config) do
+    case Keyword.get(config, :subscription_hibernate_after) do
+      interval when is_integer(interval) and interval >= 0 ->
+        interval
+
+      :infinity ->
+        :infinity
+
+      nil ->
+        # Default to 15 seconds when not configured
+        15_000
+
+      invalid ->
+        raise ArgumentError,
+          message:
+            "Invalid `:subscription_hibernate_after` setting in " <>
+              inspect(event_store) <>
+              " config. Expected an integer (in milliseconds) or `:infinity` but got: " <>
+              inspect(invalid)
     end
   end
 end

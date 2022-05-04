@@ -1,0 +1,4 @@
+SELECT pg_advisory_unlock(
+  '<%= schema %>.subscriptions'::regclass::oid::int,
+  (CASE WHEN $1 > 2147483647 THEN mod($1, 2147483647) ELSE $1 END)::int
+);

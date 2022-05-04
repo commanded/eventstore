@@ -1,16 +1,12 @@
 defmodule EventStore.StorageCase do
   use ExUnit.CaseTemplate
 
-  alias EventStore.Config
-  alias EventStore.Registration
-  alias EventStore.Serializer
-  alias EventStore.Storage
+  alias EventStore.{Config, Serializer, Storage}
 
   @event_store TestEventStore
 
   setup_all do
     config = Config.parsed(@event_store, :eventstore)
-    registry = Registration.registry(@event_store, config)
     serializer = Serializer.serializer(@event_store, config)
     postgrex_config = Config.default_postgrex_opts(config)
 
@@ -25,17 +21,17 @@ defmodule EventStore.StorageCase do
     [
       conn: conn,
       config: config,
+      schema: "public",
       event_store: @event_store,
       postgrex_config: postgrex_config,
-      registry: registry,
       serializer: serializer
     ]
   end
 
-  setup %{conn: conn} do
-    Storage.Initializer.reset!(conn)
+  setup %{conn: conn, config: config} do
+    Storage.Initializer.reset!(conn, config)
 
-    start_supervised!({@event_store, name: @event_store})
+    start_supervised!(@event_store)
 
     :ok
   end
@@ -58,7 +54,7 @@ defmodule EventStore.StorageCase do
       config = event_store.config()
 
       EventStore.Tasks.Create.exec(config, quiet: true)
-      EventStore.Tasks.Init.exec(event_store, config, quiet: true)
+      EventStore.Tasks.Init.exec(config, quiet: true)
     end
   end
 

@@ -1,5 +1,103 @@
 # Changelog
 
+## v1.4.0
+
+- List running event store instances ([#244](https://github.com/commanded/eventstore/pull/244)).
+- Paginate streams ([#246](https://github.com/commanded/eventstore/pull/246)).
+- Add `stream_info/2` function ([#247](https://github.com/commanded/eventstore/pull/247)).
+
+---
+
+## v1.3.2
+
+### Enhancements
+
+- Add postgrex `socket_options` option ([#242](https://github.com/commanded/eventstore/pull/242)).
+
+### Bug fixes
+
+- Fix bug with subscriptions trigger in older Postgres versions ([#241](https://github.com/commanded/eventstore/pull/241)).
+
+### Upgrading
+
+This release includes a database migration to be run. Please read the [Upgrading an EventStore](https://hexdocs.pm/eventstore/upgrades.html) guide for details on how to migrate an existing database.
+
+## v1.3.1
+
+### Bug fixes
+
+- Support running event store migrations when using a schema ([#239](https://github.com/commanded/eventstore/pull/239)).
+
+## v1.3.0
+
+- Improve performance of appending events under normal and degraded network conditions ([#230](https://github.com/commanded/eventstore/pull/230)).
+- Subscription checkpoint tuning ([#237](https://github.com/commanded/eventstore/pull/237)).
+
+## Bug fixes
+
+- Fix bug with catch-up all streams subscription where the checkpoint is not committed for hard deleted streams ([#238](https://github.com/commanded/eventstore/pull/238)).
+
+### Upgrading
+
+This release requires a database migration to be run. Please read the [Upgrading an EventStore](https://hexdocs.pm/eventstore/upgrades.html) guide for details on how to migrate an existing database.
+
+---
+
+## v1.2.3
+
+- Add `:configure` to postgrex connection options ([#233](https://github.com/commanded/eventstore/pull/233)).
+- Use runtime configuration in Mix tasks ([#236](https://github.com/commanded/eventstore/pull/236)).
+
+## v1.2.2
+
+- Read stream and stream events backward ([#234](https://github.com/commanded/eventstore/pull/234)).
+
+## v1.2.1
+
+- Allow optional `event_id` to be included in `EventStore.EventData` struct ([#229](https://github.com/commanded/eventstore/pull/229)).
+- Adds an option to supply an existing database connection or transaction to `EventStore` functions ([#231](https://github.com/commanded/eventstore/pull/231)).
+
+## v1.2.0
+
+### Enhancements
+
+- Delete event stream ([#203](https://github.com/commanded/eventstore/pull/203)).
+- Introduce `mix event_store.migrations` task to list migration status ([#207](https://github.com/commanded/eventstore/pull/207)).
+- Remove distributed registry ([#210](https://github.com/commanded/eventstore/pull/210)).
+- Hibernate subscription process after inactivity ([#214](https://github.com/commanded/eventstore/pull/214)).
+- Runtime event store configuration ([#217](https://github.com/commanded/eventstore/pull/217)).
+- Shared database connection pools ([#216](https://github.com/commanded/eventstore/pull/216)).
+- Shared database connection for notifications ([#225](https://github.com/commanded/eventstore/pull/225)).
+- Transient subscriptions ([#215](https://github.com/commanded/eventstore/pull/215))
+- Improve resilience when database connection is unavailable ([#226](https://github.com/commanded/eventstore/pull/226)).
+
+### Upgrading
+
+This release requires a database migration to be run. Please read the [Upgrading an EventStore](https://hexdocs.pm/eventstore/upgrades.html) guide for details on how to migrate an existing database.
+
+### Breaking changes
+
+Usage of `EventStore.Tasks.Init` task to initialise an event store database has been changed as follows:
+
+Previous usage:
+
+```elixir
+:ok = EventStore.Tasks.Init.exec(MyApp.EventStore, config, opts)
+```
+
+Usage now:
+
+```elixir
+:ok = EventStore.Tasks.Init.exec(config)
+:ok = EventStore.Tasks.Init.exec(config, opts)
+```
+
+### Bug fixes
+
+- Support appending events to a stream with `:any_version` concurrently ([#209](https://github.com/commanded/eventstore/pull/209)).
+
+---
+
 ## v1.1.0
 
 ### Enhancements
@@ -49,6 +147,8 @@ EventStore.stream_all_forward(start_version, read_batch_size: read_batch_size, t
 
 This release requires a database migration to be run. Please read the [Upgrading an EventStore](https://hexdocs.pm/eventstore/upgrades.html) guide for details on how to migrate an existing database.
 
+---
+
 ## v1.0.3
 
 ### Bug fixes
@@ -83,6 +183,8 @@ This release requires a database migration to be run. Please read the [Upgrading
 ### Upgrading
 
 [Follow the upgrade guide](guides/upgrades/0.17-1.0.md) to define and use your own application specific event store].
+
+---
 
 ## v0.17.0
 
@@ -189,7 +291,7 @@ mix do event_store.drop, event_store.create, event_store.init
 - Make `mix event_store.init` task do nothing if events table already exists ([#89](https://github.com/commanded/eventstore/pull/89)).
 - Timeout issue when using `EventStore.read_stream_forward` ([#92](https://github.com/commanded/eventstore/pull/92)).
 - Replace `:info` level logging with `:debug` ([#90](https://github.com/commanded/eventstore/issues/90)).
-- Dealing better with Poison dependancy ([#91](https://github.com/commanded/eventstore/issues/91)).
+- Dealing better with Poison dependency ([#91](https://github.com/commanded/eventstore/issues/91)).
 - Publish events directly to subscriptions ([#93](https://github.com/commanded/eventstore/pull/93)).
 - Use PostgreSQL advisory locks to enforce only one subscription instance ([#98](https://github.com/commanded/eventstore/pull/98)).
 - Remove stream process ([#99](https://github.com/commanded/eventstore/pull/99)).

@@ -7,9 +7,7 @@ defmodule EventStore.Config do
   Get the event store configuration for the environment.
   """
   def get(event_store, otp_app) do
-    Application.get_env(otp_app, event_store) ||
-      raise ArgumentError,
-            "#{inspect(event_store)} storage configuration not specified in environment"
+    Application.get_env(otp_app, event_store, [])
   end
 
   @doc """
@@ -26,13 +24,25 @@ defmodule EventStore.Config do
   Get the event store configuration for the environment.
   """
   def parsed(event_store, otp_app) do
-    event_store |> get(otp_app) |> parse()
+    get(event_store, otp_app) |> parse()
   end
 
   @doc """
-  Normalizes the event stor configuration.
+  Normalizes the event store configuration.
   """
   defdelegate parse(config), to: EventStore.Config.Parser
+
+  @doc false
+  defdelegate all, to: EventStore.Config.Store
+
+  @doc false
+  defdelegate associate(name, pid, event_store, config), to: EventStore.Config.Store
+
+  @doc false
+  defdelegate lookup(name), to: EventStore.Config.Store, as: :get
+
+  @doc false
+  defdelegate lookup(name, setting), to: EventStore.Config.Store, as: :get
 
   @doc """
   Get the data type used to store event data and metadata.
@@ -75,56 +85,57 @@ defmodule EventStore.Config do
     :password,
     :database,
     :hostname,
+    :configure,
     :port,
     :types,
     :socket,
     :socket_dir,
     :ssl,
     :ssl_opts,
-    :timeout
+    :timeout,
+    :pool,
+    :pool_size,
+    :queue_target,
+    :queue_interval,
+    :socket_options
   ]
 
   def default_postgrex_opts(config) do
-    config
-    |> Keyword.take(@postgrex_connection_opts)
-    |> Keyword.put(:after_connect, set_schema_search_path(config))
+    Keyword.take(config, @postgrex_connection_opts)
   end
 
   def postgrex_opts(config, name) do
     [
       pool_size: 10,
-      pool_overflow: 0,
       queue_target: 50,
       queue_interval: 1_000
     ]
     |> Keyword.merge(config)
-    |> Keyword.take(
-      @postgrex_connection_opts ++
-        [
-          :pool,
-          :pool_size,
-          :pool_overflow,
-          :queue_target,
-          :queue_interval
-        ]
-    )
+    |> Keyword.take(@postgrex_connection_opts)
     |> Keyword.put(:backoff_type, :exp)
-    |> Keyword.put(:name, Module.concat([name, Postgrex]))
-    |> Keyword.put(:after_connect, set_schema_search_path(config))
+    |> Keyword.put(:name, name)
   end
 
-  def sync_connect_postgrex_opts(config) do
+  def postgrex_notifications_opts(config, name) do
+    config
+    |> default_postgrex_opts()
+    |> Keyword.put(:auto_reconnect, true)
+    |> Keyword.put(:backoff_type, :exp)
+    |> Keyword.put(:pool_size, 1)
+    |> Keyword.put(:sync_connect, false)
+    |> Keyword.put(:name, name)
+  end
+
+  @doc """
+  Stop the Postgrex process when the database connection is lost.
+
+  Stopping the process allows a subscription to be notified when it has lost its
+  advisory lock.
+  """
+  def advisory_locks_postgrex_opts(config) do
     config
     |> default_postgrex_opts()
     |> Keyword.put(:backoff_type, :stop)
-    |> Keyword.put(:sync_connect, true)
-  end
-
-  # Set the Postgres connection's `search_path` to include only the configured
-  # schema. This will be `public` by default.
-  defp set_schema_search_path(config) do
-    schema = Keyword.fetch!(config, :schema)
-
-    {Postgrex, :query!, ["SET search_path TO #{schema};", []]}
+    |> Keyword.put(:pool_size, 1)
   end
 end

@@ -32,15 +32,15 @@ defmodule EventStore.AdvisoryLocksTest do
       assert is_reference(lock3)
     end
 
-    test "should fail to acquire lock when already taken", %{conn: conn} do
-      :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
+    test "should fail to acquire lock when already taken", %{conn: conn, schema: schema} do
+      :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1, schema: schema)
 
       assert {:error, :lock_already_taken} = AdvisoryLocks.try_advisory_lock(@locks, 1)
     end
   end
 
   describe "release lock" do
-    test "should release lock when process terminates", %{conn: conn} do
+    test "should release lock when process terminates", %{conn: conn, schema: schema} do
       reply_to = self()
 
       pid =
@@ -56,13 +56,15 @@ defmodule EventStore.AdvisoryLocksTest do
         end)
 
       assert_receive :lock_acquired
-      assert {:error, :lock_already_taken} = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
+
+      assert {:error, :lock_already_taken} =
+               Storage.Lock.try_acquire_exclusive_lock(conn, 1, schema: schema)
 
       send(pid, :shutdown)
 
       # Wait for lock to be released after process terminates
       Wait.until(fn ->
-        assert :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1)
+        assert :ok = Storage.Lock.try_acquire_exclusive_lock(conn, 1, schema: schema)
       end)
     end
   end
@@ -71,7 +73,7 @@ defmodule EventStore.AdvisoryLocksTest do
     test "should send `lock_released` message" do
       {:ok, lock} = AdvisoryLocks.try_advisory_lock(@locks, 1)
 
-      connection_down()
+      shutdown_database_connection()
 
       assert_receive({AdvisoryLocks, :lock_released, ^lock, :shutdown})
     end
@@ -95,16 +97,18 @@ defmodule EventStore.AdvisoryLocksTest do
 
       conn2 = start_supervised!({Postgrex, example_schema}, id: :conn2)
 
-      [conn1: conn1, conn2: conn2]
+      [conn1: conn1, conn2: conn2, schema1: "public", schema2: "example"]
     end
 
-    test "should acquire lock", %{conn1: conn1, conn2: conn2} do
-      :ok = Storage.Lock.try_acquire_exclusive_lock(conn1, 1)
-      :ok = Storage.Lock.try_acquire_exclusive_lock(conn2, 1)
+    test "should acquire lock", %{conn1: conn1, conn2: conn2, schema1: schema1, schema2: schema2} do
+      :ok = Storage.Lock.try_acquire_exclusive_lock(conn1, 1, schema: schema1)
+      :ok = Storage.Lock.try_acquire_exclusive_lock(conn2, 1, schema: schema2)
     end
   end
 
-  defp connection_down do
-    send(@locks, {:DOWN, @conn, nil, :shutdown})
+  defp shutdown_database_connection do
+    %{pid: pid} = Process.whereis(@conn) |> :sys.get_state()
+
+    EventStore.ProcessHelper.shutdown(pid)
   end
 end

@@ -6,7 +6,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       ```elixir
       def deps do
-        [{:eventstore, "~> 1.1"}]
+        [{:eventstore, "~> 1.3"}]
       end
       ```
 
@@ -54,7 +54,6 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
       ```elixir
       config :my_app, MyApp.EventStore,
         pool_size: 10
-        pool_overflow: 5
         queue_target: 50
         queue_interval: 1_000,
         schema: "schema_name"
@@ -63,7 +62,6 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
       The database connection pool configuration options are:
 
       - `:pool_size` - The number of connections (default: `10`).
-      - `:pool_overflow` - The maximum number of overflow connections to start if all connections are checked out (default: `0`).
 
       Handling requests is done through a queue. When DBConnection is started, there are two relevant options to control the queue:
 
@@ -74,6 +72,12 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       - `:schema` - define the Postgres schema to use (default: `public` schema).
       - `:timeout` - set the default database query timeout in milliseconds (default: 15,000ms).
+      - `:shared_connection_pool` - allows a database connection pool to be shared amongst multiple event store instances (default: `nil`).
+
+      Subscription options:
+
+      - `:subscription_retry_interval` - interval between subscription connection retry attempts (default: 60,000ms).
+      - `:subscription_hibernate_after` - subscriptions will automatically hibernate to save memory after a period of inactivity (default: 15,000ms).
 
   4. Add your event store module to the `event_stores` list for your app in mix config:
 
@@ -151,7 +155,7 @@ defmodule MyApp.ReleaseTasks do
     config = MyApp.EventStore.config()
 
     :ok = EventStore.Tasks.Create.exec(config, [])
-    :ok = EventStore.Tasks.Init.exec(MyApp.EventStore, config, [])
+    :ok = EventStore.Tasks.Init.exec(config, [])
   end
 end
 ```
@@ -214,12 +218,12 @@ config :my_app, MyApp.EventStore,
   types: EventStore.PostgresTypes
 ```
 
-Finally, you need to include the Jason library as a depencency in `mix.exs` to enable Postgrex JSON support and then run `mix deps.get` to install.
+Finally, you need to include the Jason library as a dependency in `mix.exs` to enable Postgrex JSON support and then run `mix deps.get` to install.
 
 ```elixir
 # mix.exs
 defp deps do
-  [{:jason, "~> 1.1"}]
+  [{:jason, "~> 1.2"}]
 end
 ```
 

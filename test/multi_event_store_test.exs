@@ -1,4 +1,4 @@
-defmodule MultiEventStoreTest do
+defmodule EventStore.MultiEventStoreTest do
   use EventStore.StorageCase
 
   alias EventStore.{Config, EventData, EventFactory, RecordedEvent, Storage}
@@ -192,12 +192,16 @@ defmodule MultiEventStoreTest do
   end
 
   defp reset_event_store!(event_store) do
-    config = Config.parsed(event_store, :eventstore)
+    config = event_store.config()
     postgrex_config = Config.default_postgrex_opts(config)
 
     {:ok, conn} = Postgrex.start_link(postgrex_config)
 
-    Storage.Initializer.reset!(conn)
+    try do
+      Storage.Initializer.reset!(conn, config)
+    after
+      GenServer.stop(conn)
+    end
   end
 
   # defp pluck(enumerable, field), do: Enum.map(enumerable, &Map.get(&1, field))

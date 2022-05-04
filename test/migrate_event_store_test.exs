@@ -1,4 +1,4 @@
-defmodule MigrateEventStoreTest do
+defmodule EventStore.MigrateEventStoreTest do
   use ExUnit.Case
 
   import ExUnit.CaptureIO
@@ -84,6 +84,8 @@ defmodule MigrateEventStoreTest do
     |> Enum.reject(fn
       "0\t17\t0\tNOW" -> true
       "1\t1\t0\tNOW" -> true
+      "1\t2\t0\tNOW" -> true
+      "1\t3\t0\tNOW" -> true
       _line -> false
     end)
   end
@@ -94,7 +96,7 @@ defmodule MigrateEventStoreTest do
 
     {:ok, conn} = Postgrex.start_link(config)
 
-    EventStore.Storage.Initializer.run!(TestEventStore, config, conn)
+    EventStore.Storage.Initializer.run!(conn, config)
 
     :ok = GenServer.stop(conn)
   end

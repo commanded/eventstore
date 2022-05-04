@@ -1,3 +1,3 @@
-exclude = [:distributed, :ignore, :manual, :migration, :slow]
+exclude = [:ignore, :manual, :migration, :slow]
 
 ExUnit.start(exclude: exclude)

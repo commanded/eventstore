@@ -4,23 +4,11 @@ EventStore supports running on multiple nodes as either a [distributed Erlang](h
 
 ## Event publication
 
-PostgreSQL's `LISTEN` / `NOTIFY` is used to pub/sub event notifications.
-
-A single listener process will connect to the database to listen for events when using a distributed cluster. Events will be broadcast from the single listener process to a `GenServer` process running on each connected node that forwards events to its local subscribers. This limits the number of database connections to at most the number of running clusters.
-
-Running EventStore on multiple nodes that are not connected together to form a cluster will result in one listener process and database connection per node.
+PostgreSQL's `LISTEN` / `NOTIFY` is used to pub/sub event notifications. A listener database connection process is started on each node. It connects to the database to listen for events and publishes them to interested subscription processes running on the node. The approach is the same regardless of whether distributed Erlang is used or not.
 
 ## Subscriptions
 
 PostgreSQL's [advisory locks](https://www.postgresql.org/docs/current/static/explicit-locking.html#ADVISORY-LOCKS) are used to limit each uniquely named subscription to run at most once. This prevents multiple instances of a subscription from running on different nodes. Advisory locks are faster than table locks, are stored in memory to avoid table bloat, and are automatically cleaned up by the server at the end of the session.
-
-## Running on a cluster
-
-Configure your EventStore module to use the `:distributed` registry in the environment config (e.g. `config/config.exs`):
-
-```elixir
-config :my_app, MyApp.EventStore, registry: :distributed
-```
 
 ## Automatic cluster formation
 

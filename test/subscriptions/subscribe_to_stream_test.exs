@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, ProcessHelper, Storage, Subscriptions, Wait}
+  alias EventStore.{EventFactory, ProcessHelper, RecordedEvent, Storage, Subscriptions, Wait}
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Support.CollectingSubscriber
   alias TestEventStore, as: EventStore
@@ -19,7 +19,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     setup [:append_events_to_another_stream]
 
     test "should receive `:subscribed` message once subscribed", %{
-      registry: registry,
+      schema: schema,
       serializer: serializer,
       subscription_name: subscription_name
     } do
@@ -29,8 +29,9 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
         Subscriptions.subscribe_to_stream(self(),
           event_store: @event_store,
           conn: @conn,
-          registry: registry,
+          schema: schema,
           serializer: serializer,
+          hibernate_after: 15_000,
           retry_interval: 1_000,
           stream_uuid: stream_uuid,
           subscription_name: subscription_name
@@ -297,6 +298,39 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       refute_receive {:events, _received_events}
     end
+
+    test "subscription process hibernated after inactivity", %{
+      subscription_name: subscription_name
+    } do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(3)
+
+      # Create a subscription with `hibernate_after` set to 1ms so process will
+      # immediately hibernate
+      {:ok, subscription} =
+        subscribe_to_stream(stream_uuid, subscription_name, self(), hibernate_after: 1)
+
+      # Subscription process should be hibernated
+      Wait.until(fn -> assert_hibernated(subscription) end)
+
+      # Appending events to the stream should resume the subscription's event loop
+      :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      assert_receive {:events, received_events}
+
+      assert pluck(received_events, :event_number) == [1, 2, 3]
+      assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
+      assert pluck(received_events, :stream_version) == [1, 2, 3]
+      assert pluck(received_events, :correlation_id) == pluck(events, :correlation_id)
+      assert pluck(received_events, :causation_id) == pluck(events, :causation_id)
+      assert pluck(received_events, :event_type) == pluck(events, :event_type)
+      assert pluck(received_events, :data) == pluck(events, :data)
+      assert pluck(received_events, :metadata) == pluck(events, :metadata)
+      refute pluck(received_events, :created_at) |> Enum.any?(&is_nil/1)
+
+      # Subscription process should be hibernated again after inactivity
+      Wait.until(fn -> assert_hibernated(subscription) end)
+    end
   end
 
   describe "all stream subscription" do
@@ -309,7 +343,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream1_events = EventFactory.create_events(1)
       stream2_events = EventFactory.create_events(1)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), buffer_size: 1)
 
       :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_events)
       :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
@@ -358,12 +392,14 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_initial_events)
       :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_initial_events)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), start_from: 2)
+      {:ok, subscription} =
+        subscribe_to_all_streams(subscription_name, self(), buffer_size: 1, start_from: 2)
 
       :ok = EventStore.append_to_stream(stream1_uuid, 1, stream1_new_events)
       :ok = EventStore.append_to_stream(stream2_uuid, 1, stream2_new_events)
 
       assert_receive {:events, stream1_received_events}
+
       :ok = Subscription.ack(subscription, stream1_received_events)
 
       assert_receive {:events, stream2_received_events}
@@ -428,12 +464,15 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       stream1_events = EventFactory.create_events(1)
       stream2_events = EventFactory.create_events(1)
 
-      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self())
+      {:ok, subscription} = subscribe_to_all_streams(subscription_name, self(), buffer_size: 1)
+
+      refute_receive {:events, _events}
 
       :ok = EventStore.append_to_stream(stream1_uuid, 0, stream1_events)
       :ok = EventStore.append_to_stream(stream2_uuid, 0, stream2_events)
 
       assert_receive {:events, stream1_received_events}
+
       :ok = Subscription.ack(subscription, 1)
 
       assert_receive {:events, stream2_received_events}
@@ -464,14 +503,22 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
 
       :ok = EventStore.append_to_stream(stream_uuid, 0, events)
 
-      # should receive events twice
-      assert_receive_events(stream_uuid, events, [1, 2, 3])
-      assert_receive_events(stream_uuid, events, [4, 5, 6])
+      # Should receive the same three events from both subscriptions
+      assert_receive {:events, [%RecordedEvent{event_number: 1} | _events] = received_events1}
+      assert_receive {:events, [%RecordedEvent{event_number: 4} | _events] = received_events2}
+
+      assert_received_events(received_events1, stream_uuid, events, [1, 2, 3])
+      assert_received_events(received_events2, stream_uuid, events, [4, 5, 6])
+
       refute_receive {:events, _received_events}
     end
 
-    defp assert_receive_events(stream_uuid, expected_events, expected_event_numbers) do
-      assert_receive {:events, received_events}
+    defp assert_received_events(
+           received_events,
+           stream_uuid,
+           expected_events,
+           expected_event_numbers
+         ) do
       assert pluck(received_events, :event_number) == expected_event_numbers
       assert pluck(received_events, :stream_uuid) == [stream_uuid, stream_uuid, stream_uuid]
       assert pluck(received_events, :stream_version) == [1, 2, 3]
@@ -522,6 +569,182 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
     end
   end
 
+  describe "restarting a subscription" do
+    test "should only receive not acked events", %{
+      subscription_name: subscription_name
+    } do
+      stream_uuid = UUID.uuid4()
+      initial_events = EventFactory.create_events(1)
+      new_events = EventFactory.create_events(1, 2)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+
+      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(initial_events, :data)
+
+      :ok = Subscription.ack(subscription, received_events)
+
+      Process.exit(subscription, :kill)
+      refute Process.info(subscription)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
+      {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(new_events, :data)
+    end
+  end
+
+  describe "restarting a transient subscription" do
+    test "should receive all events after restart", %{
+      subscription_name: subscription_name
+    } do
+      stream_uuid = UUID.uuid4()
+      initial_events = EventFactory.create_events(1)
+      new_events = EventFactory.create_events(1, 2)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(initial_events, :data)
+
+      :ok = Subscription.ack(subscription, received_events)
+
+      Process.exit(subscription, :kill)
+      refute Process.info(subscription)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(initial_events, :data)
+    end
+
+    test "should receive all events starting from start_from after restart", %{
+      subscription_name: subscription_name
+    } do
+      stream_uuid = UUID.uuid4()
+      initial_events = EventFactory.create_events(1)
+      new_events = EventFactory.create_events(1, 2)
+      after_restart_events = EventFactory.create_events(1, 3)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(initial_events, :data)
+
+      :ok = Subscription.ack(subscription, received_events)
+
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(new_events, :data)
+
+      Process.exit(subscription, :kill)
+      refute Process.info(subscription)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 2, after_restart_events)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(),
+          transient: true,
+          start_from: 1
+        )
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(new_events, :data)
+    end
+
+    test "should allow to start with a transient subscription and change it to a none transient subscription",
+         %{
+           subscription_name: subscription_name
+         } do
+      stream_uuid = UUID.uuid4()
+      initial_events = EventFactory.create_events(1)
+      new_events = EventFactory.create_events(1, 2)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(initial_events, :data)
+
+      :ok = Subscription.ack(subscription, received_events)
+
+      Process.exit(subscription, :kill)
+      refute Process.info(subscription)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: false)
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(initial_events, :data)
+    end
+
+    test "should allow to start with a persistent subscription and later start a transient subscription with the same name",
+         %{
+           subscription_name: subscription_name
+         } do
+      stream_uuid = UUID.uuid4()
+      initial_events = EventFactory.create_events(1)
+      new_events = EventFactory.create_events(1, 2)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 0, initial_events)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: false)
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(initial_events, :data)
+
+      :ok = Subscription.ack(subscription, received_events)
+
+      Process.exit(subscription, :kill)
+      refute Process.info(subscription)
+
+      :ok = EventStore.append_to_stream(stream_uuid, 1, new_events)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: true)
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(initial_events, :data)
+
+      Process.exit(subscription, :kill)
+      refute Process.info(subscription)
+
+      {:ok, subscription} =
+        EventStore.subscribe_to_stream(stream_uuid, subscription_name, self(), transient: false)
+
+      assert_receive {:subscribed, ^subscription}
+      assert_receive {:events, received_events}
+      assert pluck(received_events, :data) == pluck(new_events, :data)
+    end
+  end
+
   describe "unsubscribe from stream" do
     test "should shutdown subscription process", %{
       subscription_name: subscription_name
@@ -560,7 +783,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   end
 
   describe "delete subscription" do
-    test "should be deleted", %{subscription_name: subscription_name} do
+    test "should be deleted", %{subscription_name: subscription_name, schema: schema} do
       stream_uuid = UUID.uuid4()
 
       {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, subscription_name, self())
@@ -568,8 +791,12 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
       assert :ok = EventStore.delete_subscription(stream_uuid, subscription_name)
       refute Process.alive?(subscription)
 
-      assert {:ok, []} = Storage.subscriptions(@conn)
+      assert {:ok, []} = Storage.subscriptions(@conn, schema: schema)
     end
+  end
+
+  defp assert_hibernated(pid) do
+    assert Process.info(pid, :current_function) == {:current_function, {:erlang, :hibernate, 3}}
   end
 
   # Append events to another stream so that for single stream subscription tests
@@ -594,7 +821,7 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   end
 
   # subscribe to all streams and wait for the subscription to be subscribed
-  defp subscribe_to_all_streams(subscription_name, subscriber, opts \\ []) do
+  defp subscribe_to_all_streams(subscription_name, subscriber, opts) do
     subscribe_to_stream("$all", subscription_name, subscriber, opts)
   end
 

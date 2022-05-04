@@ -1,4 +1,4 @@
-use Mix.Config
+import Config
 
 # no logging for benchmarking
 config :logger, backends: []
@@ -13,7 +13,6 @@ default_config = [
   database: "eventstore_bench",
   hostname: "localhost",
   pool_size: 10,
-  pool_overflow: 5,
   serializer: EventStore.TermSerializer
 ]
 

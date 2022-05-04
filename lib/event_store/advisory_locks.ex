@@ -11,7 +11,7 @@ defmodule EventStore.AdvisoryLocks do
 
   defmodule State do
     @moduledoc false
-    defstruct [:conn, state: :connected, locks: %{}]
+    defstruct [:conn, :ref, :schema, locks: %{}]
   end
 
   defmodule Lock do
@@ -23,26 +23,35 @@ defmodule EventStore.AdvisoryLocks do
             ref: reference()
           }
     defstruct [:key, :owner, :ref]
+
+    def new(key, owner) do
+      %Lock{key: key, owner: owner, ref: make_ref()}
+    end
+
+    def ref(%Lock{ref: ref}), do: ref
   end
 
   alias EventStore.AdvisoryLocks.{Lock, State}
   alias EventStore.Storage
 
   def start_link(opts) do
-    conn = Keyword.fetch!(opts, :conn)
-    name = Keyword.get(opts, :name, __MODULE__)
+    {start_opts, advisory_locks_opts} =
+      Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt, :hibernate_after])
 
-    state = %State{conn: conn}
+    conn = Keyword.fetch!(advisory_locks_opts, :conn)
+    schema = Keyword.fetch!(advisory_locks_opts, :schema)
 
-    GenServer.start_link(__MODULE__, state, name: name)
+    state = %State{conn: conn, schema: schema}
+
+    GenServer.start_link(__MODULE__, state, start_opts)
   end
 
   def init(%State{} = state) do
     %State{conn: conn} = state
 
-    :ok = MonitoredServer.monitor(conn)
+    {:ok, ref} = MonitoredServer.monitor(conn)
 
-    {:ok, state}
+    {:ok, %State{state | ref: ref}}
   end
 
   @doc """
@@ -55,7 +64,7 @@ defmodule EventStore.AdvisoryLocks do
 
   ## Lock released
 
-  A `{EventStore.AdvisoryLocks, :lock_released, lock, reason}` message will be
+  An `{EventStore.AdvisoryLocks, :lock_released, lock, reason}` message will be
   sent to the lock owner when the lock is released, usually due to the database
   connection terminating. It is up to the lock owner to attempt to reacquire the
   lost lock.
@@ -68,28 +77,22 @@ defmodule EventStore.AdvisoryLocks do
   end
 
   def handle_call({:try_advisory_lock, key, owner}, _from, %State{} = state) do
-    %State{conn: conn} = state
-
-    case try_acquire_exclusive_lock(conn, key, owner) do
-      {:ok, %Lock{ref: lock_ref} = lock} ->
+    case try_acquire_exclusive_lock(key, owner, state) do
+      {:ok, %Lock{} = lock} ->
         state = monitor_acquired_lock(lock, state)
 
-        {:reply, {:ok, lock_ref}, state}
+        {:reply, {:ok, Lock.ref(lock)}, state}
 
       reply ->
         {:reply, reply, state}
     end
   end
 
-  defp try_acquire_exclusive_lock(conn, key, owner) do
-    case Storage.Lock.try_acquire_exclusive_lock(conn, key) do
-      :ok ->
-        lock = %Lock{key: key, owner: owner, ref: make_ref()}
+  defp try_acquire_exclusive_lock(key, owner, %State{} = state) do
+    %State{conn: conn, schema: schema} = state
 
-        {:ok, lock}
-
-      {:error, error} ->
-        {:error, error}
+    with :ok <- Storage.Lock.try_acquire_exclusive_lock(conn, key, schema: schema) do
+      {:ok, Lock.new(key, owner)}
     end
   end
 
@@ -101,18 +104,13 @@ defmodule EventStore.AdvisoryLocks do
     %State{state | locks: Map.put(locks, owner_ref, lock)}
   end
 
-  # Database connection has come up.
-  def handle_info({:UP, conn, _pid}, %State{conn: conn} = state) do
-    {:noreply, %State{state | state: :connected}}
-  end
-
   # Lost locks when database connection goes down.
-  def handle_info({:DOWN, conn, _pid, reason}, %State{conn: conn} = state) do
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %State{ref: ref} = state) do
     %State{locks: locks} = state
 
     notify_lost_locks(locks, reason)
 
-    {:noreply, %State{state | locks: %{}, state: :disconnected}}
+    {:noreply, %State{state | locks: %{}}}
   end
 
   # Release lock when the lock owner process terminates.
@@ -125,7 +123,7 @@ defmodule EventStore.AdvisoryLocks do
           state
 
         %Lock{key: key} ->
-          :ok = release_lock(key, state)
+          release_lock(key, state)
 
           %State{state | locks: Map.delete(locks, ref)}
       end
@@ -143,11 +141,9 @@ defmodule EventStore.AdvisoryLocks do
     :ok
   end
 
-  defp release_lock(key, %State{state: :connected} = state) do
-    %State{conn: conn} = state
+  defp release_lock(key, %State{} = state) do
+    %State{conn: conn, schema: schema} = state
 
-    Storage.Lock.unlock(conn, key)
+    Storage.Lock.unlock(conn, key, schema: schema)
   end
-
-  defp release_lock(_key, %State{}), do: :ok
 end

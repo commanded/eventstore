@@ -14,7 +14,7 @@ EventStore supports [running on a cluster of nodes](guides/Cluster.md).
 
 MIT License
 
-[![Build Status](https://travis-ci.com/commanded/eventstore.svg?branch=master)](https://travis-ci.com/commanded/eventstore)
+![Build Status](https://github.com/commanded/eventstore/workflows/Test/badge.svg?branch=master)
 
 ---
 
@@ -198,6 +198,29 @@ The benchmark suite is configured to use Erlang's [external term format](http://
 
 ## Testing
 
+Tests can be run using any Postgres database instance, including via Docker.
+
+To use Docker, first pull the latest Postgres image:
+
+```shell
+docker pull postgres
+```
+
+A [tmpfs](https://docs.docker.com/storage/tmpfs/) mount can be used to run the Docker container with the Postgres data directory stored in memory.
+
+```shell
+docker run --rm \
+  --name postgres \
+  --tmpfs=/pgtmpfs \
+  -e PGDATA=/pgtmpfs \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_USER=postgres \
+  -p 5432:5432 \
+  postgres
+```
+
+### Running tests
+
 Create and initialize the test event store databases:
 
 ```
@@ -222,7 +245,9 @@ You should include unit tests to cover any changes.
 
 EventStore exists thanks to the following people who have contributed.
 
+- [Andreas Riemer](https://github.com/arfl)
 - [Andrey Akulov](https://github.com/astery)
+- [Basile Nouvellet](https://github.com/BasileNouvellet)
 - [Ben Smith](https://github.com/slashdotdash)
 - [Bruce Williams](https://github.com/bruce)
 - [Chris Brodt](https://github.com/uberbrodt)
@@ -237,7 +262,9 @@ EventStore exists thanks to the following people who have contributed.
 - [Eamon Taaffe](https://github.com/eamontaaffe)
 - [Floris Huetink](https://github.com/florish)
 - [Jan Vereecken](https://github.com/javereec)
+- [Kai Kuchenbecker](https://github.com/kaikuchn)
 - [Kaz Walker](https://github.com/KazW)
+- [Morten Berg Nissen](https://github.com/mbnissen)
 - [Nicholas Henry](https://github.com/nicholasjhenry)
 - [Olafur Arason](https://github.com/olafura)
 - [Ole Michaelis](https://github.com/OleMchls)
@@ -246,6 +273,7 @@ EventStore exists thanks to the following people who have contributed.
 - [Samuel Roze](https://github.com/sroze)
 - [Simon Harris](https://github.com/harukizaemon)
 - [Stuart Corbishley](https://github.com/stuartc)
+- [Thomas Coopman](https://github.com/tcoopman)
 - [Victor Oliveira Nascimento](https://github.com/victorolinasc)
 - [Yamil Díaz Aguirre](https://github.com/Yamilquery)
 - [Yannis Weishaupt](https://github.com/MrYawe)

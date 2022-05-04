@@ -1,7 +1,8 @@
 defmodule EventStore.Mixfile do
   use Mix.Project
 
-  @version "1.1.0"
+  @source_url "https://github.com/commanded/eventstore"
+  @version "1.4.0"
 
   def project do
     [
@@ -20,17 +21,18 @@ defmodule EventStore.Mixfile do
       preferred_cli_env: preferred_cli_env(),
       dialyzer: dialyzer(),
       name: "EventStore",
-      source_url: "https://github.com/commanded/eventstore"
+      source_url: @source_url
     ]
   end
 
   def application do
     [
-      extra_applications: [:logger, :ssl]
+      extra_applications: [:crypto, :eex, :logger, :ssl],
+      mod: {EventStore.Application, []}
     ]
   end
 
-  defp elixirc_paths(env) when env in [:bench, :distributed, :jsonb, :migration, :test],
+  defp elixirc_paths(env) when env in [:bench, :jsonb, :migration, :test],
     do: ["lib", "test/support", "test/subscriptions/support"]
 
   defp elixirc_paths(_env), do: ["lib"]
@@ -39,20 +41,17 @@ defmodule EventStore.Mixfile do
     [
       {:elixir_uuid, "~> 1.2"},
       {:fsm, "~> 0.3"},
-      {:gen_stage, "~> 1.0"},
+      {:gen_stage, "~> 1.1"},
       {:postgrex, "~> 0.15"},
-      {:highlander, "~> 0.2"},
 
       # Optional dependencies
-      {:jason, "~> 1.2", optional: true},
+      {:jason, "~> 1.3", optional: true},
       {:poolboy, "~> 1.5", optional: true},
 
       # Development and test tooling
       {:benchfella, "~> 0.3", only: :bench},
-      {:dialyxir, "~> 1.0", only: :dev, runtime: false},
-      {:ex_doc, "~> 0.22", only: :dev},
-      {:local_cluster, "~> 1.1", only: [:distributed]},
-      {:mix_test_watch, "~> 1.0", only: :dev}
+      {:dialyxir, "~> 1.1", only: :dev, runtime: false},
+      {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
 
@@ -110,11 +109,6 @@ defmodule EventStore.Mixfile do
           EventStore.Serializer,
           EventStore.TermSerializer
         ],
-        Registration: [
-          EventStore.Registration,
-          EventStore.Registration.DistributedRegistry,
-          EventStore.Registration.LocalRegistry
-        ],
         Tasks: [
           EventStore.Tasks.Create,
           EventStore.Tasks.Drop,
@@ -127,11 +121,12 @@ defmodule EventStore.Mixfile do
 
   defp package do
     [
-      files: ["lib", "priv/event_store", "guides", "mix.exs", "README*", "LICENSE*"],
+      files: ["lib", "priv/event_store", "guides", "mix.exs", "README*", "LICENSE*", "CHANGELOG*"],
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => "https://github.com/commanded/eventstore"
+        "Changelog" => "https://hexdocs.pm/eventstore/#{@version}/changelog.html",
+        "GitHub" => @source_url
       }
     ]
   end
@@ -143,8 +138,7 @@ defmodule EventStore.Mixfile do
       "event_store.setup": ["event_store.create", "event_store.init"],
       "es.reset": ["event_store.reset"],
       "es.setup": ["event_store.setup"],
-      "test.all": ["test", "test.jsonb", "test.distributed", "test.migration", "test --only slow"],
-      "test.distributed": &test_distributed/1,
+      "test.all": ["test", "test.jsonb", "test.migration", "test --only slow"],
       "test.jsonb": &test_jsonb/1,
       "test.migration": &test_migration/1
     ]
@@ -153,7 +147,6 @@ defmodule EventStore.Mixfile do
   defp preferred_cli_env do
     [
       "test.all": :test,
-      "test.distributed": :test,
       "test.jsonb": :test,
       "test.migration": :test
     ]
@@ -161,13 +154,13 @@ defmodule EventStore.Mixfile do
 
   defp dialyzer do
     [
+      ignore_warnings: ".dialyzer_ignore.exs",
       plt_add_apps: [:ex_unit, :jason, :mix],
       plt_add_deps: :app_tree,
       plt_file: {:no_warn, "priv/plts/eventstore.plt"}
     ]
   end
 
-  defp test_distributed(args), do: test_env(:distributed, ["--only", "distributed"] ++ args)
   defp test_migration(args), do: test_env(:migration, ["--include", "migration"] ++ args)
   defp test_jsonb(args), do: test_env(:jsonb, args)
 

@@ -45,7 +45,7 @@ defmodule EventStore.Notifications.NotifyEventsTest do
   end
 
   defp start_listener(config, id) do
-    listener_opts = Config.sync_connect_postgrex_opts(config)
+    listener_opts = Config.postgrex_notifications_opts(config, id)
 
     start_supervised(%{
       id: id,
