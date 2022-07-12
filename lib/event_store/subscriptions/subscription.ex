@@ -273,7 +273,7 @@ defmodule EventStore.Subscriptions.Subscription do
        when fsm in [:initial, :disconnected] do
     %Subscription{retry_interval: retry_interval} = state
 
-    _ref = Process.send_after(self(), :subscribe_to_stream, retry_interval)
+    Process.send_after(self(), :subscribe_to_stream, retry_interval)
 
     state
   end

@@ -1125,6 +1125,7 @@ defmodule EventStore do
         busy subscriptions, but means that events might be replayed when the
         subscription resumes if the checkpoint cannot be written.
         The default is to persist the checkpoint after each acknowledgement.
+        See the "Subscription tuning" section below for more detail.
 
       - `checkpoint_after` (milliseconds) used to ensure a checkpoint is written
         after a period of inactivity even if the checkpoint threshold has not
@@ -1177,15 +1178,15 @@ defmodule EventStore do
   Subscribers will initially receive a `{:subscribed, subscription}` message
   once the subscription has successfully subscribed.
 
-  After this message events will be sent to the subscriber, in batches, as
-  `{:events, events}` where events is a collection of `EventStore.RecordedEvent`
-  structs.
+  After the subscribed message, events will be sent to the subscriber as
+  `{:events, events}` messages where events is a collection of
+  `EventStore.RecordedEvent` structs.
 
   ## Example
 
       {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, "example", self())
 
-      # wait for the subscription confirmation
+      # Wait for the subscription confirmation
       receive do
         {:subscribed, ^subscription} ->
           IO.puts "Successfully subscribed to stream: " <> inspect(stream_uuid)
@@ -1195,7 +1196,7 @@ defmodule EventStore do
         {:events, events} ->
           IO.puts "Received events: " <> inspect(events)
 
-          # acknowledge receipt
+          # Acknowledge receipt
           EventStore.ack(subscription, events)
       end
 
@@ -1210,12 +1211,16 @@ defmodule EventStore do
   processing of the event.
 
   The `checkpoint_threshold` controls how frequently checkpoints are persisted.
-  Increasing the threshold reduces the number of database writes. For example
-  using a threshold of 100 means that a checkpoint is written at most once for
-  every 100 events processed. The `checkpoint_after` ensures that a checkpoint
-  will still be written after a period of inactivity even when the threshold has
-  not been met. This ensures bursts of event processing can be safely handled.
+  Increasing the threshold reduces the number of database writes (better
+  performance). For example using a threshold of 100 means that a checkpoint is
+  written at least once for every 100 events processed.
 
+  The `checkpoint_after` option ensures that a checkpoint will still be written
+  at a fixed interval even if the threshold has not been met. This allows a
+  large checkpoint threshold to be used for fewer writes (better performance)
+  but still guarantees a maximum interval between checkpoint writes to reduce
+  the likelihood of replaying too many already seen events on checkpointing
+  failure.
   """
   @callback subscribe_to_stream(
               stream_uuid :: String.t(),

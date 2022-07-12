@@ -102,6 +102,8 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
       # Should receive already sent, but not successfully ack'd events
       assert_receive_events([1, 2, 3])
+
+      refute_received {:subscribed, _subscription}
     end
   end
 

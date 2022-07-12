@@ -57,8 +57,9 @@ defmodule EventStore.Supervisor do
 
         advisory_locks_name = Module.concat([name, AdvisoryLocks])
         advisory_locks_postgrex_conn = Module.concat([advisory_locks_name, Postgrex])
-        advisory_locks_config = Config.advisory_locks_postgrex_opts(config)
+        advisory_locks_postgrex_config = Config.advisory_locks_postgrex_opts(config)
 
+        subscription_retry_interval = Keyword.fetch!(config, :subscription_retry_interval)
         subscriptions_name = Module.concat([name, Subscriptions.Supervisor])
         subscriptions_registry_name = Module.concat([name, Subscriptions.Registry])
 
@@ -75,13 +76,16 @@ defmodule EventStore.Supervisor do
             ),
             Supervisor.child_spec(
               {MonitoredServer,
-               mfa: {Postgrex, :start_link, [advisory_locks_config]},
+               mfa: {Postgrex, :start_link, [advisory_locks_postgrex_config]},
                name: advisory_locks_postgrex_conn,
                backoff_min: 30_000},
               id: Module.concat([advisory_locks_postgrex_conn, MonitoredServer])
             ),
             {AdvisoryLocks,
-             conn: advisory_locks_postgrex_conn, schema: schema, name: advisory_locks_name},
+             conn: advisory_locks_postgrex_conn,
+             schema: schema,
+             name: advisory_locks_name,
+             retry_interval: subscription_retry_interval},
             {Subscriptions.Supervisor, name: subscriptions_name},
             Supervisor.child_spec({Registry, keys: :unique, name: subscriptions_registry_name},
               id: subscriptions_registry_name

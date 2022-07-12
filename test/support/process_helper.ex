@@ -7,7 +7,7 @@ defmodule EventStore.ProcessHelper do
   def shutdown(name_or_pid)
 
   def shutdown(name) when is_atom(name) do
-    name |> Process.whereis() |> shutdown()
+    Process.whereis(name) |> shutdown()
   end
 
   def shutdown(pid) when is_pid(pid) do

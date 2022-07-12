@@ -60,8 +60,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       end
     end
 
-    defevent subscribe,
-      data: %SubscriptionState{} = data do
+    defevent subscribe, data: %SubscriptionState{} = data do
       data = SubscriptionState.reset_event_tracking(data)
 
       with {:ok, subscription} <- create_subscription(data),
