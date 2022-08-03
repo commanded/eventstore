@@ -3,7 +3,7 @@ defmodule EventStore.Storage.Appender do
 
   require Logger
 
-  alias EventStore.RecordedEvent
+  alias EventStore.{RecordedEvent, UUID}
   alias EventStore.Sql.Statements
 
   @doc """

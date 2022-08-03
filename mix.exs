@@ -8,7 +8,7 @@ defmodule EventStore.Mixfile do
     [
       app: :eventstore,
       version: @version,
-      elixir: "~> 1.6",
+      elixir: "~> 1.10",
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       description: description(),
@@ -39,7 +39,6 @@ defmodule EventStore.Mixfile do
 
   defp deps do
     [
-      {:elixir_uuid, "~> 1.2"},
       {:fsm, "~> 0.3"},
       {:gen_stage, "~> 1.1"},
       {:postgrex, "~> 0.15"},

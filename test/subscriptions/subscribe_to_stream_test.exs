@@ -1,7 +1,16 @@
 defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, ProcessHelper, RecordedEvent, Storage, Subscriptions, Wait}
+  alias EventStore.{
+    EventFactory,
+    ProcessHelper,
+    RecordedEvent,
+    Storage,
+    Subscriptions,
+    UUID,
+    Wait
+  }
+
   alias EventStore.Subscriptions.Subscription
   alias EventStore.Support.CollectingSubscriber
   alias TestEventStore, as: EventStore

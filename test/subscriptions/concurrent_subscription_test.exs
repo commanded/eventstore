@@ -3,8 +3,7 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
 
   import EventStore.SubscriptionHelpers
 
-  alias EventStore.ProcessHelper
-  alias EventStore.RecordedEvent
+  alias EventStore.{ProcessHelper, RecordedEvent, UUID}
   alias EventStore.Subscriptions.Subscription
   alias TestEventStore, as: EventStore
 

@@ -1,7 +1,7 @@
 defmodule EventStore.Storage.SnapshotTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, UUID}
   alias EventStore.Snapshots.SnapshotData
   alias EventStore.Storage.Snapshot
 

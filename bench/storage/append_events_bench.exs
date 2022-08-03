@@ -1,7 +1,7 @@
 defmodule AppendEventsBench do
   use Benchfella
 
-  alias EventStore.{EventFactory, ProcessHelper, StorageInitializer}
+  alias EventStore.{EventFactory, ProcessHelper, StorageInitializer, UUID}
   alias TestEventStore, as: EventStore
 
   @await_timeout_ms 100_000

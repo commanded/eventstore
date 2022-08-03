@@ -1,7 +1,7 @@
 defmodule EventStore.EventFactory do
-  alias EventStore.{EventData, RecordedEvent}
+  alias EventStore.{EventData, RecordedEvent, UUID}
 
-  @serializer Application.get_env(:eventstore, TestEventStore)[:serializer] ||
+  @serializer Application.compile_env(:eventstore, TestEventStore)[:serializer] ||
                 EventStore.JsonSerializer
 
   defmodule Event do

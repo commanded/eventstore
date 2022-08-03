@@ -3,8 +3,7 @@ defmodule EventStore.Subscriptions.SubscriptionPartitioningTest do
 
   import EventStore.SubscriptionHelpers
 
-  alias EventStore.EventFactory
-  alias EventStore.RecordedEvent
+  alias EventStore.{EventFactory, RecordedEvent, UUID}
   alias EventStore.Subscriptions.Subscription
   alias TestEventStore, as: EventStore
 

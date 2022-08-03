@@ -5,12 +5,12 @@
 #     dropdb eventstore_bench
 #     createdb eventstore_bench
 #     pg_restore -d eventstore_bench eventstore_bench.dump
-# 
+#
 #     MIX_ENV=bench mix do app.start, bench
 #
 #
 defmodule EventBuilder do
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, UUID}
 
   def seed(total_event_count, events_per_stream, initial_event_number \\ 0)
 

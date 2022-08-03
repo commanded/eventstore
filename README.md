@@ -83,7 +83,7 @@ end
 Append events to a stream:
 
 ```elixir
-stream_uuid = UUID.uuid4()
+stream_uuid = EventStore.UUID.uuid4()
 expected_version = 0
 
 events = [

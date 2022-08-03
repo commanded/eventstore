@@ -1,7 +1,7 @@
 defmodule EventStore.Streams.Stream do
   @moduledoc false
 
-  alias EventStore.{EventData, RecordedEvent, Storage}
+  alias EventStore.{EventData, RecordedEvent, Storage, UUID}
   alias EventStore.Streams.StreamInfo
 
   def append_to_stream(conn, stream_uuid, expected_version, events, opts)

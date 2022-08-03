@@ -1,7 +1,7 @@
 defmodule EventStore.Storage.StreamPersistenceTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, UUID}
   alias EventStore.Storage.{Appender, CreateStream, Stream}
   alias EventStore.Streams.StreamInfo
 

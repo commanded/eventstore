@@ -4,7 +4,7 @@
 #   mix run --no-halt test/manual/long_running_subscription.exs
 #
 
-alias EventStore.EventData
+alias EventStore.{EventData, UUID}
 
 defmodule LoggingSubscriber do
   use GenServer

@@ -1,7 +1,7 @@
 defmodule EventStore.MultiEventStoreTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config, EventData, EventFactory, RecordedEvent, Storage}
+  alias EventStore.{Config, EventData, EventFactory, RecordedEvent, Storage, UUID}
   alias EventStore.Snapshots.SnapshotData
 
   setup do

@@ -1,7 +1,7 @@
 defmodule EventStore.Streams.StreamInfoTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, UUID}
   alias EventStore.Streams.StreamInfo
   alias TestEventStore, as: EventStore
 

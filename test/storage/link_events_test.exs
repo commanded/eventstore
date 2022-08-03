@@ -1,7 +1,7 @@
 defmodule EventStore.Storage.LinkEventsTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, RecordedEvent}
+  alias EventStore.{EventFactory, RecordedEvent, UUID}
   alias EventStore.Storage.{Appender, CreateStream}
 
   test "link single event to new stream", context do
