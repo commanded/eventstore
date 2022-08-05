@@ -1,7 +1,7 @@
 defmodule EventStore.DynamicEventStoreTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, UUID}
 
   describe "dynamic event store" do
     setup do

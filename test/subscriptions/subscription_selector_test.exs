@@ -4,7 +4,7 @@ defmodule EventStore.Subscriptions.SubscriptionSelectorTest do
   import Integer, only: [is_odd: 1]
   import EventStore.SubscriptionHelpers
 
-  alias EventStore.{RecordedEvent, SelectorSubscriber}
+  alias EventStore.{RecordedEvent, SelectorSubscriber, UUID}
   alias EventStore.EventFactory.Event
 
   describe "subscription selector with no processing delay" do

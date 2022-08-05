@@ -1,7 +1,7 @@
 defmodule EventStore.AppendToStreamTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, UUID}
   alias TestEventStore, as: EventStore
 
   describe "append to new stream using `:any_version`" do

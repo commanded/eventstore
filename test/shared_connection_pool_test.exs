@@ -1,11 +1,9 @@
 defmodule EventStore.SharedConnectionPoolTest do
   use ExUnit.Case
 
-  alias EventStore.EventFactory
-  alias EventStore.MonitoredServer
+  alias EventStore.{EventFactory, MonitoredServer, UUID, Wait}
   alias EventStore.MonitoredServer.State, as: MonitoredServerState
   alias EventStore.Tasks.{Create, Drop, Init}
-  alias EventStore.Wait
 
   describe "connection pool sharing" do
     setup do

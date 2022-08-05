@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config, EventFactory, Storage}
+  alias EventStore.{Config, EventFactory, Storage, UUID}
   alias EventStore.Subscriptions.Subscription
 
   @conn TestEventStore.Postgrex

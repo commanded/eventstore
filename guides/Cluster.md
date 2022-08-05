@@ -132,7 +132,7 @@ defmodule ExampleEvent do
   defstruct [:key]
 end
 
-stream_uuid = UUID.uuid4()
+stream_uuid = EventStore.UUID.uuid4()
 
 events = [
   %EventData{

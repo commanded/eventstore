@@ -1,8 +1,7 @@
 defmodule EventStore.SchemaTest do
   use EventStore.StorageCase
 
-  alias EventStore.Config
-  alias EventStore.EventFactory
+  alias EventStore.{Config, EventFactory, UUID}
   alias EventStore.Storage.Initializer
 
   setup_all do

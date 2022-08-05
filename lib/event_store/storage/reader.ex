@@ -3,7 +3,7 @@ defmodule EventStore.Storage.Reader do
 
   require Logger
 
-  alias EventStore.RecordedEvent
+  alias EventStore.{RecordedEvent, UUID}
   alias EventStore.Sql.Statements
   alias EventStore.Storage.Reader
 

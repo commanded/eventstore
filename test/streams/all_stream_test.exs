@@ -1,7 +1,7 @@
 defmodule EventStore.Streams.AllStreamTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
+  alias EventStore.{EventFactory, UUID}
   alias EventStore.Streams.Stream
   alias EventStore.Subscriptions.Subscription
   alias TestEventStore, as: EventStore

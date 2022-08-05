@@ -1,7 +1,7 @@
 defmodule EventStore.Streams.PaginateStreamsTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, Page}
+  alias EventStore.{EventFactory, Page, UUID}
   alias EventStore.Streams.StreamInfo
   alias TestEventStore, as: EventStore
 

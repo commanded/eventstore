@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.AllStreamsSubscriptionTest do
   use EventStore.Subscriptions.StreamSubscriptionTestCase, stream_uuid: "$all"
 
-  alias EventStore.{EventFactory, ProcessHelper, RecordedEvent}
+  alias EventStore.{EventFactory, ProcessHelper, RecordedEvent, UUID}
   alias EventStore.Storage.{Appender, CreateStream}
   alias EventStore.Subscriptions.SubscriptionFsm
 

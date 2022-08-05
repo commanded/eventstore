@@ -3,7 +3,7 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
 
   @moduletag :slow
 
-  alias EventStore.{EventFactory, RecordedEvent}
+  alias EventStore.{EventFactory, RecordedEvent, UUID}
   alias EventStore.Subscriptions.Subscription
   alias TestEventStore, as: EventStore
 

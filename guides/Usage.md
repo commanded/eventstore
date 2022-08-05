@@ -13,7 +13,7 @@ end
 Create a unique identity for each stream. It **must** be a string. This example uses the [elixir_uuid](https://hex.pm/packages/elixir_uuid) package.
 
 ```elixir
-stream_uuid = UUID.uuid4()
+stream_uuid = EventStore.UUID.uuid4()
 ```
 
 Set the expected version of the stream. This is used for optimistic concurrency. A new stream will be created when the expected version is zero.

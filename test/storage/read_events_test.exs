@@ -1,8 +1,7 @@
 defmodule EventStore.Storage.ReadEventsTest do
   use EventStore.StorageCase
 
-  alias EventStore.EventFactory
-  alias EventStore.{RecordedEvent, Storage}
+  alias EventStore.{EventFactory, RecordedEvent, Storage, UUID}
   alias EventStore.Storage.{Appender, CreateStream}
 
   describe "read stream forward" do

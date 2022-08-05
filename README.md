@@ -2,7 +2,7 @@
 
 Event store implemented in Elixir. Uses [PostgreSQL](http://www.postgresql.org/) as the underlying storage engine.
 
-Requires Elixir v1.6 and PostgreSQL v9.5 or newer.
+Requires Elixir v1.10 and PostgreSQL v9.5 or newer.
 
 EventStore supports [running on a cluster of nodes](guides/Cluster.md).
 
@@ -83,7 +83,7 @@ end
 Append events to a stream:
 
 ```elixir
-stream_uuid = UUID.uuid4()
+stream_uuid = EventStore.UUID.uuid4()
 expected_version = 0
 
 events = [

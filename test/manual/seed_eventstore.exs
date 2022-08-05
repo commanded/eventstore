@@ -19,7 +19,7 @@ defmodule Snapshot do
 end
 
 defmodule Seed do
-  alias EventStore.EventData
+  alias EventStore.{EventData, UUID}
   alias EventStore.Snapshots.SnapshotData
 
   def run(opts \\ []) do

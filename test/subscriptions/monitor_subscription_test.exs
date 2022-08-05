@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.MonitorSubscriptionTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, ProcessHelper, Subscriptions, Subscriber}
+  alias EventStore.{EventFactory, ProcessHelper, Subscriptions, Subscriber, UUID}
   alias TestEventStore, as: EventStore
 
   @event_store TestEventStore

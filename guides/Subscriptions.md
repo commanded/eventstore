@@ -152,7 +152,7 @@ Subscribe to events appended to a *single* stream:
 ```elixir
 alias MyApp.EventStore
 
-stream_uuid = UUID.uuid4()
+stream_uuid = EventStore.UUID.uuid4()
 {:ok, subscription} = EventStore.subscribe_to_stream(stream_uuid, "example_single_subscription", self())
 
 # Wait for the subscription confirmation

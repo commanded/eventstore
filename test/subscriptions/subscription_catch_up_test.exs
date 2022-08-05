@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.SubscriptionCatchUpTest do
   use EventStore.StorageCase
 
-  alias EventStore.{EventFactory, RecordedEvent}
+  alias EventStore.{EventFactory, RecordedEvent, UUID}
   alias EventStore.Subscriptions.Subscription
   alias TestEventStore, as: EventStore
 
