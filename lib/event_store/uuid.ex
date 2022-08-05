@@ -1,8 +1,9 @@
+#
+# Implementation from https://github.com/elixir-ecto/ecto/blob/v3.8.4/lib/ecto/uuid.ex
+# Apache License 2.0 https://github.com/elixir-ecto/ecto/blob/master/LICENSE.md
+#
 defmodule EventStore.UUID do
   @moduledoc false
-
-  # implementation taken from https://github.com/elixir-ecto/ecto/blob/v3.8.4/lib/ecto/uuid.ex
-  # license: Apache License 2.0 https://github.com/elixir-ecto/ecto/blob/master/LICENSE.md
 
   @typedoc """
   A hex-encoded UUID string.
@@ -18,10 +19,10 @@ defmodule EventStore.UUID do
   Generates a random, version 4 UUID.
   """
   @spec uuid4() :: hex()
-  def uuid4, do: hex_encode(bingenerate())
+  def uuid4, do: bingenerate() |> hex_encode()
 
   @doc """
-  Converts a string repreenting a UUID into a raw binary.
+  Converts a string representing a UUID into a raw binary.
   """
   @spec string_to_binary!(hex()) :: raw()
   def string_to_binary!(
@@ -39,12 +40,11 @@ defmodule EventStore.UUID do
     hex_encode(raw_uuid)
   end
 
-  defp bingenerate() do
+  defp bingenerate do
     <<u0::48, _::4, u1::12, _::2, u2::62>> = :crypto.strong_rand_bytes(16)
     <<u0::48, 4::4, u1::12, 2::2, u2::62>>
   end
 
-  @spec hex_encode(raw()) :: hex()
   defp hex_encode(
          <<a1::4, a2::4, a3::4, a4::4, a5::4, a6::4, a7::4, a8::4, b1::4, b2::4, b3::4, b4::4,
            c1::4, c2::4, c3::4, c4::4, d1::4, d2::4, d3::4, d4::4, e1::4, e2::4, e3::4, e4::4,

@@ -5,6 +5,7 @@
 - List running event store instances ([#244](https://github.com/commanded/eventstore/pull/244)).
 - Paginate streams ([#246](https://github.com/commanded/eventstore/pull/246)).
 - Add `stream_info/2` function ([#247](https://github.com/commanded/eventstore/pull/247)).
+- Remove unmaintained `elixir_uuid` dependency ([#253](https://github.com/commanded/eventstore/pull/253)).
 
 ---
 

@@ -254,6 +254,7 @@ EventStore exists thanks to the following people who have contributed.
 - [Chris Martin](https://github.com/trbngr)
 - [Christian Green](https://github.com/Arthien)
 - [Craig Savolainen](https://github.com/maedhr)
+- [Damir Vandic](https://github.com/dvic)
 - [David Soff](https://github.com/Davidsoff)
 - [Derek Kraan](https://github.com/derekkraan)
 - [Diogo Scudelletti](https://github.com/scudelletti)
