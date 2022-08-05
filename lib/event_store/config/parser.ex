@@ -5,10 +5,14 @@ defmodule EventStore.Config.Parser do
     config
     |> Enum.reduce([], fn
       {:url, value}, config ->
-        Keyword.merge(config, value |> get_config_value() |> parse_url())
+        parsed_value = get_config_value(value) |> parse_url()
+
+        Keyword.merge(config, parsed_value)
 
       {:session_mode_url, value}, config ->
-        Keyword.merge(config, session_mode_pool: value |> get_config_value() |> parse_url())
+        parsed_value = get_config_value(value) |> parse_url()
+
+        Keyword.put(config, :session_mode_pool, parsed_value)
 
       {key, value}, config when key in [:port, :timeout] ->
         Keyword.put(config, key, get_config_integer(value))
@@ -108,7 +112,6 @@ defmodule EventStore.Config.Parser do
   end
 
   def get_config_value(nil, default), do: default
-
   def get_config_value(value, _default), do: value
 
   def get_config_integer(value, default \\ nil) do

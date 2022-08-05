@@ -229,9 +229,9 @@ end
 
 These settings must be configured *before* creating the EventStore database. It's not possible to migrate between `bytea` and `jsonb` data types once you've created the database. This must be decided in advance.
 
-## Using with Pgbouncer
+## Using with PgBouncer
 
-Eventstore uses `LISTEN/NOTIFY` and `pg_advisory_locks` Postgres capabalities. Unfortunately, they are not compatible with PGBouncer running in transaction (most typical) mode.
+EventStore uses `LISTEN/NOTIFY` and `pg_advisory_locks` Postgres capabalities. Unfortunately, they are not compatible with PgBouncer running in transaction (most typical) mode.
 As a possible workaround, you can provide additional parameter to config:
 
 ```
@@ -240,4 +240,4 @@ config :my_app, MyApp.EventStore,
   session_mode_url: "postgres://postgres:pgbouncer-in-session-mode@localhost/eventstore"
 ```
 
-And it will use your regular pool settings to connect to database defined `url` and it will establish two connections to `session_mode_url` - which you should point to PGBouncer in session mode or regular postgres instance.
+And it will use your regular pool settings to connect to database defined `url` and it will establish two connections to `session_mode_url` - which you should point to PgBouncer in session mode or regular postgres instance.

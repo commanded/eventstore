@@ -105,7 +105,7 @@ defmodule EventStore.Config do
 
   def postgrex_notifications_opts(config, name) do
     config
-    |> Keyword.get(:session_mode_pool, config)
+    |> session_mode_pool_config()
     |> default_postgrex_opts()
     |> Keyword.put(:auto_reconnect, true)
     |> Keyword.put(:backoff_type, :exp)
@@ -122,9 +122,16 @@ defmodule EventStore.Config do
   """
   def advisory_locks_postgrex_opts(config) do
     config
-    |> Keyword.get(:session_mode_pool, config)
+    |> session_mode_pool_config()
     |> default_postgrex_opts()
     |> Keyword.put(:backoff_type, :stop)
     |> Keyword.put(:pool_size, 1)
+  end
+
+  # Get the optional session mode pool to be used for persistent Postgres
+  # connections (advisory locks and notifications). Uses the default Postgres
+  # configuration if not specified.
+  defp session_mode_pool_config(config) do
+    Keyword.get(config, :session_mode_pool, config)
   end
 end
