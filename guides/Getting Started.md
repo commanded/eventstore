@@ -6,7 +6,7 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
 
       ```elixir
       def deps do
-        [{:eventstore, "~> 1.3"}]
+        [{:eventstore, "~> 1.4"}]
       end
       ```
 
@@ -231,8 +231,9 @@ These settings must be configured *before* creating the EventStore database. It'
 
 ## Using with PgBouncer
 
-EventStore uses `LISTEN/NOTIFY` and `pg_advisory_locks` Postgres capabalities. Unfortunately, they are not compatible with PgBouncer running in transaction (most typical) mode.
-As a possible workaround, you can provide additional parameter to config:
+EventStore uses `LISTEN/NOTIFY` and `pg_advisory_locks` Postgres capabilities. Unfortunately, they are not compatible with PgBouncer running in transaction (most typical) mode.
+
+As a workaround, you can provide an additional `session_mode_url` parameter to the EventStore config:
 
 ```
 config :my_app, MyApp.EventStore,
@@ -240,4 +241,4 @@ config :my_app, MyApp.EventStore,
   session_mode_url: "postgres://postgres:pgbouncer-in-session-mode@localhost/eventstore"
 ```
 
-And it will use your regular pool settings to connect to database defined `url` and it will establish two connections to `session_mode_url` - which you should point to PgBouncer in session mode or regular postgres instance.
+This will allow the EventStore to use your regular pool settings to connect to the database defined in `url` for most database operations. It will separately establish connections using the `session_mode_url` where necessary which you should point to PgBouncer in session mode or connected directly to the Postgres instance.

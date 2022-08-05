@@ -41,7 +41,7 @@ defmodule EventStore.Mixfile do
     [
       {:fsm, "~> 0.3"},
       {:gen_stage, "~> 1.1"},
-      {:postgrex, "~> 0.15"},
+      {:postgrex, "~> 0.16"},
 
       # Optional dependencies
       {:jason, "~> 1.3", optional: true},
@@ -49,7 +49,7 @@ defmodule EventStore.Mixfile do
 
       # Development and test tooling
       {:benchfella, "~> 0.3", only: :bench},
-      {:dialyxir, "~> 1.1", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.2", only: :dev, runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
