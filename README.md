@@ -77,6 +77,7 @@ Create one or more event structs to be persisted (serialized to JSON by default)
 
 ```elixir
 defmodule ExampleEvent do
+  @derive Jason.Encoder
   defstruct [:key]
 end
 ```

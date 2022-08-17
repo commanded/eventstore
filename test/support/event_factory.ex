@@ -23,9 +23,10 @@ defmodule EventStore.EventFactory do
     }
   end
 
-  def create_events(number_of_events, initial_event_number \\ 1) when number_of_events > 0 do
-    1..number_of_events
-    |> Enum.map(fn number -> create_event(nil, initial_event_number + number) end)
+  def create_events(count, initial_event_number \\ 1) when count > 0 do
+    Enum.map(1..count, fn number ->
+      create_event(nil, initial_event_number + number)
+    end)
   end
 
   def create_recorded_events(
