@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.1
+
+- Allow `:parameters` to in the `EventStore` connection ([#257](https://github.com/commanded/eventstore/pull/257))
+    
+  ```elixir
+    config :myapp, MyApp.EventStore,
+      parameters: [application_name: "myapp"]
+  ```
+
 ## v1.4.0
 
 - List running event store instances ([#244](https://github.com/commanded/eventstore/pull/244)).
