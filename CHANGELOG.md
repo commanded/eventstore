@@ -1,13 +1,8 @@
 # Changelog
 
-## v1.4.1
+## Next release
 
-- Allow `:parameters` to in the `EventStore` connection ([#257](https://github.com/commanded/eventstore/pull/257))
-    
-  ```elixir
-    config :myapp, MyApp.EventStore,
-      parameters: [application_name: "myapp"]
-  ```
+- Allow `:parameters` to be passed to the EventStore database connection ([#257](https://github.com/commanded/eventstore/pull/257)).
 
 ## v1.4.0
 
