@@ -217,6 +217,49 @@ defmodule EventStore.ConfigTest do
              ]
   end
 
+  describe "setting application parameters" do
+    setup do
+      postgrex_config = TestEventStore.config()
+      conn = start_supervised!({Postgrex, postgrex_config})
+
+      [conn: conn]
+    end
+
+    test "successfully connects with the application name setup", %{conn: conn} do
+      start_supervised!(
+        {TestEventStore, name: :app_name_test, parameters: [application_name: "event_store_test"]}
+      )
+
+      result =
+        Postgrex.query!(
+          conn,
+          """
+          SELECT application_name
+          FROM pg_stat_activity
+          WHERE application_name = 'event_store_test'
+          """,
+          []
+        )
+
+      assert result.num_rows > 1
+    end
+
+    test "default connections do not have application name setup", %{conn: conn} do
+      result =
+        Postgrex.query!(
+          conn,
+          """
+          SELECT application_name
+          FROM pg_stat_activity
+          WHERE application_name = 'event_store_test'
+          """,
+          []
+        )
+
+      assert result.num_rows == 0
+    end
+  end
+
   defp set_envs(envs) do
     for {key, value} <- envs do
       System.put_env(key, value)

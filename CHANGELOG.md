@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+- Allow `:parameters` to be passed to the EventStore database connection ([#257](https://github.com/commanded/eventstore/pull/257)).
+
 ## v1.4.0
 
 - List running event store instances ([#244](https://github.com/commanded/eventstore/pull/244)).
