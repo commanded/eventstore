@@ -4,13 +4,12 @@ on: [push, pull_request]
 
 jobs:
   build:
-
     name: Build and test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        otp: ['23.3', '24.2']
-        elixir: ['1.13.1']
+        otp: ['24.3', '25.1']
+        elixir: ['1.14.1']
 
     services:
       postgres:
@@ -26,7 +25,7 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Set up Elixir
       id: beam
@@ -36,7 +35,7 @@ jobs:
         otp-version: ${{ matrix.otp }}
 
     - name: Restore dependencies cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: deps
         key: ${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-mix-${{ hashFiles('**/mix.lock') }}
@@ -48,9 +47,6 @@ jobs:
     - name: Check formatting
       run: mix format --check-formatted
 
-    - name: Start epmd
-      run: epmd -daemon
-
     - name: Setup EventStore test databases
       run: |
         MIX_ENV=test mix event_store.setup
@@ -60,7 +56,7 @@ jobs:
       run: mix test.all
 
     - name: Retrieve Dialyzer PLT cache
-      uses: actions/cache@v1
+      uses: actions/cache@v3
       id: plt-cache
       with:
         path: priv/plts

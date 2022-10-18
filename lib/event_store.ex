@@ -446,23 +446,34 @@ defmodule EventStore do
         schema = Keyword.fetch!(config, :schema)
         serializer = Keyword.fetch!(config, :serializer)
 
-        with {start_from, opts} <- Keyword.pop(opts, :start_from, :origin),
-             {:ok, start_from} <- Stream.start_from(conn, stream_uuid, start_from, schema: schema) do
+        query_timeout = timeout(opts, config)
+
+        {start_from, opts} = Keyword.pop(opts, :start_from, :origin)
+
+        with {:ok, start_from} <-
+               Stream.start_from(conn, stream_uuid, start_from,
+                 schema: schema,
+                 timeout: query_timeout
+               ) do
           opts =
-            [
-              hibernate_after: Keyword.fetch!(config, :subscription_hibernate_after),
-              retry_interval: Keyword.fetch!(config, :subscription_retry_interval)
-            ]
-            |> Keyword.merge(opts)
+            opts
+            |> Keyword.delete(:timeout)
             |> Keyword.merge(
               conn: conn,
               event_store: name,
+              query_timeout: query_timeout,
               schema: schema,
               serializer: serializer,
               stream_uuid: stream_uuid,
               subscription_name: subscription_name,
               start_from: start_from
             )
+            |> Keyword.put_new_lazy(:hibernate_after, fn ->
+              Keyword.fetch!(config, :subscription_hibernate_after)
+            end)
+            |> Keyword.put_new_lazy(:retry_interval, fn ->
+              Keyword.fetch!(config, :subscription_retry_interval)
+            end)
 
           Subscriptions.subscribe_to_stream(subscriber, opts)
         end

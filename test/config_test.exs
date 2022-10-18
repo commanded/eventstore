@@ -14,18 +14,17 @@ defmodule EventStore.ConfigTest do
       pool: EventStore.Config.get_pool()
     ]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               pool: EventStore.Config.get_pool(),
-               timeout: 120_000,
-               schema: "example",
-               password: "postgres",
-               database: "eventstore_test",
-               hostname: "localhost",
-               username: "postgres"
-             ]
+    assert_parsed_config(config,
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      pool: EventStore.Config.get_pool(),
+      timeout: 120_000,
+      schema: "example",
+      password: "postgres",
+      database: "eventstore_test",
+      hostname: "localhost",
+      username: "postgres"
+    )
   end
 
   test "parse socket" do
@@ -38,18 +37,17 @@ defmodule EventStore.ConfigTest do
       pool: EventStore.Config.get_pool()
     ]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               schema: "public",
-               pool: EventStore.Config.get_pool(),
-               timeout: 120_000,
-               password: "postgres",
-               database: "eventstore_test",
-               socket: "/path/to/socket",
-               username: "postgres"
-             ]
+    assert_parsed_config(config,
+      pool: EventStore.Config.get_pool(),
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      schema: "public",
+      timeout: 120_000,
+      password: "postgres",
+      database: "eventstore_test",
+      socket: "/path/to/socket",
+      username: "postgres"
+    )
   end
 
   test "parse `:shared_connection_pool`" do
@@ -60,17 +58,17 @@ defmodule EventStore.ConfigTest do
       shared_connection_pool: :shared_pool
     ]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               schema: "public",
-               pool: EventStore.Config.get_pool(),
-               shared_connection_pool: :shared_pool,
-               password: "postgres",
-               database: "eventstore_test",
-               username: "postgres"
-             ]
+    assert_parsed_config(config,
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      schema: "public",
+      timeout: 15_000,
+      pool: EventStore.Config.get_pool(),
+      shared_connection_pool: :shared_pool,
+      password: "postgres",
+      database: "eventstore_test",
+      username: "postgres"
+    )
   end
 
   test "parse socket_dir" do
@@ -83,52 +81,51 @@ defmodule EventStore.ConfigTest do
       pool: EventStore.Config.get_pool()
     ]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               schema: "public",
-               pool: EventStore.Config.get_pool(),
-               timeout: 120_000,
-               password: "postgres",
-               database: "eventstore_test",
-               socket_dir: "/path/to/socket_dir",
-               username: "postgres"
-             ]
+    assert_parsed_config(config,
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      schema: "public",
+      pool: EventStore.Config.get_pool(),
+      timeout: 120_000,
+      password: "postgres",
+      database: "eventstore_test",
+      socket_dir: "/path/to/socket_dir",
+      username: "postgres"
+    )
   end
 
   test "parse url" do
     config = [url: "postgres://username:password@localhost/database"]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               schema: "public",
-               pool: EventStore.Config.get_pool(),
-               username: "username",
-               password: "password",
-               database: "database",
-               hostname: "localhost"
-             ]
+    assert_parsed_config(config,
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      schema: "public",
+      timeout: 15_000,
+      pool: EventStore.Config.get_pool(),
+      username: "username",
+      password: "password",
+      database: "database",
+      hostname: "localhost"
+    )
   end
 
   test "parse session_mode_url" do
     config = [session_mode_url: "postgres://username:password@localhost/database"]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               schema: "public",
-               pool: DBConnection.ConnectionPool,
-               session_mode_pool: [
-                 username: "username",
-                 password: "password",
-                 database: "database",
-                 hostname: "localhost"
-               ]
-             ]
+    assert_parsed_config(config,
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      schema: "public",
+      timeout: 15_000,
+      pool: DBConnection.ConnectionPool,
+      session_mode_pool: [
+        username: "username",
+        password: "password",
+        database: "database",
+        hostname: "localhost"
+      ]
+    )
   end
 
   test "parse url with query parameters" do
@@ -136,20 +133,19 @@ defmodule EventStore.ConfigTest do
       url: "postgres://username:password@localhost/database?ssl=true&pool_size=5&timeout=120000"
     ]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               schema: "public",
-               pool: EventStore.Config.get_pool(),
-               username: "username",
-               password: "password",
-               database: "database",
-               hostname: "localhost",
-               timeout: 120_000,
-               pool_size: 5,
-               ssl: true
-             ]
+    assert_parsed_config(config,
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      schema: "public",
+      pool: EventStore.Config.get_pool(),
+      username: "username",
+      password: "password",
+      database: "database",
+      hostname: "localhost",
+      timeout: 120_000,
+      pool_size: 5,
+      ssl: true
+    )
   end
 
   test "parse database url from environment variable" do
@@ -157,17 +153,17 @@ defmodule EventStore.ConfigTest do
 
     config = [url: {:system, "ES_URL"}]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               schema: "public",
-               pool: EventStore.Config.get_pool(),
-               username: "username",
-               password: "password",
-               database: "database",
-               hostname: "localhost"
-             ]
+    assert_parsed_config(config,
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      schema: "public",
+      timeout: 15_000,
+      pool: EventStore.Config.get_pool(),
+      username: "username",
+      password: "password",
+      database: "database",
+      hostname: "localhost"
+    )
   end
 
   test "fetch database settings from environment variables" do
@@ -189,32 +185,31 @@ defmodule EventStore.ConfigTest do
       timeout: {:system, "ES_TIMEOUT"}
     ]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               schema: "public",
-               pool: EventStore.Config.get_pool(),
-               timeout: 120_000,
-               port: 5432,
-               hostname: "hostname",
-               database: "database",
-               password: "password",
-               username: "username"
-             ]
+    assert_parsed_config(config,
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      schema: "public",
+      pool: EventStore.Config.get_pool(),
+      timeout: 120_000,
+      port: 5432,
+      hostname: "hostname",
+      database: "database",
+      password: "password",
+      username: "username"
+    )
   end
 
   test "support default value when env variable not set" do
     config = [username: {:system, "ES_USERNAME", "default_username"}]
 
-    assert Config.parse(config) ==
-             [
-               enable_hard_deletes: false,
-               column_data_type: "bytea",
-               schema: "public",
-               pool: EventStore.Config.get_pool(),
-               username: "default_username"
-             ]
+    assert_parsed_config(config,
+      pool: EventStore.Config.get_pool(),
+      username: "default_username",
+      column_data_type: "bytea",
+      enable_hard_deletes: false,
+      schema: "public",
+      timeout: 15_000
+    )
   end
 
   describe "setting application parameters" do
@@ -258,6 +253,12 @@ defmodule EventStore.ConfigTest do
 
       assert result.num_rows == 0
     end
+  end
+
+  defp assert_parsed_config(config, expected) do
+    parsed = Config.parse(config)
+
+    assert Keyword.equal?(parsed, expected)
   end
 
   defp set_envs(envs) do

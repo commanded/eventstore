@@ -17,6 +17,7 @@ defmodule EventStore.Subscriptions.SubscriptionState do
     :mapper,
     :max_size,
     :partition_by,
+    :query_timeout,
     :lock_ref,
     last_received: 0,
     last_sent: 0,

@@ -3,11 +3,9 @@ defmodule EventStore.StorageCase do
 
   alias EventStore.{Config, Serializer, Storage}
 
-  @event_store TestEventStore
-
   setup_all do
-    config = Config.parsed(@event_store, :eventstore)
-    serializer = Serializer.serializer(@event_store, config)
+    config = Config.parsed(TestEventStore, :eventstore)
+    serializer = Serializer.serializer(TestEventStore, config)
     postgrex_config = Config.default_postgrex_opts(config)
 
     if Mix.env() == :migration do
@@ -22,7 +20,7 @@ defmodule EventStore.StorageCase do
       conn: conn,
       config: config,
       schema: "public",
-      event_store: @event_store,
+      event_store: TestEventStore,
       postgrex_config: postgrex_config,
       serializer: serializer
     ]
@@ -31,7 +29,7 @@ defmodule EventStore.StorageCase do
   setup %{conn: conn, config: config} do
     Storage.Initializer.reset!(conn, config)
 
-    start_supervised!(@event_store)
+    start_supervised!(TestEventStore)
 
     :ok
   end

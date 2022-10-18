@@ -52,8 +52,9 @@ defmodule EventStore.Supervisor do
       {:ok, config} ->
         config = validate_config!(event_store, name, config)
 
-        schema = Keyword.fetch!(config, :schema)
         conn = Keyword.fetch!(config, :conn)
+        schema = Keyword.fetch!(config, :schema)
+        query_timeout = Keyword.fetch!(config, :timeout)
 
         advisory_locks_name = Module.concat([name, AdvisoryLocks])
         advisory_locks_postgrex_conn = Module.concat([advisory_locks_name, Postgrex])
@@ -81,7 +82,10 @@ defmodule EventStore.Supervisor do
               id: Module.concat([advisory_locks_postgrex_conn, MonitoredServer])
             ),
             {AdvisoryLocks,
-             conn: advisory_locks_postgrex_conn, schema: schema, name: advisory_locks_name},
+             conn: advisory_locks_postgrex_conn,
+             query_timeout: query_timeout,
+             schema: schema,
+             name: advisory_locks_name},
             {Subscriptions.Supervisor, name: subscriptions_name},
             Supervisor.child_spec({Registry, keys: :unique, name: subscriptions_registry_name},
               id: subscriptions_registry_name

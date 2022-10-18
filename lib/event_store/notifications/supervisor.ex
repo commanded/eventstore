@@ -9,19 +9,20 @@ defmodule EventStore.Notifications.Supervisor do
   alias EventStore.{Config, MonitoredServer, Subscriptions}
   alias EventStore.Notifications.{Listener, Publisher}
 
-  def child_spec({name, _config} = init_arg) do
-    %{id: Module.concat(name, __MODULE__), start: {__MODULE__, :start_link, [init_arg]}}
+  def child_spec({event_store, _config} = init_arg) do
+    %{id: Module.concat(event_store, __MODULE__), start: {__MODULE__, :start_link, [init_arg]}}
   end
 
-  def start_link(init_arg) do
+  def start_link({_event_store, _config} = init_arg) do
     Supervisor.start_link(__MODULE__, init_arg)
   end
 
   @impl Supervisor
   def init({event_store, config}) do
+    conn = Keyword.fetch!(config, :conn)
     schema = Keyword.fetch!(config, :schema)
     serializer = Keyword.fetch!(config, :serializer)
-    conn = Keyword.fetch!(config, :conn)
+    query_timeout = Keyword.fetch!(config, :timeout)
 
     listener_name = Module.concat([event_store, Listener])
     publisher_name = Module.concat([event_store, Publisher])
@@ -43,11 +44,13 @@ defmodule EventStore.Notifications.Supervisor do
         ),
         {Listener,
          listen_to: postgrex_notifications_conn,
+         query_timeout: query_timeout,
          schema: schema,
          name: listener_name,
          hibernate_after: hibernate_after},
         {Publisher,
          conn: conn,
+         query_timeout: query_timeout,
          event_store: event_store,
          schema: schema,
          serializer: serializer,
