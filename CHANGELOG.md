@@ -3,6 +3,7 @@
 ## Next release
 
 - Allow `:parameters` to be passed to the EventStore database connection ([#257](https://github.com/commanded/eventstore/pull/257)).
+- Use configurable `:timeout` option for subscription database queries ([#259](https://github.com/commanded/eventstore/pull/259)).
 
 ## v1.4.0
 
