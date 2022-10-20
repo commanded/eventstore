@@ -240,8 +240,11 @@ defmodule EventStore do
           | {:checkpoint_after, non_neg_integer()}
           | {:checkpoint_threshold, pos_integer()}
           | {:concurrency_limit, pos_integer()}
+          | {:max_size, pos_integer()}
           | {:partition_by, (EventStore.RecordedEvent.t() -> any())}
           | {:start_from, :origin | :current | non_neg_integer()}
+          | {:timeout, timeout()}
+          | {:transient, boolean()}
   @type persistent_subscription_options :: [persistent_subscription_option]
   @type expected_version :: :any_version | :no_stream | :stream_exists | non_neg_integer
   @type start_from :: :origin | :current | non_neg_integer
@@ -633,12 +636,13 @@ defmodule EventStore do
   Returns `:ok` on success, or an `{:error, reason}` tagged tuple. The returned
   error may be due to one of the following reasons:
 
-    - `{:error, :wrong_expected_version}` when the actual stream version differs
+    * `{:error, :wrong_expected_version}` when the actual stream version differs
       from the provided expected version.
-    - `{:error, :stream_exists}` when the stream exists, but expected version
+    * `{:error, :stream_exists}` when the stream exists, but expected version
       was `:no_stream`.
-    - `{:error, :stream_not_found}` when the stream does not exist, but
+    * `{:error, :stream_not_found}` when the stream does not exist, but
       expected version was `:stream_exists`.
+
   """
   @callback append_to_stream(
               stream_uuid :: String.t(),
@@ -687,11 +691,11 @@ defmodule EventStore do
   Returns `:ok` on success, or an `{:error, reason}` tagged tuple. The returned
   error may be due to one of the following reasons:
 
-    - `{:error, :wrong_expected_version}` when the actual stream version differs
+    * `{:error, :wrong_expected_version}` when the actual stream version differs
       from the provided expected version.
-    - `{:error, :stream_exists}` when the stream exists, but expected version
+    * `{:error, :stream_exists}` when the stream exists, but expected version
       was `:no_stream`.
-    - `{:error, :stream_not_found}` when the stream does not exist, but
+    * `{:error, :stream_not_found}` when the stream does not exist, but
       expected version was `:stream_exists`.
   """
   @callback link_to_stream(
@@ -722,8 +726,8 @@ defmodule EventStore do
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
   """
   @callback read_stream_forward(
               stream_uuid :: String.t(),
@@ -747,8 +751,8 @@ defmodule EventStore do
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
   """
   @callback read_all_streams_forward(
               start_version :: non_neg_integer,
@@ -771,8 +775,8 @@ defmodule EventStore do
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
   """
   @callback read_stream_backward(
               stream_uuid :: String.t(),
@@ -797,8 +801,8 @@ defmodule EventStore do
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
   """
   @callback read_all_streams_backward(
               start_version :: integer,
@@ -815,8 +819,8 @@ defmodule EventStore do
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
       - `read_batch_size` optionally, the number of events to read at a time
         from storage. Defaults to reading 1,000 events per batch.
   """
@@ -835,8 +839,8 @@ defmodule EventStore do
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
       - `read_batch_size` optionally, the number of events to read at a time from
         storage. Defaults to reading 1,000 events per batch.
   """
@@ -855,8 +859,8 @@ defmodule EventStore do
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
       - `read_batch_size` optionally, the number of events to read at a time
         from storage. Defaults to reading 1,000 events per batch.
   """
@@ -876,8 +880,8 @@ defmodule EventStore do
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
       - `read_batch_size` optionally, the number of events to read at a time from
         storage. Defaults to reading 1,000 events per batch.
   """
@@ -1002,8 +1006,8 @@ defmodule EventStore do
       - `name` the name of the event store if provided to `start_link/1`.
         Defaults to the event store module name (e.g. `MyApp.EventStore`).
 
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
 
   Returns an `{:ok, page}` result containing a list of `StreamInfo` structs, or
   an error tagged tuple on failure.
@@ -1024,14 +1028,14 @@ defmodule EventStore do
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
-      - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      - `timeout` an optional timeout for the database query, in milliseconds.
+        Defaults to 15,000ms.
 
-    Returns `{:ok, StreamInfo.t()}` on success, or an `{:error, reason}` tagged
-    tuple. The returned error may be due to one of the following reasons:
+  Returns `{:ok, StreamInfo.t()}` on success, or an `{:error, reason}` tagged
+  tuple. The returned error may be due to one of the following reasons:
 
-      - `{:error, :stream_not_found}` when the stream does not exist.
-      - `{:error, :stream_deleted}` when the stream was soft deleted.
+    * `{:error, :stream_not_found}` when the stream does not exist.
+    * `{:error, :stream_deleted}` when the stream was soft deleted.
 
   ### Example
 
@@ -1053,7 +1057,8 @@ defmodule EventStore do
     - `stream_uuid` is the stream to subscribe to.
       Use the `$all` identifier to subscribe to events from all streams.
 
-    - `opts` is an optional map providing additional subscription configuration:
+    - `opts` is an optional keyword list providing additional subscription
+      configuration:
       - `name` the name of the event store if provided to `start_link/1`.
       - `selector` to define a function to filter each event, i.e. returns
         only those elements for which fun returns a truthy value
@@ -1102,7 +1107,8 @@ defmodule EventStore do
     - `subscriber` is a process that will be sent `{:events, events}`
       notification messages.
 
-    - `opts` is an optional map providing additional subscription configuration:
+    - `opts` is an optional keyword list providing additional subscription
+      configuration:
 
       - `name` the name of the event store if provided to `start_link/1`.
 
@@ -1114,7 +1120,7 @@ defmodule EventStore do
           - any positive integer for a stream version to receive events after.
 
       - `selector` to define a function to filter each event, i.e. returns
-        only those elements for which fun returns a truthy value.
+        only those elements for which the function returns a truthy value.
 
       - `mapper` to define a function to map each recorded event before sending
         to the subscriber.
@@ -1144,6 +1150,14 @@ defmodule EventStore do
         been set as the default subscription behaviour is to checkpoint after
         each acknowledgement.
 
+      - `max_size` limits the number of events queued in memory by the
+        subscription process to prevent excessive memory usage. If the in-memory
+        queue exceeds the max size - because the subscriber cannot keep up -
+        then events will not be queued in memory, but instead will be read from
+        the database on demand once the subscriber process has processed the
+        queue. This limit also determines how many events are read from the
+        database at a time during catch-up. Defaults to 1,000 events.
+
       - `partition_by` is an optional function used to partition events to
         subscribers. It can be used to guarantee processing order when multiple
         subscribers have subscribed to a single subscription. The function is
@@ -1161,6 +1175,9 @@ defmodule EventStore do
               partition_by: by_stream
             )
           ```
+
+      - `timeout` an optional timeout for database queries, in milliseconds.
+        Defaults to 15,000ms.
 
       - `transient` is an optional boolean flag to create a transient subscription.
         By default this is set to `false`. If you want to create a transient
@@ -1243,44 +1260,7 @@ defmodule EventStore do
   @doc """
   Create a subscription to all streams. By default the subscription is persistent.
 
-  The `subscriber` process will be notified of each batch of events appended to
-  any stream.
-
-    - `subscription_name` is used to uniquely identify the subscription.
-
-    - `subscriber` is a process that will be sent `{:events, events}`
-      notification messages.
-
-    - `opts` is an optional map providing additional subscription configuration:
-
-      - `name` the name of the event store if provided to `start_link/1`.
-
-      - `start_from` is a pointer to the first event to receive.
-        It must be one of:
-          - `:origin` for all events from the start of the stream (default).
-          - `:current` for any new events appended to the stream after the
-            subscription has been created.
-          - any positive integer for an event id to receive events after that
-            exact event.
-
-      - `selector` to define a function to filter each event, i.e. returns
-        only those elements for which fun returns a truthy value
-
-      - `mapper` to define a function to map each recorded event before sending
-        to the subscriber.
-
-      - `concurrency_limit` defines the maximum number of concurrent subscribers
-        allowed to connect to the subscription. By default only one subscriber
-        may connect. If too many subscribers attempt to connect to the
-        subscription an `{:error, :too_many_subscribers}` is returned.
-
-      - `transient` is an optional boolean flag to create a transient subscription.
-        See `subscribe_to_stream` for the full information.
-
-  The subscription will resume from the last acknowledged event if it already
-  exists. It will ignore the `start_from` argument in this case.
-
-  Returns `{:ok, subscription}` when subscription succeeds.
+  See `c:EventStore.subscribe_to_stream/4` for options.
 
   ## Example
 
