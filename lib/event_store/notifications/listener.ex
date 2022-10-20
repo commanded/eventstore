@@ -13,16 +13,17 @@ defmodule EventStore.Notifications.Listener do
 
   alias EventStore.Notifications.{Listener, Notification}
 
-  defstruct [:listen_to, :schema, :ref, demand: 0, queue: :queue.new()]
+  defstruct [:listen_to, :query_timeout, :schema, :ref, demand: 0, queue: :queue.new()]
 
   def start_link(opts) do
     {start_opts, listener_opts} =
       Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt, :hibernate_after])
 
     listen_to = Keyword.fetch!(listener_opts, :listen_to)
+    query_timeout = Keyword.fetch!(listener_opts, :query_timeout)
     schema = Keyword.fetch!(listener_opts, :schema)
 
-    state = %Listener{listen_to: listen_to, schema: schema}
+    state = %Listener{listen_to: listen_to, query_timeout: query_timeout, schema: schema}
 
     GenStage.start_link(__MODULE__, state, start_opts)
   end
@@ -38,7 +39,7 @@ defmodule EventStore.Notifications.Listener do
         inspect(channel) <> " with payload: " <> inspect(payload)
     )
 
-    state = payload |> Notification.new() |> enqueue(state)
+    state = Notification.new(payload) |> enqueue(state)
 
     dispatch_events([], state)
   end
@@ -52,12 +53,12 @@ defmodule EventStore.Notifications.Listener do
   end
 
   defp listen_for_events(%Listener{} = state) do
-    %Listener{listen_to: listen_to, schema: schema} = state
+    %Listener{listen_to: listen_to, query_timeout: query_timeout, schema: schema} = state
 
     channel = schema <> ".events"
 
     ref =
-      case Postgrex.Notifications.listen(listen_to, channel) do
+      case Postgrex.Notifications.listen(listen_to, channel, timeout: query_timeout) do
         {:ok, ref} -> ref
         {:eventually, ref} -> ref
       end

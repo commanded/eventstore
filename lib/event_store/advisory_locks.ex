@@ -11,7 +11,15 @@ defmodule EventStore.AdvisoryLocks do
 
   defmodule State do
     @moduledoc false
-    defstruct [:conn, :ref, :schema, locks: %{}]
+    defstruct [:conn, :query_timeout, :ref, :schema, locks: %{}]
+
+    def new(opts) do
+      conn = Keyword.fetch!(opts, :conn)
+      query_timeout = Keyword.fetch!(opts, :query_timeout)
+      schema = Keyword.fetch!(opts, :schema)
+
+      %State{conn: conn, query_timeout: query_timeout, schema: schema}
+    end
   end
 
   defmodule Lock do
@@ -38,10 +46,7 @@ defmodule EventStore.AdvisoryLocks do
     {start_opts, advisory_locks_opts} =
       Keyword.split(opts, [:name, :timeout, :debug, :spawn_opt, :hibernate_after])
 
-    conn = Keyword.fetch!(advisory_locks_opts, :conn)
-    schema = Keyword.fetch!(advisory_locks_opts, :schema)
-
-    state = %State{conn: conn, schema: schema}
+    state = State.new(advisory_locks_opts)
 
     GenServer.start_link(__MODULE__, state, start_opts)
   end
@@ -58,6 +63,9 @@ defmodule EventStore.AdvisoryLocks do
   Attempt to obtain an advisory lock.
 
      - `key` - an application specific integer to acquire a lock on.
+     - `timeout` - an integer greater than zero which specifies how many
+        milliseconds to wait for a reply, or the atom `:infinity` to wait
+        indefinitely.
 
   Returns `{:ok, lock}` when lock successfully acquired, or
   `{:error, :lock_already_taken}` if the lock cannot be acquired immediately.
@@ -70,14 +78,14 @@ defmodule EventStore.AdvisoryLocks do
   lost lock.
 
   """
-  @spec try_advisory_lock(server :: GenServer.server(), key :: non_neg_integer()) ::
+  @spec try_advisory_lock(server :: GenServer.server(), key :: non_neg_integer(), timeout()) ::
           {:ok, reference()} | {:error, :lock_already_taken} | {:error, term}
-  def try_advisory_lock(server, key) when is_integer(key) do
-    GenServer.call(server, {:try_advisory_lock, key, self()})
+  def try_advisory_lock(server, key, timeout \\ 5_000) when is_integer(key) do
+    GenServer.call(server, {:try_advisory_lock, key, self(), timeout}, timeout)
   end
 
-  def handle_call({:try_advisory_lock, key, owner}, _from, %State{} = state) do
-    case try_acquire_exclusive_lock(key, owner, state) do
+  def handle_call({:try_advisory_lock, key, owner, timeout}, _from, %State{} = state) do
+    case try_acquire_exclusive_lock(key, owner, timeout, state) do
       {:ok, %Lock{} = lock} ->
         state = monitor_acquired_lock(lock, state)
 
@@ -88,10 +96,11 @@ defmodule EventStore.AdvisoryLocks do
     end
   end
 
-  defp try_acquire_exclusive_lock(key, owner, %State{} = state) do
+  defp try_acquire_exclusive_lock(key, owner, timeout, %State{} = state) do
     %State{conn: conn, schema: schema} = state
 
-    with :ok <- Storage.Lock.try_acquire_exclusive_lock(conn, key, schema: schema) do
+    with :ok <-
+           Storage.Lock.try_acquire_exclusive_lock(conn, key, schema: schema, timeout: timeout) do
       {:ok, Lock.new(key, owner)}
     end
   end
@@ -142,8 +151,8 @@ defmodule EventStore.AdvisoryLocks do
   end
 
   defp release_lock(key, %State{} = state) do
-    %State{conn: conn, schema: schema} = state
+    %State{conn: conn, query_timeout: query_timeout, schema: schema} = state
 
-    Storage.Lock.unlock(conn, key, schema: schema)
+    Storage.Lock.unlock(conn, key, schema: schema, timeout: query_timeout)
   end
 end

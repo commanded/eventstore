@@ -25,6 +25,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         buffer_size: opts[:buffer_size] || 1,
         checkpoint_after: opts[:checkpoint_after] || 0,
         checkpoint_threshold: opts[:checkpoint_threshold] || 1,
+        query_timeout: opts[:query_timeout] || 15_000,
         max_size: opts[:max_size] || 1_000,
         transient: Keyword.get(opts, :transient, false)
       }
@@ -309,6 +310,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   defp create_subscription(%SubscriptionState{} = data) do
     %SubscriptionState{
       conn: conn,
+      query_timeout: query_timeout,
       schema: schema,
       start_from: start_from,
       stream_uuid: stream_uuid,
@@ -320,7 +322,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       stream_uuid,
       subscription_name,
       start_from,
-      schema: schema
+      schema: schema,
+      timeout: query_timeout
     )
   end
 
@@ -329,11 +332,11 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
          %Storage.Subscription{} = subscription
        ) do
     %Storage.Subscription{subscription_id: subscription_id} = subscription
-    %SubscriptionState{event_store: event_store} = data
+    %SubscriptionState{event_store: event_store, query_timeout: timeout} = data
 
     server = Module.concat(event_store, AdvisoryLocks)
 
-    AdvisoryLocks.try_advisory_lock(server, subscription_id)
+    AdvisoryLocks.try_advisory_lock(server, subscription_id, timeout)
   end
 
   defp subscribe_to_events(%SubscriptionState{} = data) do
@@ -458,12 +461,14 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       serializer: serializer,
       stream_uuid: stream_uuid,
       last_sent: last_sent,
-      max_size: max_size
+      max_size: max_size,
+      query_timeout: query_timeout
     } = data
 
     Stream.read_stream_forward(conn, stream_uuid, last_sent + 1, max_size,
       schema: schema,
-      serializer: serializer
+      serializer: serializer,
+      timeout: query_timeout
     )
   end
 
@@ -720,12 +725,14 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       stream_uuid: stream_uuid,
       subscription_name: subscription_name,
       last_ack: last_ack,
+      query_timeout: query_timeout,
       checkpoints_pending: checkpoints_pending
     } = data
 
     if checkpoints_pending > 0 do
       Storage.Subscription.ack_last_seen_event(conn, stream_uuid, subscription_name, last_ack,
-        schema: schema
+        schema: schema,
+        timeout: query_timeout
       )
     end
 

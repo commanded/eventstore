@@ -79,12 +79,17 @@ defmodule EventStore.RuntimeConfigTest do
   end
 
   defp with_defaults(config) do
-    config
-    |> Keyword.put_new(:column_data_type, "bytea")
-    |> Keyword.put_new(:enable_hard_deletes, false)
-    |> Keyword.put_new(:otp_app, :eventstore)
-    |> Keyword.put_new(:pool, DBConnection.ConnectionPool)
-    |> Keyword.put_new(:subscription_hibernate_after, 15_000)
-    |> Keyword.put_new(:subscription_retry_interval, 1000)
+    Keyword.merge(
+      [
+        column_data_type: "bytea",
+        enable_hard_deletes: false,
+        otp_app: :eventstore,
+        pool: DBConnection.ConnectionPool,
+        subscription_hibernate_after: 15_000,
+        subscription_retry_interval: 1_000,
+        timeout: 15_000
+      ],
+      config
+    )
   end
 end

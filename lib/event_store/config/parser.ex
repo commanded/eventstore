@@ -1,29 +1,36 @@
 defmodule EventStore.Config.Parser do
   @moduledoc false
 
+  @config_defaults [
+    column_data_type: "bytea",
+    enable_hard_deletes: false,
+    schema: "public",
+    timeout: 15_000
+  ]
+
   def parse(config) do
     config
-    |> Enum.reduce([], fn
-      {:url, value}, config ->
-        parsed_value = get_config_value(value) |> parse_url()
-
-        Keyword.merge(config, parsed_value)
+    |> Enum.reduce(@config_defaults, fn
+      {:port, value}, config ->
+        Keyword.put(config, :port, get_config_integer(value))
 
       {:session_mode_url, value}, config ->
         parsed_value = get_config_value(value) |> parse_url()
 
         Keyword.put(config, :session_mode_pool, parsed_value)
 
-      {key, value}, config when key in [:port, :timeout] ->
-        Keyword.put(config, key, get_config_integer(value))
+      {:timeout, value}, config ->
+        Keyword.put(config, :timeout, get_config_timeout(value))
+
+      {:url, value}, config ->
+        parsed_value = get_config_value(value) |> parse_url()
+
+        Keyword.merge(config, parsed_value)
 
       {key, value}, config ->
         Keyword.put(config, key, get_config_value(value))
     end)
     |> Keyword.put(:pool, EventStore.Config.get_pool())
-    |> Keyword.put_new(:schema, "public")
-    |> Keyword.put_new(:column_data_type, "bytea")
-    |> Keyword.put_new(:enable_hard_deletes, false)
   end
 
   # Converts a database url into a Keyword list
@@ -95,29 +102,48 @@ defmodule EventStore.Config.Parser do
     end
   end
 
-  def get_config_value(value, default \\ nil)
+  defp get_config_value(value, default \\ nil)
 
-  def get_config_value({:system, env_var}, default) do
+  defp get_config_value({:system, env_var}, default) do
     case System.get_env(env_var) do
       nil -> default
       val -> val
     end
   end
 
-  def get_config_value({:system, env_var, default}, _default) do
+  defp get_config_value({:system, env_var, default}, _default) do
     case System.get_env(env_var) do
       nil -> default
       val -> val
     end
   end
 
-  def get_config_value(nil, default), do: default
-  def get_config_value(value, _default), do: value
+  defp get_config_value(nil, default), do: default
+  defp get_config_value(value, _default), do: value
 
-  def get_config_integer(value, default \\ nil) do
+  defp get_config_integer(value, default \\ nil) do
     case get_config_value(value) do
       nil ->
         default
+
+      n when is_integer(n) ->
+        n
+
+      n ->
+        case Integer.parse(n) do
+          {i, _} -> i
+          :error -> default
+        end
+    end
+  end
+
+  defp get_config_timeout(value, default \\ nil) do
+    case get_config_value(value) do
+      nil ->
+        default
+
+      :infinity ->
+        :infinity
 
       n when is_integer(n) ->
         n
