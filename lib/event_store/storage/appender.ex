@@ -183,5 +183,7 @@ defmodule EventStore.Storage.Appender do
     end
   end
 
+  defp handle_response({:error, %DBConnection.ConnectionError{}} = reply), do: reply
+
   defp stream_uuid([event | _]), do: event.stream_uuid
 end
