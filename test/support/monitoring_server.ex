@@ -1,7 +1,9 @@
-defmodule EventStore.ObservedServer do
+defmodule EventStore.MonitoringServer do
   @moduledoc false
 
   use GenServer
+
+  alias alias EventStore.MonitoredServer
 
   def start_link(opts) do
     {start_opts, observer_opts} =
@@ -22,25 +24,7 @@ defmodule EventStore.ObservedServer do
     end
   end
 
-  def handle_call(:ping, _from, reply_to) do
-    {:reply, {:ok, :pong}, reply_to}
-  end
-
-  def handle_cast(:ping, reply_to) do
-    send(reply_to, :pong)
-
-    {:noreply, reply_to}
-  end
-
-  def handle_info(:ping, reply_to) do
-    send(reply_to, :pong)
-
-    {:noreply, reply_to}
-  end
-
-  def handle_info({:DOWN, _ref, :process, _pid, _reason} = msg, reply_to) do
-    send(reply_to, msg)
-
-    {:noreply, reply_to}
+  def handle_call({:monitor, name}, _from, reply_to) do
+    {:reply, MonitoredServer.monitor(name), reply_to}
   end
 end

@@ -141,6 +141,14 @@ defmodule EventStore.MonitoredServer do
     {:noreply, on_process_exit(pid, reason, state)}
   end
 
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, %State{} = state) do
+    %State{monitors: monitors} = state
+
+    state = %State{state | monitors: Map.delete(monitors, pid)}
+
+    {:noreply, state}
+  end
+
   def handle_info(msg, %State{pid: nil} = state) do
     {:noreply, enqueue({:info, msg}, state)}
   end

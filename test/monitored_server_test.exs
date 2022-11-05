@@ -1,7 +1,7 @@
 defmodule EventStore.MonitoredServerTest do
   use ExUnit.Case
 
-  alias EventStore.{MonitoredServer, ObservedServer, ProcessHelper}
+  alias EventStore.{MonitoredServer, ObservedServer, ProcessHelper, MonitoringServer}
 
   describe "monitored server" do
     test "should start process" do
@@ -85,6 +85,19 @@ defmodule EventStore.MonitoredServerTest do
       send(pid, :ping)
 
       assert_receive :pong
+    end
+
+    test "should not forward DOWN messages of monitoring process to observed process" do
+      pid = start_supervised!({MonitoringServer, reply_to: self(), name: MonitoringServer})
+      start_monitored_process!()
+
+      assert_receive {:init, ^pid}
+
+      assert {:ok, _ref} = GenServer.call(pid, {:monitor, MonitoredServer})
+
+      :ok = stop_supervised(MonitoringServer)
+
+      refute_receive {:DOWN, _ref, :process, ^pid, _reason}
     end
 
     test "allow monitored process to monitor an already started process" do
