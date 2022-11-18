@@ -85,7 +85,8 @@ defmodule EventStore.Config do
     :queue_target,
     :queue_interval,
     :socket_options,
-    :parameters
+    :parameters,
+    :disconnect_on_error_codes
   ]
 
   def default_postgrex_opts(config) do
