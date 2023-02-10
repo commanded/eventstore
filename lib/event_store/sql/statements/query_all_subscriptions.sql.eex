@@ -4,5 +4,5 @@ SELECT
   subscription_name,
   last_seen,
   created_at
-FROM <%= schema %>.subscriptions
+FROM "<%= schema %>".subscriptions
 ORDER BY created_at;

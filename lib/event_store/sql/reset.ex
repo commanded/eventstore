@@ -7,8 +7,8 @@ defmodule EventStore.Sql.Reset do
     schema = Keyword.fetch!(config, :schema)
 
     [
-      "SET LOCAL search_path TO #{schema};",
-      "SET LOCAL eventstore.reset TO 'on'",
+      ~s/SET LOCAL search_path TO "#{schema}";/,
+      ~s/SET LOCAL eventstore.reset TO 'on'/,
       truncate_tables(),
       seed_all_stream()
     ]
