@@ -6,7 +6,7 @@ defmodule EventStore.Storage.Schema do
   def create(config) do
     schema = Keyword.fetch!(config, :schema)
 
-    case Database.execute(config, "CREATE SCHEMA #{schema}") do
+    case Database.execute(config, ~s/CREATE SCHEMA "#{schema}"/) do
       :ok ->
         :ok
 
@@ -21,7 +21,7 @@ defmodule EventStore.Storage.Schema do
   def drop(config) do
     schema = Keyword.fetch!(config, :schema)
 
-    case Database.execute(config, "DROP SCHEMA #{schema} CASCADE;") do
+    case Database.execute(config, ~s/DROP SCHEMA "#{schema}" CASCADE;/) do
       :ok ->
         :ok
 

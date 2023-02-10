@@ -4,5 +4,5 @@ SELECT
   stream_version,
   created_at,
   deleted_at
-FROM <%= schema %>.streams
+FROM "<%= schema %>".streams
 WHERE stream_uuid = $1;
