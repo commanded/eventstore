@@ -283,6 +283,4 @@ EventStore exists thanks to the following people who have contributed.
 
 ## Need help?
 
-Please [open an issue](https://github.com/commanded/eventstore/issues) if you encounter a problem, or need assistance.
-
-For commercial support, and consultancy, please contact [Ben Smith](mailto:ben@10consulting.com).
+Please [open an issue](https://github.com/commanded/eventstore/issues) if you encounter a problem, or need assistance. You can also seek help in the #commanded channel in the [official Elixir Slack](https://elixir-slackin.herokuapp.com/).
