@@ -439,7 +439,7 @@ defmodule EventStore do
       def subscribe(stream_uuid, opts \\ []) do
         name = name(opts)
 
-        PubSub.subscribe(name, stream_uuid, opts)
+        PubSub.subscribe(name, stream_uuid, Keyword.delete(opts, :name))
       end
 
       def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ []) do
@@ -537,7 +537,7 @@ defmodule EventStore do
       end
 
       defp name(opts) do
-        case Keyword.get(opts, :name) do
+        case Keyword.pop(opts, :name) do
           nil ->
             __MODULE__
 
