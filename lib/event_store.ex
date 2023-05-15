@@ -537,7 +537,7 @@ defmodule EventStore do
       end
 
       defp name(opts) do
-        case Keyword.pop(opts, :name) do
+        case Keyword.get(opts, :name) do
           nil ->
             __MODULE__
 
