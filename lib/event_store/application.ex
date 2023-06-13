@@ -5,7 +5,8 @@ defmodule EventStore.Application do
 
   def start(_type, _args) do
     children = [
-      EventStore.Config.Store
+      EventStore.Config.Store,
+      {Registry, keys: :duplicate, name: MonitoredServer.Registry}
     ]
 
     opts = [strategy: :one_for_one, name: EventStore.Supervisor]
