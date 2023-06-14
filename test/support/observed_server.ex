@@ -26,6 +26,10 @@ defmodule EventStore.ObservedServer do
     {:reply, {:ok, :pong}, reply_to}
   end
 
+  def handle_cast(:crash, _state) do
+    raise RuntimeError, message: "crash"
+  end
+
   def handle_cast(:ping, reply_to) do
     send(reply_to, :pong)
 

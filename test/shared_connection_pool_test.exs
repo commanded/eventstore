@@ -53,14 +53,17 @@ defmodule EventStore.SharedConnectionPoolTest do
     end
 
     test "start a separate Postgrex connection for non-shared connection pools" do
-      # An event store started without specifying a connection pool should start its own pool
-      pid = Process.whereis(Module.concat([:eventstore3, Postgrex]))
+      shared_conn = Process.whereis(Module.concat([:shared_pool, Postgrex]))
 
-      assert is_pid(pid)
-      assert_postgrex_connection(pid)
+      # An event store started without specifying a connection pool should start its own pool
+      conn = Process.whereis(Module.concat([:eventstore3, Postgrex]))
+
+      assert is_pid(conn)
+      assert_postgrex_connection(conn)
+      assert shared_conn != conn
     end
 
-    test "stopping event store with shared connection pool should start new connection" do
+    test "stopping event store with shared connection pool should not stop connection pool" do
       conn = Process.whereis(Module.concat([:shared_pool, Postgrex]))
       assert is_pid(conn)
 
@@ -68,23 +71,14 @@ defmodule EventStore.SharedConnectionPoolTest do
 
       stop_supervised!(:eventstore1)
 
-      assert_receive {:DOWN, ^ref, :process, _object, _reason}
+      refute_receive {:DOWN, ^ref, :process, _object, _reason}
 
-      conn =
-        Wait.until(fn ->
-          conn = Process.whereis(Module.concat([:shared_pool, Postgrex]))
-          assert is_pid(conn)
-
-          conn
-        end)
-
-      # Ensure newly started Postgrex connection can be used
+      # Ensure existing Postgrex connection can still be used
       assert {:ok, _events} = append_events_to_stream(:eventstore2, UUID.uuid4(), 1)
-
-      ref = Process.monitor(conn)
 
       stop_supervised!(:eventstore2)
 
+      # Stopping the last event store using the shared pool should stop the Postgrex connection
       assert_receive {:DOWN, ^ref, :process, _object, _reason}
     end
 
@@ -147,6 +141,35 @@ defmodule EventStore.SharedConnectionPoolTest do
 
       assert_receive {:events, _events}
       refute_receive {:events, _events}
+    end
+
+    test "subscription to stream continues to receive events after event store with shared pool is stopped" do
+      stream_uuid = UUID.uuid4()
+
+      {:ok, subscription} =
+        TestEventStore.subscribe_to_stream(stream_uuid, "subscriber2", self(), name: :eventstore2)
+
+      assert_receive {:subscribed, ^subscription}
+
+      {:ok, _events} = append_events_to_stream(:eventstore2, stream_uuid, 1)
+
+      assert_receive {:events, received_events}
+
+      :ok = TestEventStore.ack(subscription, received_events)
+
+      refute_received {:events, _events}
+
+      # Stop eventstore1
+      stop_supervised!(:eventstore1)
+
+      # Append new events to stream should be received via eventstore2 subscription
+      {:ok, _events} = append_events_to_stream(:eventstore2, stream_uuid, 1, 1)
+
+      assert_receive {:events, received_events}
+
+      :ok = TestEventStore.ack(subscription, received_events)
+
+      refute_received {:events, _events}
     end
   end
 
