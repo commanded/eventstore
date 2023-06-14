@@ -45,7 +45,7 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
   end
 
   defp wait_socket do
-    Wait.until(fn ->
+    Wait.until(5_000, fn ->
       refute :undefined == :erlang.port_info(get_port())
     end)
   end
