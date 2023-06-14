@@ -9,6 +9,7 @@
 
 ### Bug fixes
 
+* Dialyzer error when calling `EventStore.subscribe/2` with `:name` option ([#268](https://github.com/commanded/eventstore/pull/268)).
 * Terminate a monitored process only if there are no other processes registered to use it ([#272](https://github.com/commanded/eventstore/pull/272)).
 
 ## v1.4.1
