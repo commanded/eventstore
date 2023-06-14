@@ -59,10 +59,11 @@ defmodule EventStore.Notifications.NotificationsReconnectTest do
   end
 
   defp shutdown_postgrex_notifications_connection(name) do
-    pid = Process.whereis(name)
-    assert is_pid(pid)
+    conn = Process.whereis(name)
+    assert is_pid(conn)
 
-    {:gen_tcp, sock} = :sys.get_state(pid).mod_state.protocol.sock
+    {_, %{protocol: %{sock: {:gen_tcp, sock}}}} = :sys.get_state(conn)
+
     :gen_tcp.shutdown(sock, :read_write)
   end
 

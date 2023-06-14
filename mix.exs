@@ -40,16 +40,16 @@ defmodule EventStore.Mixfile do
   defp deps do
     [
       {:fsm, "~> 0.3"},
-      {:gen_stage, "~> 1.1"},
-      {:postgrex, "~> 0.16"},
+      {:gen_stage, "~> 1.2"},
+      {:postgrex, "~> 0.17"},
 
       # Optional dependencies
-      {:jason, "~> 1.3", optional: true},
+      {:jason, "~> 1.4", optional: true},
       {:poolboy, "~> 1.5", optional: true},
 
       # Development and test tooling
       {:benchfella, "~> 0.3", only: :bench},
-      {:dialyxir, "~> 1.2", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.3", only: :dev, runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end

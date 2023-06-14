@@ -1,16 +1,13 @@
 defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
   use EventStore.StorageCase
 
-  @moduletag :slow
-
-  alias EventStore.{EventFactory, RecordedEvent, UUID}
+  alias EventStore.{EventFactory, RecordedEvent, UUID, Wait}
   alias EventStore.Subscriptions.Subscription
   alias TestEventStore, as: EventStore
 
   describe "subscription recovery" do
     test "should receive events after socket is closed" do
       subscription_name = UUID.uuid4()
-
       stream1_uuid = UUID.uuid4()
 
       append_to_stream(stream1_uuid, 10)
@@ -39,40 +36,24 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
   end
 
   defp kill_socket do
-    port = wait_until(&get_port/0)
+    port = get_port()
+
     :erlang.monitor(:port, port)
     :erlang.port_close(port)
+
     assert_receive {:DOWN, _monitor_ref, _type, _object, _info}
   end
 
-  defp wait_socket() do
-    # This is because MonitoredServer has some problem if we
-    # do :sys.get_state very often. So we set a high step
-    # so we leave time for MonitoredServer to start again
-    wait_until(
-      50_000,
-      5_000,
-      fn ->
-        refute :undefined == :erlang.port_info(get_port())
-      end
-    )
+  defp wait_socket do
+    Wait.until(fn ->
+      refute :undefined == :erlang.port_info(get_port())
+    end)
   end
 
   defp get_port do
-    pid =
-      GenServer.whereis(TestEventStore.EventStore.Notifications.Listener.Postgrex)
-      |> :sys.get_state()
-      |> Map.get(:pid)
+    conn = GenServer.whereis(TestEventStore.Postgrex.Notifications)
 
-    refute is_nil(pid)
-    assert Process.alive?(pid)
-
-    {_, port} =
-      pid
-      |> :sys.get_state()
-      |> Map.get(:mod_state)
-      |> Map.get(:protocol)
-      |> Map.get(:sock)
+    {_, %{protocol: %{sock: {:gen_tcp, port}}}} = :sys.get_state(conn)
 
     port
   end
@@ -106,22 +87,5 @@ defmodule EventStore.Subscriptions.SubscriptionRecoveryTest do
     end)
 
     :ok = Subscription.ack(subscription, received_events)
-  end
-
-  def wait_until(timeout \\ 1000, step \\ 50, fun)
-  def wait_until(timeout, _step, fun) when timeout <= 0, do: fun.()
-
-  def wait_until(timeout, step, fun) do
-    try do
-      fun.()
-    catch
-      :exit, _ ->
-        Process.sleep(step)
-        wait_until(max(0, timeout - step), step, fun)
-    end
-  rescue
-    _ ->
-      Process.sleep(step)
-      wait_until(max(0, timeout - step), step, fun)
   end
 end
