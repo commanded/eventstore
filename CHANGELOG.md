@@ -2,9 +2,10 @@
 
 ## Next release
 
-### Bug fixes
+### Enhancements
 
-* Allow `disconnect_on_error_codes` to be pass to the event store Postgrex connection ([#263](https://github.com/commanded/eventstore/pull/263)).
+* Allow `disconnect_on_error_codes` to be passed to the event store Postgrex connection ([#263](https://github.com/commanded/eventstore/pull/263)).
+* Support all `Postgrex` and `DBConnection` options when configuring an event store ([#273](https://github.com/commanded/eventstore/pull/273)).
 
 ## v1.4.1
 
