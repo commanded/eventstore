@@ -273,6 +273,7 @@ EventStore exists thanks to the following people who have contributed.
 - [Paul Iannazzo](https://github.com/boxxxie)
 - [Piotr Szmielew](https://github.com/esse)
 - [Raphaël Lustin](https://github.com/rlustin)
+- [Ryan Young](https://github.com/ryoung786)
 - [Samuel Roze](https://github.com/sroze)
 - [Simon Harris](https://github.com/harukizaemon)
 - [Stuart Corbishley](https://github.com/stuartc)
