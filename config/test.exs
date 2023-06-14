@@ -8,6 +8,7 @@ config :ex_unit,
   refute_receive_timeout: 100
 
 default_config = [
+  idle_interval: 100,
   username: "postgres",
   password: "postgres",
   database: "eventstore_test",
