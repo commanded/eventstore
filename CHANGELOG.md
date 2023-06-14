@@ -7,6 +7,10 @@
 * Allow `disconnect_on_error_codes` to be passed to the event store Postgrex connection ([#263](https://github.com/commanded/eventstore/pull/263)).
 * Support all `Postgrex` and `DBConnection` options when configuring an event store ([#273](https://github.com/commanded/eventstore/pull/273)).
 
+### Bug fixes
+
+* Terminate a monitored process only if there are no other processes registered to use it ([#272](https://github.com/commanded/eventstore/pull/272)).
+
 ## v1.4.1
 
 ### Enhancements
