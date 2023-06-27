@@ -110,6 +110,22 @@ defmodule EventStore.ConfigTest do
     )
   end
 
+  test "parse url with encoded hash in password" do
+    config = [url: "postgres://username:password%23with_hash@localhost/database"]
+
+    assert_parsed_config(config,
+      enable_hard_deletes: false,
+      column_data_type: "bytea",
+      schema: "public",
+      timeout: 15_000,
+      pool: EventStore.Config.get_pool(),
+      username: "username",
+      password: "password#with_hash",
+      database: "database",
+      hostname: "localhost"
+    )
+  end
+
   test "parse session_mode_url" do
     config = [session_mode_url: "postgres://username:password@localhost/database"]
 

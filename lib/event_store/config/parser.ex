@@ -39,7 +39,7 @@ defmodule EventStore.Config.Parser do
   defp parse_url(""), do: []
 
   defp parse_url(url) do
-    info = url |> URI.decode() |> URI.parse()
+    info = URI.parse(url)
 
     if is_nil(info.host) do
       raise ArgumentError, message: "host is not present"
