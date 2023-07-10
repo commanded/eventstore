@@ -281,6 +281,7 @@ EventStore exists thanks to the following people who have contributed.
 - [Victor Oliveira Nascimento](https://github.com/victorolinasc)
 - [Yamil Díaz Aguirre](https://github.com/Yamilquery)
 - [Yannis Weishaupt](https://github.com/MrYawe)
+- [Yordis Prieto](https://github.com/yordis)
 
 ## Need help?
 
