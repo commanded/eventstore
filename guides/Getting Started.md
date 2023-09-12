@@ -41,6 +41,14 @@ EventStore is [available in Hex](https://hex.pm/packages/eventstore) and can be 
         url: "postgres://postgres:postgres@localhost/eventstore"
       ```
 
+
+      **Note:** Some managed database providers (such as DigitalOcean) don't provide access to the default `postgres` database. In such case, you can specify a default database in the following way:
+
+      ```elixir
+      config :my_app, MyApp.EventStore,
+        default_database: "defaultdb",
+      ```
+
       **Note:** To use an EventStore with Commanded you should configure the event
       store to use Commanded's JSON serializer which provides additional support for
       JSON decoding:
