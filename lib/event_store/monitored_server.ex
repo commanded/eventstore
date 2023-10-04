@@ -181,7 +181,7 @@ defmodule EventStore.MonitoredServer do
         {:EXIT, ^pid, _reason} -> :ok
       after
         shutdown ->
-          Logger.warn(
+          Logger.warning(
             "Monitored server #{inspect(module)} failed to terminate within #{shutdown}, killing it brutally"
           )
 

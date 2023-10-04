@@ -17,14 +17,14 @@ defmodule EventStore.Storage.DeleteStream do
         :ok
 
       {:ok, %Postgrex.Result{num_rows: 0}} ->
-        Logger.warn(fn ->
+        Logger.warning(fn ->
           "Failed to soft delete stream #{inspect(stream_id)} due to: stream not found"
         end)
 
         {:error, :stream_not_found}
 
       {:error, error} = reply ->
-        Logger.warn(fn ->
+        Logger.warning(fn ->
           "Failed to soft delete stream #{inspect(stream_id)} due to: " <> inspect(error)
         end)
 
@@ -44,21 +44,21 @@ defmodule EventStore.Storage.DeleteStream do
         :ok
 
       {:ok, %Postgrex.Result{num_rows: 0}} ->
-        Logger.warn(fn ->
+        Logger.warning(fn ->
           "Failed to hard delete stream #{inspect(stream_id)} due to: stream not found"
         end)
 
         {:error, :stream_not_found}
 
       {:error, %Postgrex.Error{postgres: %{code: :feature_not_supported}} = error} ->
-        Logger.warn(fn ->
+        Logger.warning(fn ->
           "Failed to hard delete stream #{inspect(stream_id)} due to: " <> inspect(error)
         end)
 
         {:error, :not_supported}
 
       {:error, error} = reply ->
-        Logger.warn(fn ->
+        Logger.warning(fn ->
           "Failed to hard delete stream #{inspect(stream_id)} due to: " <> inspect(error)
         end)
 
