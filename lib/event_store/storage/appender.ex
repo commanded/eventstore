@@ -34,7 +34,7 @@ defmodule EventStore.Storage.Appender do
       end)
     catch
       {:error, error} = reply ->
-        Logger.warn(
+        Logger.warning(
           "Failed to append events to stream #{inspect(stream_uuid)} due to: " <> inspect(error)
         )
 
@@ -76,7 +76,7 @@ defmodule EventStore.Storage.Appender do
       end)
     catch
       {:error, error} = reply ->
-        Logger.warn("Failed to link events to stream due to: #{inspect(error)}")
+        Logger.warning("Failed to link events to stream due to: #{inspect(error)}")
 
         reply
     end

@@ -24,13 +24,13 @@ defmodule EventStore.Storage.CreateStream do
          {:error, %Postgrex.Error{postgres: %{code: :unique_violation}}},
          stream_uuid
        ) do
-    Logger.warn("Failed to create stream #{inspect(stream_uuid)}, already exists")
+    Logger.warning("Failed to create stream #{inspect(stream_uuid)}, already exists")
 
     {:error, :stream_exists}
   end
 
   defp handle_response({:error, error}, stream_uuid) do
-    Logger.warn("Failed to create stream #{inspect(stream_uuid)} due to: " <> inspect(error))
+    Logger.warning("Failed to create stream #{inspect(stream_uuid)} due to: " <> inspect(error))
 
     {:error, error}
   end
