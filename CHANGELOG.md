@@ -6,6 +6,8 @@ Support Elixir v1.11 and later.
 
 ### Enhancements
 
+* Parse url with encoded hash in password ([#275](https://github.com/commanded/eventstore/pull/275)).
+* Allow configuring the default database ([#277](https://github.com/commanded/eventstore/pull/277)).
 * Fix Elixir `Logger.warn/2` warning deprecation message ([#278](https://github.com/commanded/eventstore/pull/278)).
 
 ## v1.4.2
