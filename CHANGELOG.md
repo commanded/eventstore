@@ -1,5 +1,13 @@
 # Changelog
 
+## Next release
+
+Support Elixir v1.11 and later.
+
+### Enhancements
+
+* Fix Elixir `Logger.warn/2` warning deprecation message ([#278](https://github.com/commanded/eventstore/pull/278)).
+
 ## v1.4.2
 
 ### Enhancements
