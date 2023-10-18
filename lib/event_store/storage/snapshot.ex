@@ -19,7 +19,7 @@ defmodule EventStore.Storage.Snapshot do
         {:ok, to_snapshot_from_row(row)}
 
       {:error, error} = reply ->
-        Logger.warn(fn ->
+        Logger.warning(fn ->
           "Failed to read snapshot for source \"#{source_uuid}\" due to: #{inspect(error)}"
         end)
 
@@ -46,7 +46,7 @@ defmodule EventStore.Storage.Snapshot do
         :ok
 
       {:error, error} = reply ->
-        Logger.warn(
+        Logger.warning(
           "Failed to record snapshot for source \"#{source_uuid}\" at version \"#{source_version}\" due to: " <>
             inspect(error)
         )
@@ -65,7 +65,7 @@ defmodule EventStore.Storage.Snapshot do
         :ok
 
       {:error, error} = reply ->
-        Logger.warn(
+        Logger.warning(
           "Failed to delete snapshot for source \"#{source_uuid}\" due to: " <> inspect(error)
         )
 

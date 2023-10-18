@@ -117,7 +117,7 @@ defmodule EventStore.Storage.Subscription do
           {:error, :subscription_already_exists}
 
         {:error, error} = reply ->
-          Logger.warn(
+          Logger.warning(
             "Failed to create stream create subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: " <>
               inspect(error)
           )
@@ -140,7 +140,7 @@ defmodule EventStore.Storage.Subscription do
           :ok
 
         {:error, error} = reply ->
-          Logger.warn(
+          Logger.warning(
             "Failed to ack last seen event on stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: " <>
               inspect(error)
           )
@@ -171,7 +171,7 @@ defmodule EventStore.Storage.Subscription do
           :ok
 
         {:error, error} = reply ->
-          Logger.warn(
+          Logger.warning(
             "Failed to delete subscription to stream \"#{stream_uuid}\" named \"#{subscription_name}\" due to: " <>
               inspect(error)
           )
