@@ -533,6 +533,12 @@ defmodule EventStore do
         conn = Keyword.get(opts, :conn) || Keyword.fetch!(config, :conn)
         timeout = timeout(opts, config)
 
+        config =
+          case Keyword.fetch(opts, :read_batch_size) do
+            {:ok, read_batch_size} -> Keyword.put(config, :read_batch_size, read_batch_size)
+            :error -> config
+          end
+
         {conn, Keyword.put(config, :timeout, timeout)}
       end
 
