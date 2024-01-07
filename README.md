@@ -222,12 +222,6 @@ docker run --rm \
 
 ### Running tests
 
-Create and initialize the test event store databases:
-
-```
-MIX_ENV=test mix event_store.setup
-```
-
 Run the test suite:
 
 ```
