@@ -3,7 +3,7 @@ import Config
 config :logger, backends: []
 
 config :ex_unit,
-  capture_log: [level: :warn],
+  capture_log: [level: :warning],
   assert_receive_timeout: 2_000,
   refute_receive_timeout: 100
 
