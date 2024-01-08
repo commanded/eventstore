@@ -1,4 +1,4 @@
-INSERT INTO <%= schema %>.subscriptions
+INSERT INTO "<%= schema %>".subscriptions
   (
     stream_uuid,
     subscription_name,

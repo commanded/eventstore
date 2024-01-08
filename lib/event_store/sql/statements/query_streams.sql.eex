@@ -4,7 +4,7 @@ SELECT
   stream_version,
   created_at,
   deleted_at
-FROM <%= schema %>.streams
+FROM "<%= schema %>".streams
 WHERE $1::text IS NULL OR stream_uuid LIKE $1::text
 ORDER BY <%= sort_by %> <%= sort_dir %>
 LIMIT $2 OFFSET $3;

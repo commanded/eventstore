@@ -1,4 +1,4 @@
-INSERT INTO <%= schema %>.snapshots 
+INSERT INTO "<%= schema %>".snapshots
   (
     source_uuid,
     source_version,

@@ -96,7 +96,7 @@ defmodule EventStore.Tasks.Migrations do
     config
     |> run_query("""
       SELECT major_version, minor_version, patch_version, migrated_at
-      FROM #{schema}.schema_migrations
+      FROM "#{schema}".schema_migrations
       ORDER BY 1, 2, 3
     """)
     |> handle_response()

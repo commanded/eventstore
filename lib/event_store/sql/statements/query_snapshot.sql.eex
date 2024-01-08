@@ -5,5 +5,5 @@ SELECT
   data,
   metadata,
   created_at
-FROM <%= schema %>.snapshots
+FROM "<%= schema %>".snapshots
 WHERE source_uuid = $1;
