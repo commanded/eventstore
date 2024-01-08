@@ -8,7 +8,7 @@ defmodule EventStore.Sql.Init do
     schema = Keyword.fetch!(config, :schema)
 
     [
-      ~s/SET LOCAL search_path TO "#{schema}";/,
+      ~s(SET LOCAL search_path TO "#{schema}";),
       create_streams_table(),
       create_stream_uuid_index(),
       create_events_table(column_data_type),
@@ -33,7 +33,7 @@ defmodule EventStore.Sql.Init do
   end
 
   defp create_streams_table do
-   """
+    """
     CREATE TABLE streams
     (
         stream_id bigserial PRIMARY KEY NOT NULL,

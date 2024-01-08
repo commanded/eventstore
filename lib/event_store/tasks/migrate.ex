@@ -94,7 +94,10 @@ defmodule EventStore.Tasks.Migrate do
       path = Application.app_dir(:eventstore, "priv/event_store/migrations/v#{migration}.sql")
       script = File.read!(path)
 
-      statements = [~s/SET LOCAL search_path TO "#{schema}"; /, script]
+      statements = [
+        ~s(SET LOCAL search_path TO "#{schema}";),
+        script
+      ]
 
       case transaction(conn, statements) do
         {:ok, :ok} ->

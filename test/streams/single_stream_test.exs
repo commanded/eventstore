@@ -34,7 +34,10 @@ defmodule EventStore.Streams.SingleStreamTest do
       utc_now = DateTime.utc_now()
 
       {:ok, [event]} =
-        Stream.read_stream_forward(conn, stream_uuid, 0, 1, schema: schema, serializer: serializer)
+        Stream.read_stream_forward(conn, stream_uuid, 0, 1,
+          schema: schema,
+          serializer: serializer
+        )
 
       created_at = event.created_at
       assert created_at != nil
@@ -509,14 +512,20 @@ defmodule EventStore.Streams.SingleStreamTest do
     events = EventFactory.create_events(3)
 
     :ok =
-      Stream.append_to_stream(conn, stream_uuid, 0, events, schema: schema, serializer: serializer)
+      Stream.append_to_stream(conn, stream_uuid, 0, events,
+        schema: schema,
+        serializer: serializer
+      )
 
     # stream above needed for preventing accidental event_number/stream_version match
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(3)
 
     :ok =
-      Stream.append_to_stream(conn, stream_uuid, 0, events, schema: schema, serializer: serializer)
+      Stream.append_to_stream(conn, stream_uuid, 0, events,
+        schema: schema,
+        serializer: serializer
+      )
 
     assert {:ok, 3} = Stream.stream_version(conn, stream_uuid, schema: schema)
   end
@@ -528,7 +537,10 @@ defmodule EventStore.Streams.SingleStreamTest do
     events = EventFactory.create_events(3)
 
     :ok =
-      Stream.append_to_stream(conn, stream_uuid, 0, events, schema: schema, serializer: serializer)
+      Stream.append_to_stream(conn, stream_uuid, 0, events,
+        schema: schema,
+        serializer: serializer
+      )
 
     [
       stream_uuid: stream_uuid,
@@ -543,7 +555,10 @@ defmodule EventStore.Streams.SingleStreamTest do
     events = EventFactory.create_events(1)
 
     :ok =
-      Stream.append_to_stream(conn, stream_uuid, 0, events, schema: schema, serializer: serializer)
+      Stream.append_to_stream(conn, stream_uuid, 0, events,
+        schema: schema,
+        serializer: serializer
+      )
 
     [
       other_stream_uuid: stream_uuid,
