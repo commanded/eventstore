@@ -238,19 +238,28 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
 
         # Start receiving remaining events acknowledge received events
         subscription =
-          assert_ack(subscription, subscriber, event1, expected_last_sent: 4, expected_last_ack: 1)
+          assert_ack(subscription, subscriber, event1,
+            expected_last_sent: 4,
+            expected_last_ack: 1
+          )
 
         assert_receive {:events, [received_event], ^subscriber}
         assert_event(Enum.at(events, 3), received_event)
 
         subscription =
-          assert_ack(subscription, subscriber, event2, expected_last_sent: 5, expected_last_ack: 2)
+          assert_ack(subscription, subscriber, event2,
+            expected_last_sent: 5,
+            expected_last_ack: 2
+          )
 
         assert_receive {:events, [received_event], ^subscriber}
         assert_event(Enum.at(events, 4), received_event)
 
         subscription =
-          assert_ack(subscription, subscriber, event3, expected_last_sent: 6, expected_last_ack: 3)
+          assert_ack(subscription, subscriber, event3,
+            expected_last_sent: 6,
+            expected_last_ack: 3
+          )
 
         assert_receive {:events, [received_event], ^subscriber}
         assert_event(Enum.at(events, 5), received_event)
