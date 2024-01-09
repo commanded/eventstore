@@ -213,7 +213,7 @@ defmodule EventStore.Storage.AppendEventsTest do
   end
 
   test "append single event with a db connection error", %{conn: conn, schema: schema} do
-    recorded_events = EventFactory.create_recorded_events(1, UUID.uuid4())
+    recorded_events = EventFactory.create_recorded_events(100, UUID.uuid4())
 
     # Using Postgrex query timeout value of zero will cause a `DBConnection.ConnectionError` error
     # to be returned.
