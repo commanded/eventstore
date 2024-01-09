@@ -205,6 +205,22 @@ defmodule EventStore.Storage.AppendEventsTest do
     end
   end
 
+  test "append event to schema which does not exist", %{conn: conn} do
+    recorded_events = EventFactory.create_recorded_events(1, UUID.uuid4())
+
+    assert {:error, :undefined_table} =
+             Appender.append(conn, 1, recorded_events, schema: "doesnotexist")
+  end
+
+  test "append single event with a db connection error", %{conn: conn, schema: schema} do
+    recorded_events = EventFactory.create_recorded_events(1, UUID.uuid4())
+
+    # Using Postgrex query timeout value of zero will cause a `DBConnection.ConnectionError` error
+    # to be returned.
+    assert {:error, %DBConnection.ConnectionError{}} =
+             Appender.append(conn, 1, recorded_events, schema: schema, timeout: 0)
+  end
+
   defp create_stream(context) do
     %{conn: conn, schema: schema} = context
 

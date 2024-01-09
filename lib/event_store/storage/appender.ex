@@ -1,10 +1,9 @@
 defmodule EventStore.Storage.Appender do
   @moduledoc false
-
-  require Logger
-
   alias EventStore.{RecordedEvent, UUID}
   alias EventStore.Sql.Statements
+
+  require Logger
 
   @doc """
   Append the given list of events to storage.
@@ -15,7 +14,7 @@ defmodule EventStore.Storage.Appender do
   Returns `:ok` on success, `{:error, reason}` on failure.
   """
   def append(conn, stream_id, events, opts) do
-    stream_uuid = stream_uuid(events)
+    [%RecordedEvent{stream_uuid: stream_uuid} | _] = events
 
     try do
       events
@@ -108,11 +107,13 @@ defmodule EventStore.Storage.Appender do
       end
 
     stream_id_or_uuid = stream_id || stream_uuid
-    parameters = [stream_id_or_uuid, event_count] ++ build_insert_parameters(events)
+    params = [stream_id_or_uuid, event_count] ++ build_insert_parameters(events)
 
-    conn
-    |> Postgrex.query(statement, parameters, opts)
-    |> handle_response()
+    case Postgrex.query(conn, statement, params, opts) do
+      {:ok, %Postgrex.Result{num_rows: 0}} -> {:error, :not_found}
+      {:ok, %Postgrex.Result{}} -> :ok
+      {:error, error} -> handle_error(error)
+    end
   end
 
   defp build_insert_parameters(events) do
@@ -147,41 +148,40 @@ defmodule EventStore.Storage.Appender do
   defp insert_link_events(conn, params, event_count, schema, opts) do
     statement = Statements.insert_link_events(schema, event_count)
 
-    conn
-    |> Postgrex.query(statement, params, opts)
-    |> handle_response()
+    case Postgrex.query(conn, statement, params, opts) do
+      {:ok, %Postgrex.Result{num_rows: 0}} -> {:error, :not_found}
+      {:ok, %Postgrex.Result{}} -> :ok
+      {:error, error} -> handle_error(error)
+    end
   end
 
-  defp handle_response({:ok, %Postgrex.Result{num_rows: 0}}), do: {:error, :not_found}
-  defp handle_response({:ok, %Postgrex.Result{}}), do: :ok
+  defp handle_error(%Postgrex.Error{} = error) do
+    %Postgrex.Error{postgres: postgres} = error
 
-  defp handle_response({:error, %Postgrex.Error{} = error}) do
-    %Postgrex.Error{postgres: %{code: error_code, constraint: constraint}} = error
-
-    case {error_code, constraint} do
-      {:foreign_key_violation, _constraint} ->
+    case postgres do
+      %{code: :foreign_key_violation} ->
         {:error, :not_found}
 
-      {:unique_violation, "events_pkey"} ->
+      %{code: :unique_violation, constraint: "events_pkey"} ->
         {:error, :duplicate_event}
 
-      {:unique_violation, "stream_events_pkey"} ->
+      %{code: :unique_violation, constraint: "stream_events_pkey"} ->
         {:error, :duplicate_event}
 
-      {:unique_violation, "ix_streams_stream_uuid"} ->
-        # EventStore.Streams.Stream will retry when it gets this
-        # error code. That will always work because on the second
-        # time around, the stream will have been made, so the
-        # race to create the stream will have been resolved.
+      %{code: :unique_violation, constraint: "ix_streams_stream_uuid"} ->
+        # EventStore.Streams.Stream will retry when it gets this error code. That will always work
+        # because on the second time around, the stream will have been made, so the race to create
+        # the stream will have been resolved.
         {:error, :duplicate_stream_uuid}
 
-      {:unique_violation, _constraint} ->
+      %{code: :unique_violation} ->
         {:error, :wrong_expected_version}
 
-      {error_code, _constraint} ->
+      %{code: error_code} ->
         {:error, error_code}
     end
   end
 
-  defp stream_uuid([event | _]), do: event.stream_uuid
+  # Return all other errors to the caller
+  defp handle_error(error), do: {:error, error}
 end
