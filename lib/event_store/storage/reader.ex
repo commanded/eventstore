@@ -34,9 +34,7 @@ defmodule EventStore.Storage.Reader do
   end
 
   defp failed_to_read(stream_id, reason) do
-    Logger.warning(fn ->
-      "Failed to read events from stream id #{stream_id} due to: #{inspect(reason)}"
-    end)
+    Logger.warning("Failed to read events from stream id #{stream_id} due to: #{inspect(reason)}")
 
     {:error, reason}
   end

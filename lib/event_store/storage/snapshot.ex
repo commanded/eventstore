@@ -19,9 +19,9 @@ defmodule EventStore.Storage.Snapshot do
         {:ok, to_snapshot_from_row(row)}
 
       {:error, error} = reply ->
-        Logger.warning(fn ->
+        Logger.warning(
           "Failed to read snapshot for source \"#{source_uuid}\" due to: #{inspect(error)}"
-        end)
+        )
 
         reply
     end

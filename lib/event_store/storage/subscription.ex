@@ -6,6 +6,12 @@ defmodule EventStore.Storage.Subscription do
   alias EventStore.Sql.Statements
   alias EventStore.Storage.Subscription
 
+  alias EventStore.Storage.Subscription.{
+    CreateSubscription,
+    QueryAllSubscriptions,
+    QuerySubscription
+  }
+
   @type t :: %EventStore.Storage.Subscription{
           subscription_id: non_neg_integer(),
           stream_uuid: String.t(),
@@ -16,21 +22,21 @@ defmodule EventStore.Storage.Subscription do
 
   defstruct [:subscription_id, :stream_uuid, :subscription_name, :last_seen, :created_at]
 
-  defdelegate subscriptions(conn, opts), to: Subscription.All, as: :execute
+  defdelegate subscriptions(conn, opts), to: QueryAllSubscriptions, as: :execute
 
   defdelegate subscription(conn, stream_uuid, subscription_name, opts),
-    to: Subscription.Query,
+    to: QuerySubscription,
     as: :execute
 
   def subscribe_to_stream(conn, stream_uuid, subscription_name, start_from, opts) do
-    with {:ok, %Subscription{} = subscription} <-
-           Subscription.Query.execute(conn, stream_uuid, subscription_name, opts) do
-      {:ok, subscription}
-    else
+    case QuerySubscription.execute(conn, stream_uuid, subscription_name, opts) do
+      {:ok, %Subscription{}} = reply ->
+        reply
+
       {:error, :subscription_not_found} ->
         create_subscription(conn, stream_uuid, subscription_name, start_from, opts)
 
-      reply ->
+      {:error, _error} = reply ->
         reply
     end
   end
@@ -43,19 +49,19 @@ defmodule EventStore.Storage.Subscription do
     do: Subscription.Delete.execute(conn, stream_uuid, subscription_name, opts)
 
   defp create_subscription(conn, stream_uuid, subscription_name, start_from, opts) do
-    with {:ok, %Subscription{} = subscription} <-
-           Subscription.Subscribe.execute(conn, stream_uuid, subscription_name, start_from, opts) do
-      {:ok, subscription}
-    else
-      {:error, :subscription_already_exists} ->
-        Subscription.Query.execute(conn, stream_uuid, subscription_name, opts)
+    case CreateSubscription.execute(conn, stream_uuid, subscription_name, start_from, opts) do
+      {:ok, %Subscription{}} = reply ->
+        reply
 
-      reply ->
+      {:error, :subscription_already_exists} ->
+        QuerySubscription.execute(conn, stream_uuid, subscription_name, opts)
+
+      {:error, _error} = reply ->
         reply
     end
   end
 
-  defmodule All do
+  defmodule QueryAllSubscriptions do
     @moduledoc false
 
     def execute(conn, opts) do
@@ -71,7 +77,7 @@ defmodule EventStore.Storage.Subscription do
     end
   end
 
-  defmodule Query do
+  defmodule QuerySubscription do
     @moduledoc false
 
     def execute(conn, stream_uuid, subscription_name, opts) do
@@ -87,7 +93,7 @@ defmodule EventStore.Storage.Subscription do
     end
   end
 
-  defmodule Subscribe do
+  defmodule CreateSubscription do
     @moduledoc false
 
     def execute(conn, stream_uuid, subscription_name, start_from, opts) do

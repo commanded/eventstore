@@ -134,23 +134,19 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
       case first_event_number(events) do
         past when past < expected_event ->
-          Logger.debug(fn -> describe(data) <> " received past event(s), ignoring" end)
+          Logger.debug(describe(data) <> " received past event(s), ignoring")
 
           # Ignore already seen events
           next_state(:subscribed, data)
 
         future when future > expected_event ->
-          Logger.debug(fn ->
-            describe(data) <> " received unexpected event(s), requesting catch up"
-          end)
+          Logger.debug(describe(data) <> " received unexpected event(s), requesting catch up")
 
           # Missed event(s), request catch-up with any unseen events from storage
           next_state(:request_catch_up, data)
 
         ^expected_event ->
-          Logger.debug(fn ->
-            describe(data) <> " is enqueueing #{length(events)} event(s)"
-          end)
+          Logger.debug(describe(data) <> " is enqueueing #{length(events)} event(s)")
 
           # Subscriber is up-to-date, so enqueue events to send
           data =

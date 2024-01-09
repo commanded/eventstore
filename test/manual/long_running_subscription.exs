@@ -19,13 +19,13 @@ defmodule LoggingSubscriber do
   end
 
   def handle_info({:subscribed, subscription}, subscription) do
-    Logger.debug(fn -> "Subscribed to stream" end)
+    Logger.debug("Subscribed to stream")
 
     {:noreply, subscription}
   end
 
   def handle_info({:events, events}, subscription) do
-    Logger.debug(fn -> "Received event(s): #{inspect(events)}" end)
+    Logger.debug("Received event(s): #{inspect(events)}")
 
     :ok = EventStore.ack(subscription, events)
 
