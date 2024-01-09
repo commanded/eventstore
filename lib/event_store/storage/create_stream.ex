@@ -1,37 +1,31 @@
 defmodule EventStore.Storage.CreateStream do
   @moduledoc false
+  alias EventStore.Sql.Statements
 
   require Logger
-
-  alias EventStore.Sql.Statements
 
   def execute(conn, stream_uuid, opts) do
     Logger.debug("Attempting to create stream #{stream_uuid}")
 
     {schema, opts} = Keyword.pop(opts, :schema)
 
-    conn
-    |> Postgrex.query(Statements.create_stream(schema), [stream_uuid], opts)
-    |> handle_response(stream_uuid)
-  end
+    case Postgrex.query(conn, Statements.create_stream(schema), [stream_uuid], opts) do
+      {:ok, %Postgrex.Result{rows: [[stream_id]]}} ->
+        Logger.debug("Created stream #{inspect(stream_uuid)} (id: #{stream_id})")
 
-  defp handle_response({:ok, %Postgrex.Result{rows: [[stream_id]]}}, stream_uuid) do
-    Logger.debug(fn -> "Created stream #{inspect(stream_uuid)} (id: #{stream_id})" end)
-    {:ok, stream_id}
-  end
+        {:ok, stream_id}
 
-  defp handle_response(
-         {:error, %Postgrex.Error{postgres: %{code: :unique_violation}}},
-         stream_uuid
-       ) do
-    Logger.warning("Failed to create stream #{inspect(stream_uuid)}, already exists")
+      {:error, %Postgrex.Error{postgres: %{code: :unique_violation}}} ->
+        Logger.warning("Failed to create stream #{inspect(stream_uuid)}, already exists")
 
-    {:error, :stream_exists}
-  end
+        {:error, :stream_exists}
 
-  defp handle_response({:error, error}, stream_uuid) do
-    Logger.warning("Failed to create stream #{inspect(stream_uuid)} due to: " <> inspect(error))
+      {:error, error} ->
+        Logger.warning(
+          "Failed to create stream #{inspect(stream_uuid)} due to: " <> inspect(error)
+        )
 
-    {:error, error}
+        {:error, error}
+    end
   end
 end
