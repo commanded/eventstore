@@ -4,13 +4,6 @@ defmodule EventStore.Storage.AppendEventsTest do
   alias EventStore.{EventFactory, RecordedEvent, UUID}
   alias EventStore.Storage.{Appender, CreateStream}
 
-  test "append single event with a db connection error" do
-    conn = start_supervised!({Postgrex, TestEventStore.config(queue_timeout: -1, queue_target: -1)}) |> dbg()
-    recorded_events = EventFactory.create_recorded_events(1, UUID.uuid4())
-    assert {:error, %DBConnection.ConnectionError{}} =
-             Appender.append(conn, 1, recorded_events, schema: "public")
-  end
-
   test "append single event to new stream", %{conn: conn, schema: schema} = context do
     {:ok, stream_uuid, stream_id} = create_stream(context)
     recorded_events = EventFactory.create_recorded_events(1, stream_uuid)
@@ -210,6 +203,22 @@ defmodule EventStore.Storage.AppendEventsTest do
       assert {:error, :duplicate_event} =
                Appender.append(conn, stream2_id, events, schema: schema)
     end
+  end
+
+  test "append event to schema which does not exist", %{conn: conn} do
+    recorded_events = EventFactory.create_recorded_events(1, UUID.uuid4())
+
+    assert {:error, :undefined_table} =
+             Appender.append(conn, 1, recorded_events, schema: "doesnotexist")
+  end
+
+  test "append single event with a db connection error", %{conn: conn, schema: schema} do
+    recorded_events = EventFactory.create_recorded_events(1, UUID.uuid4())
+
+    # Using Postgrex query timeout value of zero will cause a `DBConnection.ConnectionError` error
+    # to be returned.
+    assert {:error, %DBConnection.ConnectionError{}} =
+             Appender.append(conn, 1, recorded_events, schema: schema, timeout: 0)
   end
 
   defp create_stream(context) do
