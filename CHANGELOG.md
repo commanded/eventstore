@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Bug fixes
+
+* Handle `DBConnection.ConnectionError` errors when appending events to storage ([#261](https://github.com/commanded/eventstore/pull/261)).
+
 ## v1.4.3
 
 ### Enhancements
