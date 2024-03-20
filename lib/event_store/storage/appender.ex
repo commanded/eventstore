@@ -99,15 +99,23 @@ defmodule EventStore.Storage.Appender do
   defp insert_event_batch(conn, stream_id, stream_uuid, events, event_count, opts) do
     {schema, opts} = Keyword.pop(opts, :schema)
     {expected_version, opts} = Keyword.pop(opts, :expected_version)
+    {created_at, opts} = Keyword.pop(opts, :created_at)
 
     statement =
       case expected_version do
-        :any_version -> Statements.insert_events_any_version(schema, stream_id, event_count)
-        _expected_version -> Statements.insert_events(schema, stream_id, event_count)
+        :any_version ->
+          Statements.insert_events_any_version(schema, stream_id, event_count, created_at)
+
+        _expected_version ->
+          Statements.insert_events(schema, stream_id, event_count, created_at)
       end
 
     stream_id_or_uuid = stream_id || stream_uuid
-    params = [stream_id_or_uuid, event_count] ++ build_insert_parameters(events)
+
+    params =
+      [stream_id_or_uuid, event_count]
+      |> Enum.concat(build_insert_parameters(events))
+      |> maybe_append(created_at, stream_id)
 
     case Postgrex.query(conn, statement, params, opts) do
       {:ok, %Postgrex.Result{num_rows: 0}} -> {:error, :not_found}
@@ -115,6 +123,9 @@ defmodule EventStore.Storage.Appender do
       {:error, error} -> handle_error(error)
     end
   end
+
+  defp maybe_append(params, value, nil) when not is_nil(value), do: params ++ [value]
+  defp maybe_append(params, _, _), do: params
 
   defp build_insert_parameters(events) do
     events

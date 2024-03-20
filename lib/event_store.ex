@@ -527,9 +527,16 @@ defmodule EventStore do
         Snapshotter.delete_snapshot(conn, source_uuid, opts)
       end
 
+      @accepted_overrides [:created_at]
       defp parse_opts(opts) do
-        name = name(opts)
-        config = Config.lookup(name)
+        overrides = Keyword.take(opts, @accepted_overrides)
+
+        config =
+          opts
+          |> name()
+          |> Config.lookup()
+          |> Keyword.merge(overrides)
+
         conn = Keyword.get(opts, :conn) || Keyword.fetch!(config, :conn)
         timeout = timeout(opts, config)
 

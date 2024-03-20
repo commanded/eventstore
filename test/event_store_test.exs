@@ -203,6 +203,34 @@ defmodule EventStore.EventStoreTest do
     assert recorded_event.data.event == unicode_text
   end
 
+  test "override created_at" do
+    created_at = DateTime.utc_now() |> DateTime.add(-1, :day)
+    stream_uuid = UUID.uuid4()
+    events = EventFactory.create_events(1)
+
+    :ok = EventStore.append_to_stream(stream_uuid, 0, events, created_at: created_at)
+
+    [recorded_event] = EventStore.stream_all_forward() |> Enum.to_list()
+    {:ok, stream_info} = EventStore.stream_info(stream_uuid)
+
+    assert recorded_event.created_at == created_at
+    assert stream_info.created_at == created_at
+  end
+
+  test "override created_at any_version" do
+    created_at = DateTime.utc_now() |> DateTime.add(-1, :day)
+    stream_uuid = UUID.uuid4()
+    events = EventFactory.create_events(1)
+
+    :ok = EventStore.append_to_stream(stream_uuid, :any_version, events, created_at: created_at)
+
+    [recorded_event] = EventStore.stream_all_forward() |> Enum.to_list()
+    {:ok, stream_info} = EventStore.stream_info(stream_uuid)
+
+    assert recorded_event.created_at == created_at
+    assert stream_info.created_at == created_at
+  end
+
   describe "transient subscription" do
     test "should notify subscribers after event persisted to stream" do
       stream_uuid = UUID.uuid4()
