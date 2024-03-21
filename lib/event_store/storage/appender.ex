@@ -115,7 +115,7 @@ defmodule EventStore.Storage.Appender do
     params =
       [stream_id_or_uuid, event_count]
       |> Enum.concat(build_insert_parameters(events))
-      |> maybe_append(created_at, stream_id)
+      |> append_if(!stream_id, created_at)
 
     case Postgrex.query(conn, statement, params, opts) do
       {:ok, %Postgrex.Result{num_rows: 0}} -> {:error, :not_found}
@@ -124,8 +124,8 @@ defmodule EventStore.Storage.Appender do
     end
   end
 
-  defp maybe_append(params, value, nil) when not is_nil(value), do: params ++ [value]
-  defp maybe_append(params, _, _), do: params
+  defp append_if(params, true, value) when not is_nil(value), do: params ++ [value]
+  defp append_if(params, _, _), do: params
 
   defp build_insert_parameters(events) do
     events
