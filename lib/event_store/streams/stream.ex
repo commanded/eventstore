@@ -145,16 +145,16 @@ defmodule EventStore.Streams.Stream do
          serializer,
          opts
        ) do
-    prepared_events = prepare_events(events, stream, serializer)
+    prepared_events = prepare_events(events, stream, serializer, opts)
 
     write_to_stream(conn, prepared_events, stream, expected_version, opts)
   end
 
-  defp prepare_events(events, %StreamInfo{} = stream, serializer) do
+  defp prepare_events(events, %StreamInfo{} = stream, serializer, opts) do
     %StreamInfo{stream_uuid: stream_uuid, stream_version: stream_version} = stream
 
     events
-    |> Enum.map(&map_to_recorded_event(&1, utc_now(), serializer))
+    |> Enum.map(&map_to_recorded_event(&1, opts[:created_at] || utc_now(), serializer))
     |> Enum.with_index(1)
     |> Enum.map(fn {recorded_event, index} ->
       %RecordedEvent{
