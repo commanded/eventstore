@@ -22,6 +22,7 @@ defmodule EventStore.Streams.Stream do
       conn,
       fn transaction ->
         with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, new_opts),
+             {:ok, stream} <- prepare_stream(transaction, stream, opts),
              :ok <-
                do_append_to_storage(
                  transaction,
