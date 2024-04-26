@@ -55,13 +55,13 @@ defmodule EventStore.RecordedEvent do
     :created_at
   ]
 
-  def deserialize(%RecordedEvent{} = recorded_event, serializer) do
+  def deserialize(%RecordedEvent{} = recorded_event, serializer, metadata_serializer) do
     %RecordedEvent{data: data, metadata: metadata, event_type: event_type} = recorded_event
 
     %RecordedEvent{
       recorded_event
       | data: serializer.deserialize(data, type: event_type),
-        metadata: serializer.deserialize(metadata, [])
+        metadata: metadata_serializer.deserialize(metadata, [])
     }
   end
 

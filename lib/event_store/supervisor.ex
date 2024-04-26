@@ -115,7 +115,9 @@ defmodule EventStore.Supervisor do
   defp validate_config!(event_store, name, config) do
     conn = postgrex_conn(name, config)
     column_data_type = Config.column_data_type(event_store, config)
+    metadata_column_data_type = Config.metadata_column_data_type(event_store, config)
     serializer = Serializer.serializer(event_store, config)
+    metadata_serializer = Serializer.metadata_serializer(event_store, config)
     subscription_retry_interval = Subscriptions.retry_interval(event_store, config)
     subscription_hibernate_after = Subscriptions.hibernate_after(event_store, config)
 
@@ -123,6 +125,8 @@ defmodule EventStore.Supervisor do
       conn: conn,
       column_data_type: column_data_type,
       serializer: serializer,
+      metadata_serializer: metadata_serializer,
+      metadata_column_data_type: metadata_column_data_type,
       subscription_retry_interval: subscription_retry_interval,
       subscription_hibernate_after: subscription_hibernate_after
     )

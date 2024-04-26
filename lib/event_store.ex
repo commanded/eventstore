@@ -23,6 +23,7 @@ defmodule EventStore do
 
       config :my_app, MyApp.EventStore,
         serializer: EventStore.JsonSerializer,
+        metadata_serializer: EventStore.JsonSerializer,
         username: "postgres",
         password: "postgres",
         database: "eventstore",
@@ -448,6 +449,7 @@ defmodule EventStore do
         conn = Keyword.fetch!(config, :conn)
         schema = Keyword.fetch!(config, :schema)
         serializer = Keyword.fetch!(config, :serializer)
+        metadata_serializer = Keyword.fetch!(config, :metadata_serializer)
 
         query_timeout = timeout(opts, config)
 
@@ -467,6 +469,7 @@ defmodule EventStore do
               query_timeout: query_timeout,
               schema: schema,
               serializer: serializer,
+              metadata_serializer: metadata_serializer,
               stream_uuid: stream_uuid,
               subscription_name: subscription_name,
               start_from: start_from

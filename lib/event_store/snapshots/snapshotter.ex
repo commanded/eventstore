@@ -9,9 +9,10 @@ defmodule EventStore.Snapshots.Snapshotter do
   """
   def read_snapshot(conn, source_uuid, opts) do
     {serializer, opts} = Keyword.pop(opts, :serializer)
+    {metadata_serializer, opts} = Keyword.pop(opts, :metadata_serializer)
 
     with {:ok, snapshot} <- Snapshot.read_snapshot(conn, source_uuid, opts) do
-      deserialized = SnapshotData.deserialize(snapshot, serializer)
+      deserialized = SnapshotData.deserialize(snapshot, serializer, metadata_serializer)
 
       {:ok, deserialized}
     end
@@ -24,8 +25,9 @@ defmodule EventStore.Snapshots.Snapshotter do
   """
   def record_snapshot(conn, %SnapshotData{} = snapshot, opts) do
     {serializer, opts} = Keyword.pop(opts, :serializer)
+    {metadata_serializer, opts} = Keyword.pop(opts, :metadata_serializer)
 
-    serialized = SnapshotData.serialize(snapshot, serializer)
+    serialized = SnapshotData.serialize(snapshot, serializer, metadata_serializer)
 
     Snapshot.record_snapshot(conn, serialized, opts)
   end

@@ -31,4 +31,19 @@ defmodule EventStore.Serializer do
           message: "#{inspect(event_store)} configuration expects :serializer to be configured"
     end
   end
+
+  @doc """
+  Get the metadata serializer module from the given config for the event store.
+  """
+  def metadata_serializer(event_store, config) do
+    case Keyword.fetch(config, :metadata_serializer) do
+      {:ok, serializer} ->
+        serializer
+
+      :error ->
+        raise ArgumentError,
+          message:
+            "#{inspect(event_store)} configuration expects :metadata_serializer to be configured"
+    end
+  end
 end

@@ -22,6 +22,7 @@ defmodule EventStore.Notifications.Supervisor do
     conn = Keyword.fetch!(config, :conn)
     schema = Keyword.fetch!(config, :schema)
     serializer = Keyword.fetch!(config, :serializer)
+    metadata_serializer = Keyword.fetch!(config, :metadata_serializer)
     query_timeout = Keyword.fetch!(config, :timeout)
 
     listener_name = Module.concat([event_store, Listener])
@@ -54,6 +55,7 @@ defmodule EventStore.Notifications.Supervisor do
          event_store: event_store,
          schema: schema,
          serializer: serializer,
+         metadata_serializer: metadata_serializer,
          subscribe_to: listener_name,
          name: publisher_name,
          hibernate_after: hibernate_after}

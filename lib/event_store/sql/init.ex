@@ -5,13 +5,14 @@ defmodule EventStore.Sql.Init do
 
   def statements(config) do
     column_data_type = Keyword.fetch!(config, :column_data_type)
+    metadata_column_data_type = Keyword.fetch!(config, :metadata_column_data_type)
     schema = Keyword.fetch!(config, :schema)
 
     [
       ~s(SET LOCAL search_path TO "#{schema}";),
       create_streams_table(),
       create_stream_uuid_index(),
-      create_events_table(column_data_type),
+      create_events_table(column_data_type, metadata_column_data_type),
       create_stream_events_table(),
       create_stream_events_index(),
       create_event_store_exception_function(),
@@ -26,7 +27,7 @@ defmodule EventStore.Sql.Init do
       create_event_notification_trigger(),
       create_subscriptions_table(),
       create_subscription_index(),
-      create_snapshots_table(column_data_type),
+      create_snapshots_table(column_data_type, metadata_column_data_type),
       create_schema_migrations_table(),
       record_event_store_schema_version()
     ]
@@ -58,7 +59,7 @@ defmodule EventStore.Sql.Init do
     """
   end
 
-  defp create_events_table(column_data_type) do
+  defp create_events_table(column_data_type, metadata_column_data_type) do
     """
     CREATE TABLE events
     (
@@ -67,7 +68,7 @@ defmodule EventStore.Sql.Init do
         causation_id uuid NULL,
         correlation_id uuid NULL,
         data #{column_data_type} NOT NULL,
-        metadata #{column_data_type} NULL,
+        metadata #{metadata_column_data_type} NULL,
         created_at timestamp with time zone DEFAULT NOW() NOT NULL
     );
     """
@@ -242,7 +243,7 @@ defmodule EventStore.Sql.Init do
     """
   end
 
-  defp create_snapshots_table(column_data_type) do
+  defp create_snapshots_table(column_data_type, metadata_column_data_type) do
     """
     CREATE TABLE snapshots
     (
@@ -250,7 +251,7 @@ defmodule EventStore.Sql.Init do
         source_version bigint NOT NULL,
         source_type text NOT NULL,
         data #{column_data_type} NOT NULL,
-        metadata #{column_data_type} NULL,
+        metadata #{metadata_column_data_type} NULL,
         created_at timestamp with time zone DEFAULT NOW() NOT NULL
     );
     """

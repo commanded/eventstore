@@ -12,7 +12,7 @@ defmodule EventStore.Notifications.Publisher do
   alias EventStore.Notifications.Notification
 
   defmodule State do
-    defstruct [:conn, :event_store, :query_timeout, :schema, :serializer, :subscribe_to]
+    defstruct [:conn, :event_store, :query_timeout, :schema, :serializer, :metadata_serializer, :subscribe_to]
 
     def new(opts) do
       %State{
@@ -21,6 +21,7 @@ defmodule EventStore.Notifications.Publisher do
         query_timeout: Keyword.fetch!(opts, :query_timeout),
         schema: Keyword.fetch!(opts, :schema),
         serializer: Keyword.fetch!(opts, :serializer),
+        metadata_serializer: Keyword.fetch!(opts, :metadata_serializer),
         subscribe_to: Keyword.fetch!(opts, :subscribe_to)
       }
     end
@@ -63,7 +64,7 @@ defmodule EventStore.Notifications.Publisher do
       to_stream_version: to_stream_version
     } = notification
 
-    %State{conn: conn, query_timeout: query_timeout, schema: schema, serializer: serializer} =
+    %State{conn: conn, query_timeout: query_timeout, schema: schema, serializer: serializer, metadata_serializer: metadata_serializer} =
       state
 
     count = to_stream_version - from_stream_version + 1
@@ -74,7 +75,7 @@ defmodule EventStore.Notifications.Publisher do
              timeout: query_timeout
            ) do
         {:ok, events} ->
-          deserialized_events = deserialize_recorded_events(events, serializer)
+          deserialized_events = deserialize_recorded_events(events, serializer, metadata_serializer)
 
           {stream_uuid, deserialized_events}
 
@@ -92,8 +93,8 @@ defmodule EventStore.Notifications.Publisher do
     end
   end
 
-  defp deserialize_recorded_events(recorded_events, serializer) do
-    Enum.map(recorded_events, &RecordedEvent.deserialize(&1, serializer))
+  defp deserialize_recorded_events(recorded_events, serializer, metadata_serializer) do
+    Enum.map(recorded_events, &RecordedEvent.deserialize(&1, serializer, metadata_serializer))
   end
 
   defp broadcast(event_store, stream_uuid, events) do
