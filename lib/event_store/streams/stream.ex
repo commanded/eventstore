@@ -4,6 +4,35 @@ defmodule EventStore.Streams.Stream do
   alias EventStore.{EventData, RecordedEvent, Storage, UUID}
   alias EventStore.Streams.StreamInfo
 
+  def trim_stream(conn, stream_uuid, cutoff_version, expected_version, opts) do
+    with {:ok, %StreamInfo{} = stream} <- stream_info(conn, stream_uuid, expected_version, opts) do
+      do_trim_stream(conn, stream, cutoff_version, opts)
+    end
+  end
+
+  defp do_trim_stream(conn, stream, cutoff_version, opts) do
+    %StreamInfo{stream_id: stream_id} = stream
+
+    if Keyword.fetch!(opts, :enable_hard_deletes) do
+      opts = query_opts(opts)
+
+      transaction(
+        conn,
+        fn transaction ->
+          with :ok <- set_enable_hard_deletes(transaction),
+               :ok <- Storage.trim_stream(transaction, stream_id, cutoff_version, opts) do
+            :ok
+          else
+            {:error, error} -> Postgrex.rollback(transaction, error)
+          end
+        end,
+        opts
+      )
+    else
+      {:error, :not_supported}
+    end
+  end
+
   def append_to_stream(conn, stream_uuid, expected_version, events, opts)
       when length(events) < 1000 do
     {serializer, new_opts} = Keyword.pop(opts, :serializer)

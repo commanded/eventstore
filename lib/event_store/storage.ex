@@ -8,7 +8,8 @@ defmodule EventStore.Storage do
     Reader,
     Snapshot,
     Stream,
-    Subscription
+    Subscription,
+    TrimStream
   }
 
   @doc """
@@ -101,4 +102,9 @@ defmodule EventStore.Storage do
   Delete an existing snapshot for a given source.
   """
   defdelegate delete_snapshot(conn, source_uuid, opts), to: Snapshot
+
+  @doc """
+  Trim an existing stream up to the cutoff event
+  """
+  defdelegate trim_stream(conn, stream_id, cutoff_version, otps), to: TrimStream, as: :trim
 end
