@@ -405,6 +405,12 @@ defmodule EventStore do
       def stream_all_backward(start_version, opts),
         do: stream_backward(@all_stream, start_version, opts)
 
+      def trim_stream(stream_uuid, cutoff_version, expected_version \\ :any_version, opts \\ []) do
+        {conn, opts} = parse_opts(opts)
+
+        Stream.trim_stream(conn, stream_uuid, cutoff_version, expected_version, opts)
+      end
+
       def delete_stream(stream_uuid, expected_version, type \\ :soft, opts \\ [])
 
       def delete_stream(@all_stream, _expected_version, _type, _opts),
