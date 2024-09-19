@@ -99,7 +99,7 @@ defmodule EventStore.Storage.Appender do
   defp insert_event_batch(conn, stream_id, stream_uuid, events, event_count, opts) do
     {schema, opts} = Keyword.pop(opts, :schema)
     {expected_version, opts} = Keyword.pop(opts, :expected_version)
-    {created_at, opts} = Keyword.pop(opts, :created_at)
+    {created_at, opts} = Keyword.pop(opts, :created_at_override)
 
     statement =
       case expected_version do

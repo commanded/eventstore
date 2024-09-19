@@ -208,7 +208,7 @@ defmodule EventStore.EventStoreTest do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(1)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events, created_at: created_at)
+    :ok = EventStore.append_to_stream(stream_uuid, 0, events, created_at_override: created_at)
 
     [recorded_event] = EventStore.stream_all_forward() |> Enum.to_list()
     {:ok, stream_info} = EventStore.stream_info(stream_uuid)
@@ -224,8 +224,12 @@ defmodule EventStore.EventStoreTest do
     events = EventFactory.create_events(1)
     events2 = EventFactory.create_events(1)
 
-    :ok = EventStore.append_to_stream(stream_uuid, 0, events, created_at: created_at)
-    :ok = EventStore.append_to_stream(stream_uuid, :any_version, events2, created_at: created_at2)
+    :ok = EventStore.append_to_stream(stream_uuid, 0, events, created_at_override: created_at)
+
+    :ok =
+      EventStore.append_to_stream(stream_uuid, :any_version, events2,
+        created_at_override: created_at2
+      )
 
     [event1, event2] = EventStore.stream_all_forward() |> Enum.to_list()
     {:ok, stream_info} = EventStore.stream_info(stream_uuid)
@@ -240,7 +244,10 @@ defmodule EventStore.EventStoreTest do
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(1)
 
-    :ok = EventStore.append_to_stream(stream_uuid, :any_version, events, created_at: created_at)
+    :ok =
+      EventStore.append_to_stream(stream_uuid, :any_version, events,
+        created_at_override: created_at
+      )
 
     [recorded_event] = EventStore.stream_all_forward() |> Enum.to_list()
     {:ok, stream_info} = EventStore.stream_info(stream_uuid)
@@ -256,8 +263,15 @@ defmodule EventStore.EventStoreTest do
     events = EventFactory.create_events(1)
     events2 = EventFactory.create_events(1)
 
-    :ok = EventStore.append_to_stream(stream_uuid, :any_version, events, created_at: created_at)
-    :ok = EventStore.append_to_stream(stream_uuid, :any_version, events2, created_at: created_at2)
+    :ok =
+      EventStore.append_to_stream(stream_uuid, :any_version, events,
+        created_at_override: created_at
+      )
+
+    :ok =
+      EventStore.append_to_stream(stream_uuid, :any_version, events2,
+        created_at_override: created_at2
+      )
 
     [event1, event2] = EventStore.stream_all_forward() |> Enum.to_list()
     {:ok, stream_info} = EventStore.stream_info(stream_uuid)
