@@ -220,6 +220,11 @@ docker run --rm \
   postgres
 ```
 
+Alternatively, use Docker Compose
+```shell
+docker compose up
+```
+
 ### Running tests
 
 Create and initialize the test event store databases:
