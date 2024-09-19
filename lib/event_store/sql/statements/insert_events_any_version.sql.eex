@@ -57,20 +57,24 @@ WITH
     SET stream_version = stream_version + $2::bigint
     WHERE stream_id = 0
     RETURNING stream_version - $2::bigint as initial_stream_version
+  ),
+  linked_stream_events AS (
+    INSERT INTO "<%= schema %>".stream_events
+    (
+      event_id,
+      stream_id,
+      stream_version,
+      original_stream_id,
+      original_stream_version
+    )
+    SELECT
+      new_events_indexes.event_id,
+      0,
+      linked_stream.initial_stream_version + new_events_indexes.index,
+      stream.stream_id,
+      stream.initial_stream_version + new_events_indexes.index
+    FROM
+      new_events_indexes, linked_stream, stream
   )
-INSERT INTO "<%= schema %>".stream_events
-(
-  event_id,
-  stream_id,
-  stream_version,
-  original_stream_id,
-  original_stream_version
-)
-SELECT
-  new_events_indexes.event_id,
-  0,
-  linked_stream.initial_stream_version + new_events_indexes.index,
-  stream.stream_id,
-  stream.initial_stream_version + new_events_indexes.index
-FROM
-  new_events_indexes, linked_stream, stream;
+
+SELECT stream_id from stream;
