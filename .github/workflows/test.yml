@@ -17,8 +17,10 @@ jobs:
             otp: 26
           - elixir: 1.14.x
             otp: 26
+            check_formatted: "ignore"
           - elixir: 1.13.x
             otp: 25
+            check_formatted: "ignore"
 
     services:
       postgres:
@@ -54,6 +56,7 @@ jobs:
       run: mix deps.get
 
     - name: Check formatting
+      if: ${{ matrix.check_formatted != 'ignore' }}
       run: mix format --check-formatted
 
     - name: Setup EventStore test databases
