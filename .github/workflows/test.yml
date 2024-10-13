@@ -61,6 +61,9 @@ jobs:
         MIX_ENV=test mix event_store.setup
         MIX_ENV=jsonb mix event_store.setup
 
+    - name: Compile
+      run: mix compile --warnings-as-errors
+
     - name: Run tests
       run: mix test.all
 
