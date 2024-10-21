@@ -20,17 +20,19 @@ defmodule EventStore.Storage.Appender do
       events
       |> Stream.map(&encode_uuids/1)
       |> Stream.chunk_every(1_000)
-      |> Enum.each(fn batch ->
+      |> Enum.reduce(stream_id, fn batch, stream_id ->
         event_count = length(batch)
 
-        with :ok <- insert_event_batch(conn, stream_id, stream_uuid, batch, event_count, opts) do
+        with {:ok, new_stream_id} <-
+               insert_event_batch(conn, stream_id, stream_uuid, batch, event_count, opts) do
           Logger.debug("Appended #{event_count} event(s) to stream #{inspect(stream_uuid)}")
-
-          :ok
+          new_stream_id
         else
           {:error, error} -> throw({:error, error})
         end
       end)
+
+      :ok
     catch
       {:error, error} = reply ->
         Logger.warning(
@@ -110,9 +112,14 @@ defmodule EventStore.Storage.Appender do
     params = [stream_id_or_uuid, event_count] ++ build_insert_parameters(events)
 
     case Postgrex.query(conn, statement, params, opts) do
-      {:ok, %Postgrex.Result{num_rows: 0}} -> {:error, :not_found}
-      {:ok, %Postgrex.Result{}} -> :ok
-      {:error, error} -> handle_error(error)
+      {:ok, %Postgrex.Result{num_rows: 0}} ->
+        {:error, :not_found}
+
+      {:ok, %Postgrex.Result{rows: [[stream_id]]}} ->
+        {:ok, stream_id}
+
+      {:error, error} ->
+        handle_error(error)
     end
   end
 

@@ -344,9 +344,7 @@ defmodule EventStore.Streams.Stream do
 
       append_to_stream(conn, stream_uuid, expected_version, events, opts)
     else
-      # We should never get here, but just in case we break something in another
-      # part of the app, this will give us better output in the tests.
-      {:error, :already_retried_once}
+      {:error, {:already_retried_once, :duplicate_stream_uuid}}
     end
   end
 
