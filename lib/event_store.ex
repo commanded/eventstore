@@ -294,13 +294,17 @@ defmodule EventStore do
         Supervisor.stop(supervisor, :normal, timeout)
       end
 
+      @accepted_overrides_append_to_stream [:created_at_override]
+
       def append_to_stream(stream_uuid, expected_version, events, opts \\ [])
 
       def append_to_stream(@all_stream, _expected_version, _events, _opts),
         do: {:error, :cannot_append_to_all_stream}
 
       def append_to_stream(stream_uuid, expected_version, events, opts) do
+        overrides = Keyword.take(opts, @accepted_overrides_append_to_stream)
         {conn, opts} = parse_opts(opts)
+        opts = Keyword.merge(opts, overrides)
 
         Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
       end

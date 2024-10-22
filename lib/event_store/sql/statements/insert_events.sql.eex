@@ -24,12 +24,17 @@ WITH
     <% end %>
   ),
   stream AS (
-    <%= if stream_id do %>
+    <%= cond do %>
+    <% stream_id -> %>
       UPDATE "<%= schema %>".streams
       SET stream_version = stream_version + $2::bigint
       WHERE stream_id = $1::bigint
       returning stream_id
-    <% else %>
+    <% created_at -> %>
+      INSERT INTO "<%= schema %>".streams (stream_uuid, stream_version, created_at)
+      VALUES ($1, $2::bigint, $<%= number_of_events*9 + 3 %>)
+      returning stream_id
+    <% true -> %>
       INSERT INTO "<%= schema %>".streams (stream_uuid, stream_version)
       VALUES ($1, $2::bigint)
       returning stream_id
