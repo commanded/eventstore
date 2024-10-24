@@ -4,6 +4,7 @@
 
 ### Enhancements
 
+* Expands CI test matrix to cover supported Elixir and OTP versions ([#291](https://github.com/commanded/eventstore/pull/291)).
 * Bump version
 * Updates changelog :)
 
