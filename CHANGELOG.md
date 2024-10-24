@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.4.6
+
+### Enhancements
+
+* Bump version
+* Updates changelog :)
+
+## v1.4.5
+
+### Enhancements
+
+* Add a docker compose file for standing up a suitable development database ([#290](https://github.com/commanded/eventstore/pull/290)).
+
+### Bug fixes
+
+* `append_to_stream` can now properly append more than 1000 events again ([#289](https://github.com/commanded/eventstore/pull/289)).
+
 ## v1.4.4
 
 ### Bug fixes
