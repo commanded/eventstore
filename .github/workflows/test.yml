@@ -1,6 +1,11 @@
 name: Test
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - 'v*'
 
 jobs:
   build:
@@ -8,8 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        otp: ['25.3', '26.2']
-        elixir: ['1.16.0']
+        include:
+          - elixir: 1.17.x
+            otp: 27
+          - elixir: 1.16.x
+            otp: 26
+          - elixir: 1.15.x
+            otp: 26
+          - elixir: 1.14.x
+            otp: 26
+            check_formatted: "ignore"
+          - elixir: 1.13.x
+            otp: 25
+            check_formatted: "ignore"
 
     services:
       postgres:
@@ -45,12 +61,16 @@ jobs:
       run: mix deps.get
 
     - name: Check formatting
+      if: ${{ matrix.check_formatted != 'ignore' }}
       run: mix format --check-formatted
 
     - name: Setup EventStore test databases
       run: |
         MIX_ENV=test mix event_store.setup
         MIX_ENV=jsonb mix event_store.setup
+
+    - name: Compile
+      run: mix compile --warnings-as-errors
 
     - name: Run tests
       run: mix test.all
