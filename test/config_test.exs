@@ -144,6 +144,38 @@ defmodule EventStore.ConfigTest do
     )
   end
 
+  test "passes parent config options to session mode pool config" do
+    config = [
+      ssl: true,
+      ssl_opts: [cacertfile: ~c"/etc/ssl/certs/db.ca-certificate.crt", verify: :verify_peer],
+      prepare: :unnamed,
+      session_mode_url: "postgres://username:password@localhost/database"
+    ]
+
+    session_mode_pool_config =
+      Config.parse(config) |> Config.postgrex_notifications_opts(:name) |> Enum.sort()
+
+    assert session_mode_pool_config == [
+             auto_reconnect: true,
+             backoff_type: :exp,
+             database: "database",
+             hostname: "localhost",
+             name: :name,
+             password: "password",
+             pool: DBConnection.ConnectionPool,
+             pool_size: 1,
+             prepare: :unnamed,
+             ssl: true,
+             ssl_opts: [
+               cacertfile: ~c"/etc/ssl/certs/db.ca-certificate.crt",
+               verify: :verify_peer
+             ],
+             sync_connect: false,
+             timeout: 15000,
+             username: "username"
+           ]
+  end
+
   test "parse url with query parameters" do
     config = [
       url: "postgres://username:password@localhost/database?ssl=true&pool_size=5&timeout=120000"
