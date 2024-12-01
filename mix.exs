@@ -73,6 +73,8 @@ defmodule EventStore.Mixfile do
         "guides/Subscriptions.md",
         "guides/Cluster.md",
         "guides/Event Serialization.md",
+        "guides/Architecture.md",
+        "guides/FAQ.md",
         "guides/Upgrades.md",
         "guides/upgrades/0.17-1.0.md": [
           filename: "0.17-1.0",
