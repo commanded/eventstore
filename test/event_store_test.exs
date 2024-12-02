@@ -8,6 +8,9 @@ defmodule EventStore.EventStoreTest do
   @all_stream "$all"
   @subscription_name "test_subscription"
 
+  @an_hour 60 * 60 * 1000
+  @a_day 24 * @an_hour
+
   test "returns already started for started event store" do
     assert {:error, {:already_started, _}} = EventStore.start_link()
   end
@@ -204,7 +207,7 @@ defmodule EventStore.EventStoreTest do
   end
 
   test "override created_at" do
-    created_at = DateTime.utc_now() |> DateTime.add(-1, :day)
+    created_at = DateTime.utc_now() |> DateTime.add(-1 * @a_day)
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(1)
 
@@ -218,8 +221,8 @@ defmodule EventStore.EventStoreTest do
   end
 
   test "override created_at existing stream" do
-    created_at = DateTime.utc_now() |> DateTime.add(-1, :day)
-    created_at2 = DateTime.utc_now() |> DateTime.add(-1, :hour)
+    created_at = DateTime.utc_now() |> DateTime.add(-1 * @a_day)
+    created_at2 = DateTime.utc_now() |> DateTime.add(-1 * @an_hour)
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(1)
     events2 = EventFactory.create_events(1)
@@ -240,7 +243,7 @@ defmodule EventStore.EventStoreTest do
   end
 
   test "override created_at any_version" do
-    created_at = DateTime.utc_now() |> DateTime.add(-1, :day)
+    created_at = DateTime.utc_now() |> DateTime.add(-1 * @a_day)
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(1)
 
@@ -257,8 +260,8 @@ defmodule EventStore.EventStoreTest do
   end
 
   test "override created_at any_version existing stream" do
-    created_at = DateTime.utc_now() |> DateTime.add(-1, :day)
-    created_at2 = DateTime.utc_now() |> DateTime.add(-1, :hour)
+    created_at = DateTime.utc_now() |> DateTime.add(-1 * @a_day)
+    created_at2 = DateTime.utc_now() |> DateTime.add(-1 * @an_hour)
     stream_uuid = UUID.uuid4()
     events = EventFactory.create_events(1)
     events2 = EventFactory.create_events(1)
