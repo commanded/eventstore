@@ -151,6 +151,7 @@ defmodule EventStore.Config do
   # connections (advisory locks and notifications). Uses the default Postgres
   # configuration if not specified.
   defp session_mode_pool_config(config) do
-    Keyword.get(config, :session_mode_pool, config)
+    config
+    |> Keyword.merge(Keyword.get(config, :session_mode_pool, []))
   end
 end
