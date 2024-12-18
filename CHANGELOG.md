@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.4.7
+
+### Enhancements
+
+* Add support for overriding created_at timestamps for copy transform workflows by @Johnabell in https://github.com/commanded/eventstore/pull/282
+
+### Bug fixes
+
+* fix: merge session mode pool config with main config, preserving options by @gf3 in https://github.com/commanded/eventstore/pull/293
+
 ## v1.4.6
 
 ### Enhancements
