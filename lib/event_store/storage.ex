@@ -106,5 +106,7 @@ defmodule EventStore.Storage do
   @doc """
   Trim an existing stream up to the cutoff event
   """
-  defdelegate trim_stream(conn, stream_id, stream_uuid, cutoff_version, otps), to: TrimStream, as: :trim
+  defdelegate trim_stream(conn, stream_id, stream_uuid, cutoff_version, otps),
+    to: TrimStream,
+    as: :trim
 end

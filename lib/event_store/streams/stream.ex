@@ -347,7 +347,7 @@ defmodule EventStore.Streams.Stream do
     end
   end
 
-  defp maybe_trim_stream(transaction, %StreamInfo{} = stream,  opts) do
+  defp maybe_trim_stream(transaction, %StreamInfo{} = stream, opts) do
     case Keyword.get(opts, :trim_stream_to_version) do
       nil ->
         :ok

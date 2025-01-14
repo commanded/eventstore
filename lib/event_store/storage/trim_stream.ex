@@ -11,6 +11,7 @@ defmodule EventStore.Storage.TrimStream do
     query = Statements.trim_stream(schema, stream_id)
 
     stream_id_or_uuid = stream_id || stream_uuid
+
     case Postgrex.query(conn, query, [stream_id_or_uuid, cutoff_version], opts) do
       {:ok, %Postgrex.Result{num_rows: 1, rows: [[num_events]]}} ->
         Logger.debug("Trimmed #{num_events} events from stream #{inspect(stream_id)}")
