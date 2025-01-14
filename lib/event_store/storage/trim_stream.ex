@@ -5,12 +5,13 @@ defmodule EventStore.Storage.TrimStream do
 
   alias EventStore.Sql.Statements
 
-  def trim(conn, stream_id, cutoff_version, opts) do
+  def trim(conn, stream_id, stream_uuid, cutoff_version, opts) do
     {schema, opts} = Keyword.pop(opts, :schema)
 
-    query = Statements.trim_stream(schema)
+    query = Statements.trim_stream(schema, stream_id)
 
-    case Postgrex.query(conn, query, [stream_id, cutoff_version], opts) do
+    stream_id_or_uuid = stream_id || stream_uuid
+    case Postgrex.query(conn, query, [stream_id_or_uuid, cutoff_version], opts) do
       {:ok, %Postgrex.Result{num_rows: 1, rows: [[num_events]]}} ->
         Logger.debug("Trimmed #{num_events} events from stream #{inspect(stream_id)}")
         :ok

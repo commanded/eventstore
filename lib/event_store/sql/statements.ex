@@ -23,7 +23,7 @@ defmodule EventStore.Sql.Statements do
         {:subscription_ack, [:schema]},
         {:insert_snapshot, [:schema]},
         {:delete_snapshot, [:schema]},
-        {:trim_stream, [:schema]},
+        {:trim_stream, [:schema, :stream_id]},
         {:query_all_subscriptions, [:schema]},
         {:query_snapshot, [:schema]},
         {:query_stream_info, [:schema]},

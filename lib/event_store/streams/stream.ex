@@ -11,7 +11,7 @@ defmodule EventStore.Streams.Stream do
         fn transaction ->
           with {:ok, %StreamInfo{} = stream} <-
                  stream_info(transaction, stream_uuid, expected_version, opts),
-               :ok <- do_trim_stream(transaction, stream.stream_id, cutoff_version, opts) do
+               :ok <- do_trim_stream(transaction, stream, cutoff_version, opts) do
             :ok
           else
             {:error, error} -> Postgrex.rollback(transaction, error)
@@ -342,26 +342,26 @@ defmodule EventStore.Streams.Stream do
     case {trim_version, expected_version, hard_deletes_allowed?} do
       {:no_trim, _, _} -> :ok
       {_, :any_version, _} -> {:error, :cannot_trim_stream_with_any_version}
-      {_, _version, false} -> {:error, :cannot_trim_hard_deletes_not_allowed}
+      {_, _version, false} -> {:error, :cannot_trim_when_hard_deletes_not_enabled}
       {_, _, _} -> :ok
     end
   end
 
-  defp maybe_trim_stream(transaction, %StreamInfo{stream_id: stream_id}, opts) do
+  defp maybe_trim_stream(transaction, %StreamInfo{} = stream,  opts) do
     case Keyword.get(opts, :trim_stream_to_version) do
       nil ->
         :ok
 
       cutoff_version ->
-        do_trim_stream(transaction, stream_id, cutoff_version, opts)
+        do_trim_stream(transaction, stream, cutoff_version, opts)
     end
   end
 
-  defp do_trim_stream(transaction, stream_id, cutoff_version, opts) do
+  defp do_trim_stream(transaction, %StreamInfo{} = stream, cutoff_version, opts) do
     opts = query_opts(opts)
 
     with :ok <- set_enable_hard_deletes(transaction) do
-      Storage.trim_stream(transaction, stream_id, cutoff_version, opts)
+      Storage.trim_stream(transaction, stream.stream_id, stream.stream_uuid, cutoff_version, opts)
     end
   end
 
