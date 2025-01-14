@@ -337,7 +337,7 @@ defmodule EventStore.Streams.Stream do
 
   defp validate_append_opts(opts, expected_version) do
     trim_version = Keyword.get(opts, :trim_stream_to_version, :no_trim)
-    hard_deletes_allowed? = Keyword.fetch!(opts, :enable_hard_deletes)
+    hard_deletes_allowed? = Keyword.get(opts, :enable_hard_deletes, false)
 
     case {trim_version, expected_version, hard_deletes_allowed?} do
       {:no_trim, _, _} -> :ok
