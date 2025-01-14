@@ -65,6 +65,87 @@ defmodule EventStore.EventStoreTest do
     end
   end
 
+  describe "trimming the event stream" do
+    setup(tags) do
+      hard_deletes? = Map.get(tags, :enable_hard_deletes, true)
+      stop_supervised!(TestEventStore)
+      start_supervised!({TestEventStore, enable_hard_deletes: hard_deletes?})
+      :ok
+    end
+
+    test "should not allow trimming with :any_version" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(2)
+
+      assert {:error, :cannot_trim_stream_with_any_version} =
+               EventStore.append_to_stream(stream_uuid, :any_version, events,
+                 trim_stream_to_version: 2
+               )
+    end
+
+    @tag enable_hard_deletes: false
+    test "should not allow trimming when hard_deletes are disabled" do
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(2)
+
+      assert {:error, :cannot_trim_when_hard_deletes_not_enabled} =
+               EventStore.append_to_stream(stream_uuid, 0, events, trim_stream_to_version: 2)
+    end
+
+    test "should trim up to the given version" do
+      # When a stream exists with 2 events
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(2)
+      assert :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      # When we trim to stream to the 2nd event
+      assert :ok = EventStore.trim_stream(stream_uuid, 2)
+
+      # Then the stream has a single event in it, at version 2
+      assert {:ok, [event]} = EventStore.read_stream_forward(stream_uuid)
+      assert event.stream_version == 2
+
+      # And so does the $all stream
+      assert {:ok, [event]} = EventStore.read_stream_forward("$all")
+      assert event.stream_version == 2
+    end
+
+    test "should trim up to the event given when the stream exists" do
+      # Given an existing stream with an event
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(1)
+      assert :ok = EventStore.append_to_stream(stream_uuid, 0, events)
+
+      # When we append 2 events and ask the stream to be trimmed up to the 3rd event
+      events = EventFactory.create_events(2)
+      assert :ok = EventStore.append_to_stream(stream_uuid, 1, events, trim_stream_to_version: 3)
+
+      # Then the stream has a single event in it, at version 3
+      assert {:ok, [event]} = EventStore.read_stream_forward(stream_uuid)
+      assert event.stream_version == 3
+
+      # And so does the $all stream
+      assert {:ok, [event]} = EventStore.read_stream_forward("$all")
+      assert event.stream_version == 3
+    end
+
+    test "should trim up to the event given even when the stream doesn't exist" do
+      # When we append 2 events and ask the stream to be trimmed up to the 2nd event
+      stream_uuid = UUID.uuid4()
+      events = EventFactory.create_events(2)
+
+      assert :ok = EventStore.append_to_stream(stream_uuid, 0, events, trim_stream_to_version: 2)
+
+      # Then the stream has a single event in it, at version 2
+      assert {:ok, [event]} = EventStore.read_stream_forward(stream_uuid)
+      assert event.stream_version == 2
+
+      # And so does the $all stream
+      assert {:ok, [event]} = EventStore.read_stream_forward("$all")
+      assert event.stream_version == 2
+    end
+  end
+
   describe "link to event store" do
     setup do
       source_stream_uuid = UUID.uuid4()

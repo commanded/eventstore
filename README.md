@@ -38,6 +38,7 @@ MIT License
   - [Reading from all streams](guides/Usage.md#reading-from-all-streams)
   - [Stream from all streams](guides/Usage.md#stream-from-all-streams)
   - [Linking events between streams](guides/Usage.md#linking-events-between-streams)
+  - [Trimming events from streams](guides/Usage.md#trimming-events-from-streams)
 - [Subscriptions](guides/Subscriptions.md)
   - [Transient subscriptions](guides/Subscriptions.md#transient-subscriptions)
   - [Persistent subscriptions](guides/Subscriptions.md#persistent-subscriptions)
