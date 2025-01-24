@@ -12,15 +12,40 @@ defmodule EventStore.Storage.Subscription do
     QuerySubscription
   }
 
+  @typedoc """
+  A subscription to an event stream.
+
+  * `subscription_id` - Unique identifier for the subscription
+  * `stream_uuid` - The stream being subscribed to
+  * `subscription_name` - Name of the subscription
+  * `last_seen` - Last event seen by this subscription
+  * `created_at` - When the subscription was created
+  * `annotations` - Arbitrary non-identifying metadata attached to the
+    subscription, inspired by Kubernetes annotations. These are key-value pairs
+    that can be used to store auxiliary information about a subscription that
+    is not directly part of its core functionality. For example:
+      * Build/release information (team owner, git sha, etc.)
+      * Client-specific configuration
+      * Debugging info
+      * Tool information
+  """
   @type t :: %EventStore.Storage.Subscription{
           subscription_id: non_neg_integer(),
           stream_uuid: String.t(),
           subscription_name: String.t(),
           last_seen: non_neg_integer() | nil,
-          created_at: DateTime.t()
+          created_at: DateTime.t(),
+          annotations: map()
         }
 
-  defstruct [:subscription_id, :stream_uuid, :subscription_name, :last_seen, :created_at]
+  defstruct [
+    :subscription_id,
+    :stream_uuid,
+    :subscription_name,
+    :last_seen,
+    :created_at,
+    :annotations
+  ]
 
   defdelegate subscriptions(conn, opts), to: QueryAllSubscriptions, as: :execute
 
@@ -49,7 +74,17 @@ defmodule EventStore.Storage.Subscription do
     do: Subscription.Delete.execute(conn, stream_uuid, subscription_name, opts)
 
   defp create_subscription(conn, stream_uuid, subscription_name, start_from, opts) do
-    case CreateSubscription.execute(conn, stream_uuid, subscription_name, start_from, opts) do
+    {splitted_opts, opts} = Keyword.split(opts, [:annotations])
+    annotations = Keyword.get(splitted_opts, :annotations) || %{}
+
+    case CreateSubscription.execute(
+           conn,
+           stream_uuid,
+           subscription_name,
+           start_from,
+           annotations,
+           opts
+         ) do
       {:ok, %Subscription{}} = reply ->
         reply
 
@@ -96,7 +131,8 @@ defmodule EventStore.Storage.Subscription do
   defmodule CreateSubscription do
     @moduledoc false
 
-    def execute(conn, stream_uuid, subscription_name, start_from, opts) do
+    def execute(conn, stream_uuid, subscription_name, start_from, annotations, opts)
+        when is_map(annotations) do
       Logger.debug(
         "Attempting to create subscription on stream " <>
           inspect(stream_uuid) <>
@@ -107,7 +143,12 @@ defmodule EventStore.Storage.Subscription do
 
       query = Statements.insert_subscription(schema)
 
-      case Postgrex.query(conn, query, [stream_uuid, subscription_name, start_from], opts) do
+      case Postgrex.query(
+             conn,
+             query,
+             [stream_uuid, subscription_name, start_from, annotations],
+             opts
+           ) do
         {:ok, %Postgrex.Result{rows: rows}} ->
           Logger.debug(
             "Created subscription on stream \"#{stream_uuid}\" named \"#{subscription_name}\""
@@ -200,7 +241,8 @@ defmodule EventStore.Storage.Subscription do
         stream_uuid,
         subscription_name,
         last_seen,
-        created_at
+        created_at,
+        annotations
       ] = row
 
       %Subscription{
@@ -208,8 +250,13 @@ defmodule EventStore.Storage.Subscription do
         stream_uuid: stream_uuid,
         subscription_name: subscription_name,
         last_seen: last_seen,
-        created_at: created_at
+        created_at: created_at,
+        annotations: annotations_from_row(annotations)
       }
     end
+
+    defp annotations_from_row(nil), do: %{}
+    defp annotations_from_row([]), do: %{}
+    defp annotations_from_row(annotations), do: annotations
   end
 end

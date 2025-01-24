@@ -69,16 +69,44 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
     verify_subscription(subscription, 1)
   end
 
+  test "create subscription with annotations", context do
+    annotations = %{"key" => "value", "nested" => %{"data" => 123}}
+    {:ok, subscription} = subscribe_to_stream(context, annotations: annotations)
+
+    verify_subscription(subscription, nil, annotations)
+  end
+
+  test "create subscription when already exists preserves annotations", context do
+    annotations = %{"key" => "value", "metadata" => %{"version" => 1}}
+    {:ok, subscription1} = subscribe_to_stream(context, annotations: annotations)
+
+    # No annotations provided
+    {:ok, subscription2} = subscribe_to_stream(context)
+    # Explicit nil
+    {:ok, subscription3} = subscribe_to_stream(context, annotations: nil)
+    # Empty map
+    {:ok, subscription4} = subscribe_to_stream(context, annotations: %{})
+
+    assert subscription1.subscription_id == subscription2.subscription_id
+    assert subscription2.subscription_id == subscription3.subscription_id
+    assert subscription3.subscription_id == subscription4.subscription_id
+    assert subscription1.annotations == annotations
+    assert subscription2.annotations == annotations
+    assert subscription3.annotations == annotations
+    assert subscription4.annotations == annotations
+  end
+
   def ack_last_seen_event(context, last_seen) do
     %{conn: conn, schema: schema} = context
 
     Storage.ack_last_seen_event(conn, @all_stream, @subscription_name, last_seen, schema: schema)
   end
 
-  defp subscribe_to_stream(context) do
+  defp subscribe_to_stream(context, opts \\ []) do
     %{conn: conn, schema: schema} = context
+    opts = Keyword.merge([schema: schema], opts)
 
-    Storage.subscribe_to_stream(conn, @all_stream, @subscription_name, schema: schema)
+    Storage.subscribe_to_stream(conn, @all_stream, @subscription_name, opts)
   end
 
   defp delete_subscription(context) do
@@ -93,13 +121,14 @@ defmodule EventStore.Storage.SubscriptionPersistenceTest do
     Storage.subscriptions(conn, schema: schema)
   end
 
-  defp verify_subscription(subscription, last_seen \\ nil)
+  defp verify_subscription(subscription, last_seen \\ nil, annotations \\ %{})
 
-  defp verify_subscription(subscription, last_seen) do
+  defp verify_subscription(subscription, last_seen, annotations) do
     assert subscription.subscription_id > 0
     assert subscription.stream_uuid == @all_stream
     assert subscription.subscription_name == @subscription_name
     assert subscription.last_seen == last_seen
     assert subscription.created_at != nil
+    assert subscription.annotations == annotations
   end
 end

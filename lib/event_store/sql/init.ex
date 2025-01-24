@@ -28,8 +28,22 @@ defmodule EventStore.Sql.Init do
       create_subscription_index(),
       create_snapshots_table(column_data_type),
       create_schema_migrations_table(),
-      record_event_store_schema_version()
+      record_event_store_schema_version(),
+      add_annotations_to_subscriptions(),
+      create_subscription_annotations_index()
     ]
+  end
+
+  defp add_annotations_to_subscriptions do
+    """
+    ALTER TABLE subscriptions ADD COLUMN annotations jsonb;
+    """
+  end
+
+  defp create_subscription_annotations_index do
+    """
+    CREATE INDEX subscriptions_annotations_idx ON subscriptions USING gin (annotations);
+    """
   end
 
   defp create_streams_table do
