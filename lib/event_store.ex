@@ -254,7 +254,7 @@ defmodule EventStore do
     quote bind_quoted: [opts: opts] do
       @behaviour EventStore
 
-      alias EventStore.{Config, EventData, PubSub, Subscriptions}
+      alias EventStore.{Config, EventData, PubSub, Subscriptions, Telemetry}
       alias EventStore.Snapshots.{SnapshotData, Snapshotter}
       alias EventStore.Subscriptions.Subscription
       alias EventStore.Streams.Stream
@@ -306,7 +306,17 @@ defmodule EventStore do
         {conn, opts} = parse_opts(opts)
         opts = Keyword.merge(opts, overrides)
 
-        Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
+        telemetry_metadata = %{
+          stream_uuid: stream_uuid,
+          expected_version: expected_version,
+          event_count: length(events)
+        }
+
+        # TODO: The Github issue says to measure the "count" and "total_time". We can measure those here, but would it
+        # be better to measure them at a "lower" level (i.e. in the Stream module)?
+        Telemetry.measure_span(:append_to_stream, telemetry_metadata, fn ->
+          Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
+        end)
       end
 
       def link_to_stream(
@@ -335,7 +345,17 @@ defmodule EventStore do
       def read_stream_forward(stream_uuid, start_version, count, opts) do
         {conn, opts} = parse_opts(opts)
 
-        Stream.read_stream_forward(conn, stream_uuid, start_version, count, opts)
+        telemetry_metadata = %{
+          stream_uuid: stream_uuid,
+          start_version: start_version,
+          count: count
+        }
+
+        # TODO: This is not flexible enough if we want to include part of the result in the :stop measurements.  For
+        # example, if we want to return how many events were actually read (as opposed to the "requested" count).
+        Telemetry.measure_span(:read_stream_forward, telemetry_metadata, fn ->
+          Stream.read_stream_forward(conn, stream_uuid, start_version, count, opts)
+        end)
       end
 
       def read_all_streams_forward(
