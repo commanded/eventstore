@@ -1,7 +1,6 @@
 defmodule EventStore.Telemetry do
   @moduledoc false
   alias EventStore.Storage
-  alias EventStore.Storage.Subscription
 
   require Logger
 
@@ -21,26 +20,24 @@ defmodule EventStore.Telemetry do
   end
 
   def subscriptions(conn, schema) do
-    case Storage.subscriptions(conn, schema: schema) do
-      {:ok, subscriptions} ->
-        Enum.each(subscriptions, fn %Subscription{} = subscription ->
-          # TODO: The Github issue mentions including a "lag" metric, but for that we need to know the total count of
-          # events, which may be expensive to query for.  Do we want to implement that?
-          measurements = %{
-            last_seen: subscription.last_seen
-          }
+    with {:ok, stream_info} <- Storage.stream_info(conn, "$all", schema: schema),
+         {:ok, subscriptions} <- Storage.subscriptions(conn, schema: schema) do
+      Enum.each(subscriptions, fn subscription ->
+        measurements = %{
+          last_seen: subscription.last_seen,
+          lag: stream_info.stream_version - subscription.last_seen
+        }
 
-          # TODO: The Github issue mentions having including the "last processed event".  How do we get that?
-          metadata = %{
-            stream_uuid: subscription.stream_uuid,
-            subscription_name: subscription.subscription_name
-          }
+        # TODO: The Github issue mentions having including the "last processed event".  How do we get that?
+        metadata = %{
+          stream_uuid: subscription.stream_uuid,
+          subscription_name: subscription.subscription_name
+        }
 
-          execute(:subscription, measurements, metadata)
-        end)
-
-      # TODO: How do we want to handle these errors?
-      {:error, _error} ->
+        execute(:subscription, measurements, metadata)
+      end)
+    else
+      _ ->
         Logger.warning("Failed to emit subscription telemetry")
     end
   end
