@@ -92,8 +92,6 @@ defmodule EventStore.Supervisor do
               id: subscriptions_registry_name
             ),
             {Notifications.Supervisor, {name, config}},
-            # TODO: Should this be opt-in?  It adds load on the database.
-            # TODO: Only run one poller per cluster.
             Telemetry.poller_child_spec(conn: conn, schema: schema)
           ] ++ PubSub.child_spec(name)
 

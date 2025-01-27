@@ -312,8 +312,6 @@ defmodule EventStore do
           event_count: length(events)
         }
 
-        # TODO: The Github issue says to measure the "count" and "total_time". We can measure those here, but would it
-        # be better to measure them at a "lower" level (i.e. in the Stream module)?
         Telemetry.measure_span(:append_to_stream, telemetry_metadata, fn ->
           Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
         end)
@@ -351,8 +349,6 @@ defmodule EventStore do
           count: count
         }
 
-        # TODO: This is not flexible enough if we want to include part of the result in the :stop measurements.  For
-        # example, if we want to return how many events were actually read (as opposed to the "requested" count).
         Telemetry.measure_span(:read_stream_forward, telemetry_metadata, fn ->
           Stream.read_stream_forward(conn, stream_uuid, start_version, count, opts)
         end)

@@ -7,7 +7,6 @@ defmodule EventStore.Telemetry do
   def poller_child_spec(opts) do
     conn = Keyword.fetch!(opts, :conn)
     schema = Keyword.fetch!(opts, :schema)
-    # TODO: Do the period and init_delay need to be configurable?
     period = Keyword.get(opts, :period) || :timer.seconds(15)
     init_delay = Keyword.get(opts, :init_delay) || :timer.seconds(5)
 
@@ -28,7 +27,6 @@ defmodule EventStore.Telemetry do
           lag: stream_info.stream_version - subscription.last_seen
         }
 
-        # TODO: The Github issue mentions having including the "last processed event".  How do we get that?
         metadata = %{
           stream_uuid: subscription.stream_uuid,
           subscription_name: subscription.subscription_name
@@ -61,6 +59,5 @@ defmodule EventStore.Telemetry do
     end)
   end
 
-  # TODO: Should this be :eventstore like in the mix.exs file?  Or :event_store to match the module names?
   defp event_name_prefix, do: :event_store
 end
