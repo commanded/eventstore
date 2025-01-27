@@ -92,7 +92,7 @@ defmodule EventStore.Supervisor do
               id: subscriptions_registry_name
             ),
             {Notifications.Supervisor, {name, config}},
-            Telemetry.poller_child_spec(conn: conn, schema: schema)
+            Telemetry.poller_child_spec(config)
           ] ++ PubSub.child_spec(name)
 
         :ok = Config.associate(name, self(), event_store, config)

@@ -7,8 +7,8 @@ defmodule EventStore.Telemetry do
   def poller_child_spec(opts) do
     conn = Keyword.fetch!(opts, :conn)
     schema = Keyword.fetch!(opts, :schema)
-    period = Keyword.get(opts, :period) || :timer.seconds(15)
-    init_delay = Keyword.get(opts, :init_delay) || :timer.seconds(5)
+    period = Keyword.get(opts, :telemetry_poller_period) || :timer.seconds(15)
+    init_delay = Keyword.get(opts, :telemetry_poller_init_delay) || :timer.seconds(5)
 
     {:telemetry_poller,
      period: period,
