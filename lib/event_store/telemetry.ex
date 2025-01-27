@@ -59,5 +59,5 @@ defmodule EventStore.Telemetry do
     end)
   end
 
-  defp event_name_prefix, do: :event_store
+  defp event_name_prefix, do: :eventstore
 end
