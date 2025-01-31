@@ -505,11 +505,19 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     %SubscriptionState{data | partitions: partitions, queue_size: queue_size + 1}
   end
 
-  def partition_key(%SubscriptionState{partition_by: nil}, %RecordedEvent{}), do: nil
+  def partition_key(%SubscriptionState{partition_by: nil}, %RecordedEvent{}),
+    do: :erlang.unique_integer()
 
   def partition_key(%SubscriptionState{partition_by: partition_by}, %RecordedEvent{} = event)
-      when is_function(partition_by, 1),
-      do: partition_by.(event)
+      when is_function(partition_by, 1) do
+    case partition_by.(event) do
+      # replace nil partition with a unique integer to avoid exhausting subscribers
+      # due to EventStore.Subscriptions.Subscriber.in_partition?/2 returning false for
+      # nil partition keys
+      nil -> :erlang.unique_integer()
+      rest -> rest
+    end
+  end
 
   # Attempt to notify subscribers with any pending events. Partitions are
   # selected by peeking at the event number of their queue to ensure earlier

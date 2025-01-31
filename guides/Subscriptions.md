@@ -277,8 +277,9 @@ With multiple subscriber processes connected to a single subscription the orderi
 
 You can use a `partition_by` function to guarantee ordering of events within a particular group (e.g. per stream) but still allow events for different groups to be processed concurrently.
 
-
 Partitioning gives you the benefits of competing consumers but still allows event ordering by partition where required.
+
+If a `partition_by` is not provided or if it returns `nil` - a random integer will be generated for the partition id.
 
 #### Partition by example
 
