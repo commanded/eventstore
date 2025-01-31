@@ -28,7 +28,7 @@ defmodule EventStore.Streams.AllStreamTest do
   end
 
   describe "stream forward" do
-    setup [:append_events_to_streams]
+    setup [:append_events_to_streams, :enable_hard_deletes]
 
     test "should stream events from all streams using single event batch size", %{
       conn: conn,
@@ -94,10 +94,31 @@ defmodule EventStore.Streams.AllStreamTest do
       assert Enum.map(read_events, & &1.event_number) == [1, 2, 3, 4, 5, 6]
       assert Enum.map(read_events, & &1.stream_version) == [1, 2, 3, 1, 2, 3]
     end
+
+    test "should handle gaps in all stream", %{
+      conn: conn,
+      schema: schema,
+      serializer: serializer,
+      stream1_uuid: stream1_uuid
+    } do
+
+      :ok = EventStore.delete_stream(stream1_uuid, :stream_exists, :hard)
+
+      read_events =
+        Stream.stream_forward(conn, @all_stream, 0,
+          read_batch_size: 1,
+          schema: schema,
+          serializer: serializer
+        )
+        |> Enum.to_list()
+
+      assert length(read_events) == 3
+      assert Enum.map(read_events, & &1.event_number) == [4, 5, 6]
+    end
   end
 
   describe "stream backward" do
-    setup [:append_events_to_streams]
+    setup [:append_events_to_streams, :enable_hard_deletes]
 
     test "should stream events from all streams using single event batch size", %{
       conn: conn,
@@ -180,6 +201,27 @@ defmodule EventStore.Streams.AllStreamTest do
       assert length(read_events) == 3
       assert Enum.map(read_events, & &1.event_number) == [3, 2, 1]
       assert Enum.map(read_events, & &1.stream_version) == [3, 2, 1]
+    end
+
+    test "should handle gaps in all stream", %{
+      conn: conn,
+      schema: schema,
+      serializer: serializer,
+      stream2_uuid: stream2_uuid
+    } do
+
+      :ok = EventStore.delete_stream(stream2_uuid, :stream_exists, :hard)
+
+      read_events =
+        Stream.stream_backward(conn, @all_stream, -1,
+          read_batch_size: 1,
+          schema: schema,
+          serializer: serializer
+        )
+        |> Enum.to_list()
+
+      assert length(read_events) == 3
+      assert Enum.map(read_events, & &1.event_number) == [3, 2, 1]
     end
   end
 
@@ -283,5 +325,16 @@ defmodule EventStore.Streams.AllStreamTest do
     :ok = Stream.append_to_stream(conn, stream_uuid, 0, events, opts)
 
     {stream_uuid, events}
+  end
+
+  defp enable_hard_deletes(_context) do
+    restart_event_store_with_config(enable_hard_deletes: true)
+  end
+
+  defp restart_event_store_with_config(config) do
+    stop_supervised!(TestEventStore)
+    start_supervised!({TestEventStore, config})
+
+    :ok
   end
 end
