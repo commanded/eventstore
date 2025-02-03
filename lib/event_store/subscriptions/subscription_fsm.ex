@@ -509,8 +509,8 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   # Use nil partition when there's a lack of a partition_by callback since this way
-  # we maximize parallelization by having EventStore.Subscriptions.Subscriber.in_partition?/2 s
-  # returning false for all events, making sure each event "seeks" a new available subscriber
+  # we maximize parallelization by having EventStore.Subscriptions.Subscriber.in_partition?/2
+  # return false for all events, making sure each event "seeks" a new available subscriber
   def partition_key(%SubscriptionState{partition_by: nil}, %RecordedEvent{}),
     do: nil
 
@@ -526,10 +526,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       # for nil partition keys - resulting in the nil partition being able
       # to exhaust partitions for all other partitions if it's being used to process
       # a significantly high number of events compared to the other partitions due to
-      # it then always having the priority scheduling due to having most events in queue
+      # it then always having the priority in scheduling due to having most events in queue
       # and its events never reusing existing subscribers but always looking for new ones.
-      # This works well when `partition_by` is nil to maximize parallelization but not ideal
-      # when sharing the scheduler with other partitions
+      # This works well when `partition_by` is nil to maximize parallelization for all events
+      # but not ideal when sharing the scheduler with other partitions
       nil ->
         max_partition =
           if is_integer(max_size) and max_size > 10 do
