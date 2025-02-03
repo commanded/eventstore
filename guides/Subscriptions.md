@@ -279,7 +279,7 @@ You can use a `partition_by` function to guarantee ordering of events within a p
 
 Partitioning gives you the benefits of competing consumers but still allows event ordering by partition where required.
 
-If a `partition_by` is not provided or if it returns `nil` - a random integer will be generated for the partition id.
+If a `partition_by` returns `nil`, a random default partition based on the `max_size` will be generated for the partition id.
 
 #### Partition by example
 
