@@ -1,4 +1,4 @@
-defmodule EventStore.Subscriptions.SubscriptionAcknowledgementTest do
+defmodule EventStore.Subscriptions.PartitionKeyTest do
   use ExUnit.Case, async: true
 
   alias EventStore.RecordedEvent
