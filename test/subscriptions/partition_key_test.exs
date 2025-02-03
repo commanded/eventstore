@@ -16,21 +16,21 @@ defmodule EventStore.Subscriptions.PartitionKeyTest do
       assert partition_key == "some_key"
     end
 
-    test "should return a random integer for a nil callback return" do
+    test "should return a random default partition for a nil callback return" do
       partition_key =
         SubscriptionFsm.partition_key(
           %SubscriptionState{partition_by: fn _ -> nil end},
           %RecordedEvent{}
         )
 
-      assert is_integer(partition_key)
+      assert String.match?(partition_key, ~r/^\$default\.[0-9]+$/)
     end
 
-    test "should return a random integer for a nil callback" do
+    test "should return nil for a nil callback" do
       partition_key =
         SubscriptionFsm.partition_key(%SubscriptionState{partition_by: nil}, %RecordedEvent{})
 
-      assert is_integer(partition_key)
+      assert is_nil(partition_key)
     end
   end
 end

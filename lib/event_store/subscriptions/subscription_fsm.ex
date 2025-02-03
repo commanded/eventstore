@@ -9,6 +9,9 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   require Logger
 
+  @default_partition_prefix "$default."
+  @default_partition_fallback_max 10
+
   def new(stream_uuid, subscription_name, opts) do
     new(
       data: %SubscriptionState{
@@ -505,17 +508,42 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     %SubscriptionState{data | partitions: partitions, queue_size: queue_size + 1}
   end
 
+  # Use nil partition when there's a lack of a partition_by callback since this way
+  # we maximize parallelization by having EventStore.Subscriptions.Subscriber.in_partition?/2 s
+  # returning false for all events, making sure each event "seeks" a new available subscriber
   def partition_key(%SubscriptionState{partition_by: nil}, %RecordedEvent{}),
-    do: :erlang.unique_integer()
+    do: nil
 
-  def partition_key(%SubscriptionState{partition_by: partition_by}, %RecordedEvent{} = event)
+  def partition_key(
+        %SubscriptionState{partition_by: partition_by, max_size: max_size},
+        %RecordedEvent{} = event
+      )
       when is_function(partition_by, 1) do
     case partition_by.(event) do
-      # replace nil partition with a unique integer to avoid exhausting subscribers
-      # due to EventStore.Subscriptions.Subscriber.in_partition?/2 returning false for
-      # nil partition keys
-      nil -> :erlang.unique_integer()
-      rest -> rest
+      # Replace nil partition by a set of default partitions based on max_size
+      # in order to avoid exhausting subscribers for other partitions due
+      # to EventStore.Subscriptions.Subscriber.in_partition?/2 returning false
+      # for nil partition keys - resulting in the nil partition being able
+      # to exhaust partitions for all other partitions if it's being used to process
+      # a significantly high number of events compared to the other partitions due to
+      # it then always having the priority scheduling due to having most events in queue
+      # and its events never reusing existing subscribers but always looking for new ones.
+      # This works well when `partition_by` is nil to maximize parallelization but not ideal
+      # when sharing the scheduler with other partitions
+      nil ->
+        max_partition =
+          if is_integer(max_size) and max_size > 10 do
+            round(max_size / 10)
+          else
+            @default_partition_fallback_max
+          end
+
+        partition_number = :rand.uniform(max_partition)
+
+        "#{@default_partition_prefix}#{partition_number}"
+
+      rest ->
+        rest
     end
   end
 
