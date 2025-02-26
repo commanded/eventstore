@@ -256,7 +256,7 @@ defmodule EventStore.Streams.Stream do
       fn next_version ->
         case read_storage_forward(conn, stream, next_version, read_batch_size, opts) do
           {:ok, []} -> {:halt, next_version}
-          {:ok, events} -> {events, next_version + length(events)}
+          {:ok, events} -> {events, List.last(events).event_number + 1}
         end
       end,
       fn _next_version -> :ok end
@@ -282,7 +282,7 @@ defmodule EventStore.Streams.Stream do
         next_version ->
           case read_storage_backward(conn, stream, next_version, read_batch_size, opts) do
             {:ok, []} -> {:halt, next_version}
-            {:ok, events} -> {events, next_version - length(events)}
+            {:ok, events} -> {events, List.last(events).event_number - 1}
           end
       end,
       fn _next_version -> :ok end
