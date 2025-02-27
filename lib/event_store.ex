@@ -294,7 +294,7 @@ defmodule EventStore do
         Supervisor.stop(supervisor, :normal, timeout)
       end
 
-      @accepted_overrides_append_to_stream [:created_at_override]
+      @append_to_stream_overrides [:created_at_override, :trim_stream_to_version]
 
       def append_to_stream(stream_uuid, expected_version, events, opts \\ [])
 
@@ -302,7 +302,7 @@ defmodule EventStore do
         do: {:error, :cannot_append_to_all_stream}
 
       def append_to_stream(stream_uuid, expected_version, events, opts) do
-        overrides = Keyword.take(opts, @accepted_overrides_append_to_stream)
+        overrides = Keyword.take(opts, @append_to_stream_overrides)
         {conn, opts} = parse_opts(opts)
         opts = Keyword.merge(opts, overrides)
 
@@ -408,6 +408,12 @@ defmodule EventStore do
 
       def stream_all_backward(start_version, opts),
         do: stream_backward(@all_stream, start_version, opts)
+
+      def trim_stream(stream_uuid, cutoff_version, expected_version \\ :any_version, opts \\ []) do
+        {conn, opts} = parse_opts(opts)
+
+        Stream.trim_stream(conn, stream_uuid, cutoff_version, expected_version, opts)
+      end
 
       def delete_stream(stream_uuid, expected_version, type \\ :soft, opts \\ [])
 

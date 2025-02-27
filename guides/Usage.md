@@ -156,3 +156,25 @@ alias MyApp.EventStore
 ```
 
 You can also pass a list of `event_ids` instead of recorded event structs to link events.
+
+## Trimming events from streams
+
+Stream trimming allows you to permanently delete events from a stream up to a given version. This allows one form of 'Tombstoning' or 'Closing the books' where an event can be a rollup of the state so far.
+
+Trim an existing stream up to the 50th event:
+
+```elixir
+alias MyApp.EventStore
+
+:ok = EventStore.trim_stream(stream_uuid, 50)
+```
+
+Given a stream with 50 events, append 3 new events, and trim up to the last one:
+
+```elixir
+alias MyApp.EventStore
+
+events = [withdrawn, deposited, closed_for_the_day]
+expected_version = 50
+:ok = EventStore.append_to_stream(stream_uuid, expected_version, events, trim_stream_to_version: 53)
+```

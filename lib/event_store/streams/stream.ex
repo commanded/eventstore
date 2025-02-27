@@ -4,41 +4,53 @@ defmodule EventStore.Streams.Stream do
   alias EventStore.{EventData, RecordedEvent, Storage, UUID}
   alias EventStore.Streams.StreamInfo
 
-  def append_to_stream(conn, stream_uuid, expected_version, events, opts)
-      when length(events) < 1000 do
-    {serializer, new_opts} = Keyword.pop(opts, :serializer)
-
-    with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, new_opts),
-         :ok <- do_append_to_storage(conn, stream, events, expected_version, serializer, new_opts) do
-      :ok
+  def trim_stream(conn, stream_uuid, cutoff_version, expected_version, opts) do
+    if Keyword.fetch!(opts, :enable_hard_deletes) do
+      transaction(
+        conn,
+        fn transaction ->
+          with {:ok, %StreamInfo{} = stream} <-
+                 stream_info(transaction, stream_uuid, expected_version, opts),
+               :ok <- do_trim_stream(transaction, stream, cutoff_version, opts) do
+            :ok
+          else
+            {:error, error} -> Postgrex.rollback(transaction, error)
+          end
+        end,
+        opts
+      )
+    else
+      {:error, :not_supported}
     end
-    |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
   end
 
   def append_to_stream(conn, stream_uuid, expected_version, events, opts) do
-    {serializer, new_opts} = Keyword.pop(opts, :serializer)
+    with :ok <- validate_append_opts(opts, expected_version) do
+      {serializer, new_opts} = Keyword.pop(opts, :serializer)
 
-    transaction(
-      conn,
-      fn transaction ->
-        with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, new_opts),
-             :ok <-
-               do_append_to_storage(
-                 transaction,
-                 stream,
-                 events,
-                 expected_version,
-                 serializer,
-                 new_opts
-               ) do
-          :ok
-        else
-          {:error, error} -> Postgrex.rollback(transaction, error)
-        end
-      end,
-      new_opts
-    )
-    |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
+      transaction(
+        conn,
+        fn transaction ->
+          with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, new_opts),
+               :ok <-
+                 do_append_to_storage(
+                   transaction,
+                   stream,
+                   events,
+                   expected_version,
+                   serializer,
+                   new_opts
+                 ),
+               :ok <- maybe_trim_stream(transaction, stream, new_opts) do
+            :ok
+          else
+            {:error, error} -> Postgrex.rollback(transaction, error)
+          end
+        end,
+        new_opts
+      )
+      |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
+    end
   end
 
   def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts) do
@@ -323,6 +335,36 @@ defmodule EventStore.Streams.Stream do
     end
   end
 
+  defp validate_append_opts(opts, expected_version) do
+    trim_version = Keyword.get(opts, :trim_stream_to_version, :no_trim)
+    hard_deletes_allowed? = Keyword.get(opts, :enable_hard_deletes, false)
+
+    case {trim_version, expected_version, hard_deletes_allowed?} do
+      {:no_trim, _, _} -> :ok
+      {_, :any_version, _} -> {:error, :cannot_trim_stream_with_any_version}
+      {_, _version, false} -> {:error, :cannot_trim_when_hard_deletes_not_enabled}
+      {_, _, _} -> :ok
+    end
+  end
+
+  defp maybe_trim_stream(transaction, %StreamInfo{} = stream, opts) do
+    case Keyword.get(opts, :trim_stream_to_version) do
+      nil ->
+        :ok
+
+      cutoff_version ->
+        do_trim_stream(transaction, stream, cutoff_version, opts)
+    end
+  end
+
+  defp do_trim_stream(transaction, %StreamInfo{} = stream, cutoff_version, opts) do
+    opts = query_opts(opts)
+
+    with :ok <- set_enable_hard_deletes(transaction) do
+      Storage.trim_stream(transaction, stream.stream_id, stream.stream_uuid, cutoff_version, opts)
+    end
+  end
+
   defp set_enable_hard_deletes(conn) do
     query = "SET SESSION eventstore.enable_hard_deletes TO 'on';"
 
@@ -348,7 +390,8 @@ defmodule EventStore.Streams.Stream do
     end
   end
 
-  defp maybe_retry_once(error, _conn, _stream_uuid, _expected_version, _events, _opts), do: error
+  defp maybe_retry_once(ok_or_error, _conn, _stream_uuid, _expected_version, _events, _opts),
+    do: ok_or_error
 
   defp transaction(conn, transaction_fun, opts) do
     case Postgrex.transaction(conn, transaction_fun, opts) do
