@@ -254,7 +254,7 @@ defmodule EventStore do
     quote bind_quoted: [opts: opts] do
       @behaviour EventStore
 
-      alias EventStore.{Config, EventData, PubSub, Subscriptions}
+      alias EventStore.{Config, EventData, PubSub, Subscriptions, Telemetry}
       alias EventStore.Snapshots.{SnapshotData, Snapshotter}
       alias EventStore.Subscriptions.Subscription
       alias EventStore.Streams.Stream
@@ -306,7 +306,15 @@ defmodule EventStore do
         {conn, opts} = parse_opts(opts)
         opts = Keyword.merge(opts, overrides)
 
-        Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
+        telemetry_metadata = %{
+          stream_uuid: stream_uuid,
+          expected_version: expected_version,
+          event_count: length(events)
+        }
+
+        Telemetry.measure_span(:append_to_stream, telemetry_metadata, fn ->
+          Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
+        end)
       end
 
       def link_to_stream(
@@ -335,7 +343,15 @@ defmodule EventStore do
       def read_stream_forward(stream_uuid, start_version, count, opts) do
         {conn, opts} = parse_opts(opts)
 
-        Stream.read_stream_forward(conn, stream_uuid, start_version, count, opts)
+        telemetry_metadata = %{
+          stream_uuid: stream_uuid,
+          start_version: start_version,
+          count: count
+        }
+
+        Telemetry.measure_span(:read_stream_forward, telemetry_metadata, fn ->
+          Stream.read_stream_forward(conn, stream_uuid, start_version, count, opts)
+        end)
       end
 
       def read_all_streams_forward(
