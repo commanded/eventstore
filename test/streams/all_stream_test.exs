@@ -101,7 +101,6 @@ defmodule EventStore.Streams.AllStreamTest do
       serializer: serializer,
       stream1_uuid: stream1_uuid
     } do
-
       :ok = EventStore.delete_stream(stream1_uuid, :stream_exists, :hard)
 
       read_events =
@@ -209,7 +208,6 @@ defmodule EventStore.Streams.AllStreamTest do
       serializer: serializer,
       stream2_uuid: stream2_uuid
     } do
-
       :ok = EventStore.delete_stream(stream2_uuid, :stream_exists, :hard)
 
       read_events =
