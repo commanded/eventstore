@@ -68,7 +68,7 @@ defmodule EventStore.Storage.Appender do
         params = [stream_id, event_count] ++ parameters
 
         with :ok <- insert_link_events(conn, params, event_count, schema, opts) do
-          Logger.debug("Linked #{length(event_ids)} event(s) to stream")
+          Logger.debug("Linked #{event_count} event(s) to stream")
 
           :ok
         else
