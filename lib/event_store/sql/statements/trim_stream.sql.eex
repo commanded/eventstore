@@ -1,0 +1,26 @@
+WITH stream_info AS (
+  <%= if stream_id do %>
+    SELECT $1::bigint AS stream_id
+  <% else %>
+    SELECT stream_id
+    FROM "<%= schema %>".streams
+    WHERE stream_uuid = $1
+  <% end %>
+),
+deleted_stream_events AS (
+  DELETE FROM "<%= schema %>".stream_events AS stream_events
+  USING stream_info as s
+  WHERE stream_events.stream_id = s.stream_id
+  AND stream_version < $2
+  RETURNING event_id
+),
+linked_events AS (
+  DELETE FROM "<%= schema %>".stream_events
+  WHERE event_id IN (SELECT event_id FROM deleted_stream_events)
+),
+events AS (
+  DELETE FROM "<%= schema %>".events
+  WHERE event_id IN (SELECT event_id FROM deleted_stream_events)
+)
+
+select count(*) from deleted_stream_events;
