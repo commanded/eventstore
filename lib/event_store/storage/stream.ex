@@ -67,7 +67,6 @@ defmodule EventStore.Storage.Stream do
         :stream_version -> "stream_version"
         :created_at -> "created_at"
         :deleted_at -> "deleted_at"
-        :status -> "status"
       end
 
     sort_dir =
