@@ -85,13 +85,16 @@ defmodule EventStore.Supervisor do
              conn: advisory_locks_postgrex_conn,
              query_timeout: query_timeout,
              schema: schema,
-             name: advisory_locks_name},
-            {Subscriptions.Supervisor, name: subscriptions_name},
-            Supervisor.child_spec({Registry, keys: :unique, name: subscriptions_registry_name},
-              id: subscriptions_registry_name
-            ),
-            {Notifications.Supervisor, {name, config}}
-          ] ++ PubSub.child_spec(name)
+             name: advisory_locks_name}
+          ] ++
+            PubSub.child_spec(name) ++
+            [
+              {Subscriptions.Supervisor, name: subscriptions_name},
+              Supervisor.child_spec({Registry, keys: :unique, name: subscriptions_registry_name},
+                id: subscriptions_registry_name
+              ),
+              {Notifications.Supervisor, {name, config}}
+            ]
 
         :ok = Config.associate(name, self(), event_store, config)
 
