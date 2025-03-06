@@ -156,3 +156,64 @@ alias MyApp.EventStore
 ```
 
 You can also pass a list of `event_ids` instead of recorded event structs to link events.
+
+## Deleting streams
+
+There are two ways to delete streams. Soft delete and Hard delete.
+
+Use soft delete when you no longer care about a streams events, but want to preserve the full history of events.
+
+Use hard delete when you want a stream to go away more than a bad case of viral gastroenteritis (for example GDPR compliance).
+
+### Soft delete
+
+Will mark the stream as deleted, but will not delete its events. Events from soft deleted streams will still appear in the globally ordered all events ($all) stream and in any linked streams.
+
+A soft deleted stream cannot be read nor appended to. Subscriptions to the deleted stream will not receive any events but subscriptions containing linked events from the deleted stream, such as the global all events stream, will still receive events from the deleted stream.
+
+#### Examples
+
+Delete a stream at any version:
+```elixir
+:ok = MyApp.EventStore.delete_stream("stream1", :any_version, :soft)
+```
+
+Delete a stream at an expected version:
+```elixir
+:ok = MyApp.EventStore.delete_stream("stream2", 3, :soft)
+```
+
+Delete stream will use soft delete by default so you can omit the type:
+```elixir
+:ok = MyApp.EventStore.delete_stream("stream1", :any_version)
+```
+
+### Hard delete
+
+Will permanently delete the stream and its events. **This is irreversible and will remove data**. Events will be removed from the globally ordered all events ($all) stream and any linked streams.
+
+After being hard deleted, a stream can later be appended to and read as if had never existed.
+
+#### Examples
+
+Since hard deletes are destructive and irreversible they are disabled by default. To use hard deletes you must first enable them for the event store:
+```elixir
+defmodule MyApp.EventStore do
+  use EventStore, otp_app: :my_app, enable_hard_deletes: true
+end
+```
+
+Or via config:
+```elixir
+config :my_app, MyApp.EventStore, enable_hard_deletes: true
+```
+
+Hard delete a stream at any version:
+```elixir
+:ok = MyApp.EventStore.delete_stream("stream1", :any_version, :hard)
+```
+
+Hard delete a stream that should exist:
+```elixir
+:ok = MyApp.EventStore.delete_stream("stream2", :stream_exists, :hard)
+```
