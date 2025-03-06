@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.4.8
+
+### Bug fixes
+
+* Stream.stream_forward and Stream.stream_backward should handle gaps by @lachiemurray in https://github.com/commanded/eventstore/pull/297
+* Use event count based on the batch by @yordis in https://github.com/commanded/eventstore/pull/302
+* Remove status from sort_by options by @yordis in https://github.com/commanded/eventstore/pull/304
+* Start pubsub supervisor before subscriptions supervisor by @drteeth in https://github.com/commanded/eventstore/pull/300
+
+### Enhancements
+
+* Add documentation for deleting streams by @quarterpi in https://github.com/commanded/eventstore/pull/305
+
 ## v1.4.7
 
 ### Enhancements
