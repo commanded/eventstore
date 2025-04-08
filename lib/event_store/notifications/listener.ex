@@ -44,6 +44,14 @@ defmodule EventStore.Notifications.Listener do
     dispatch_events([], state)
   end
 
+  def handle_info({:DOWN, _ref, :process, listen_to, reason}, %{listen_to: listen_to} = state) do
+    {:stop, reason, state}
+  end
+
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
+    {:noreply, state}
+  end
+
   def handle_demand(incoming_demand, %Listener{} = state) do
     %Listener{demand: pending_demand} = state
 
@@ -62,6 +70,8 @@ defmodule EventStore.Notifications.Listener do
         {:ok, ref} -> ref
         {:eventually, ref} -> ref
       end
+
+    Process.monitor(listen_to)
 
     %Listener{state | ref: ref}
   end
