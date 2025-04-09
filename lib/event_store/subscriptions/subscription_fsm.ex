@@ -203,6 +203,25 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   defstate disconnected do
     # Attempt to subscribe
+    defevent subscribe, data: %SubscriptionState{transient: true} = data do
+      with {:ok, subscription} <- create_subscription(data) do
+        %Storage.Subscription{last_seen: last_seen} = subscription
+
+        last_ack = last_seen || 0
+
+        data = %SubscriptionState{
+          data
+          | last_sent: last_ack,
+            last_ack: last_ack
+        }
+
+        next_state(:request_catch_up, data)
+      else
+        _ ->
+          next_state(:disconnected, data)
+      end
+    end
+
     defevent subscribe, data: %SubscriptionState{} = data do
       with {:ok, subscription} <- create_subscription(data),
            {:ok, lock_ref} <- try_acquire_exclusive_lock(data, subscription) do
