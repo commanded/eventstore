@@ -10,7 +10,7 @@ end
 
 ## Writing to a stream
 
-Create a unique identity for each stream. It **must** be a string. This example uses the [elixir_uuid](https://hex.pm/packages/elixir_uuid) package.
+Create a unique identity for each stream. It **must** be a string.
 
 ```elixir
 stream_uuid = EventStore.UUID.uuid4()
