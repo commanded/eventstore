@@ -236,6 +236,7 @@ defmodule EventStore do
   @type transient_subscribe_options :: [transient_subscribe_option]
   @type persistent_subscription_option ::
           transient_subscribe_option
+          | {:buffer_flush_after, non_neg_integer()}
           | {:buffer_size, pos_integer()}
           | {:checkpoint_after, non_neg_integer()}
           | {:checkpoint_threshold, pos_integer()}
@@ -1145,6 +1146,13 @@ defmodule EventStore do
         limits the number of messages sent to the subscriber and stops their
         message queue from getting filled with events. Defaults to one in-flight
         event.
+
+      - `buffer_flush_after` (milliseconds) used to ensure events are flushed
+        to the subscriber after a period of time even if the buffer size has not
+        been reached. This ensures events are delivered with bounded latency
+        during less busy periods. When set to 0 (default), no time-based
+        flushing is performed and events are only sent when the buffer_size is
+        reached. Each partition has its own independent timer.
 
       - `checkpoint_threshold` determines how frequently a checkpoint is written
         to the database for the subscription after events are acknowledged.

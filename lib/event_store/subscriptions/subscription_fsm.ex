@@ -23,6 +23,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         selector: opts[:selector],
         partition_by: opts[:partition_by],
         buffer_size: opts[:buffer_size] || 1,
+        buffer_flush_after: opts[:buffer_flush_after] || 0,
         checkpoint_after: opts[:checkpoint_after] || 0,
         checkpoint_threshold: opts[:checkpoint_threshold] || 1,
         query_timeout: opts[:query_timeout] || 15_000,
@@ -179,6 +180,15 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     defevent checkpoint(), data: %SubscriptionState{} = data do
       next_state(:subscribed, persist_checkpoint(data))
     end
+
+    defevent flush_buffer(partition_key), data: %SubscriptionState{} = data do
+      data =
+        data
+        |> clear_partition_timer(partition_key)
+        |> flush_partition_on_timeout(partition_key)
+
+      next_state(:subscribed, data)
+    end
   end
 
   defstate max_capacity do
@@ -188,7 +198,9 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           # No further pending events so catch up with any unseen.
           next_state(:request_catch_up, data)
         else
-          # Pending events remain, wait until subscriber ack's.
+          # Pending events remain, restart timers for partitions that need them
+          # (timers may have been cleared while in max_capacity)
+          data = restart_timers_for_pending_partitions(data)
           next_state(:max_capacity, data)
         end
       else
@@ -198,6 +210,12 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
     defevent checkpoint(), data: %SubscriptionState{} = data do
       next_state(:subscribed, persist_checkpoint(data))
+    end
+
+    # Handle flush_buffer in max_capacity - just clear the timer, events stay queued
+    defevent flush_buffer(partition_key), data: %SubscriptionState{} = data do
+      data = clear_partition_timer(data, partition_key)
+      next_state(:max_capacity, data)
     end
   end
 
@@ -300,6 +318,14 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defevent terminate, data: %SubscriptionState{} = data, state: state do
+    next_state(state, data)
+  end
+
+  # Handle flush_buffer in any state where it's not explicitly handled.
+  # This can happen if a timer fires while catching up or in other transitional states.
+  # Just clear the timer reference - events will be sent when appropriate.
+  defevent flush_buffer(partition_key), data: %SubscriptionState{} = data, state: state do
+    data = clear_partition_timer(data, partition_key)
     next_state(state, data)
   end
 
@@ -497,12 +523,22 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
     partition_key = partition_key(data, event)
 
+    # Check if this is a new partition (no existing queue)
+    is_new_partition = not Map.has_key?(partitions, partition_key)
+
     partitions =
       partitions
       |> Map.put_new(partition_key, :queue.new())
       |> Map.update!(partition_key, fn pending_events -> enqueue.(event, pending_events) end)
 
-    %SubscriptionState{data | partitions: partitions, queue_size: queue_size + 1}
+    data = %SubscriptionState{data | partitions: partitions, queue_size: queue_size + 1}
+
+    # Start timer when partition gets its first event
+    if is_new_partition do
+      maybe_start_partition_timer(data, partition_key)
+    else
+      data
+    end
   end
 
   def partition_key(%SubscriptionState{partition_by: nil}, %RecordedEvent{}), do: nil
@@ -545,20 +581,25 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
       subscriber = Subscriber.track_in_flight(subscriber, event, partition_key)
 
-      partitions =
+      {partitions, partition_emptied} =
         case :queue.is_empty(pending_events) do
-          true -> Map.delete(partitions, partition_key)
-          false -> Map.put(partitions, partition_key, pending_events)
+          true -> {Map.delete(partitions, partition_key), true}
+          false -> {Map.put(partitions, partition_key, pending_events), false}
         end
 
-      %SubscriptionState{
-        data
-        | partitions: partitions,
-          subscribers: Map.put(subscribers, subscriber_pid, subscriber),
-          queue_size: max(queue_size - 1, 0)
-      }
-      |> track_sent(event_number)
-      |> notify_partition_subscriber(partition_key, [{subscriber_pid, event} | events_to_send])
+      data =
+        %SubscriptionState{
+          data
+          | partitions: partitions,
+            subscribers: Map.put(subscribers, subscriber_pid, subscriber),
+            queue_size: max(queue_size - 1, 0)
+        }
+        |> track_sent(event_number)
+
+      # Cancel the timer when the partition becomes empty
+      data = if partition_emptied, do: cancel_partition_timer(data, partition_key), else: data
+
+      notify_partition_subscriber(data, partition_key, [{subscriber_pid, event} | events_to_send])
     else
       _ ->
         # No further queued event or available subscriber, send ready events to
@@ -755,4 +796,83 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   defp describe(%SubscriptionState{stream_uuid: stream_uuid, subscription_name: name}),
     do: "Subscription #{inspect(name)}@#{inspect(stream_uuid)}"
+
+  # Buffer flush timer management
+
+  # Start a timer for a partition if buffer_flush_after is configured and no timer exists
+  defp maybe_start_partition_timer(
+         %SubscriptionState{buffer_flush_after: 0} = data,
+         _partition_key
+       ),
+       do: data
+
+  defp maybe_start_partition_timer(%SubscriptionState{} = data, partition_key) do
+    %SubscriptionState{buffer_flush_after: buffer_flush_after, buffer_timers: buffer_timers} =
+      data
+
+    if Map.has_key?(buffer_timers, partition_key) do
+      # Timer already exists for this partition
+      data
+    else
+      # Start a new timer for this partition
+      timer_ref = Process.send_after(self(), {:flush_buffer, partition_key}, buffer_flush_after)
+      %SubscriptionState{data | buffer_timers: Map.put(buffer_timers, partition_key, timer_ref)}
+    end
+  end
+
+  # Cancel and clear the timer for a specific partition
+  defp cancel_partition_timer(%SubscriptionState{} = data, partition_key) do
+    %SubscriptionState{buffer_timers: buffer_timers} = data
+
+    case Map.get(buffer_timers, partition_key) do
+      nil ->
+        data
+
+      timer_ref ->
+        Process.cancel_timer(timer_ref)
+        %SubscriptionState{data | buffer_timers: Map.delete(buffer_timers, partition_key)}
+    end
+  end
+
+  # Clear the timer reference without cancelling (timer already fired)
+  defp clear_partition_timer(%SubscriptionState{} = data, partition_key) do
+    %SubscriptionState{buffer_timers: buffer_timers} = data
+    %SubscriptionState{data | buffer_timers: Map.delete(buffer_timers, partition_key)}
+  end
+
+  # Restart timers for all partitions that have pending events but no active timer.
+  # This is needed after ack in max_capacity state when timers may have been cleared.
+  defp restart_timers_for_pending_partitions(%SubscriptionState{} = data) do
+    %SubscriptionState{partitions: partitions} = data
+
+    Enum.reduce(partitions, data, fn {partition_key, _pending_events}, acc ->
+      maybe_start_partition_timer(acc, partition_key)
+    end)
+  end
+
+  # Flush a partition when the buffer timeout fires
+  defp flush_partition_on_timeout(%SubscriptionState{} = data, partition_key) do
+    %SubscriptionState{partitions: partitions} = data
+
+    case Map.get(partitions, partition_key) do
+      nil ->
+        # Partition is empty, nothing to flush
+        data
+
+      _pending_events ->
+        # Try to notify subscribers for this partition
+        data = notify_partition_subscriber(data, partition_key)
+
+        # Restart timer if partition still has events after flush
+        case Map.get(data.partitions, partition_key) do
+          nil ->
+            # Partition emptied, timer already cancelled in notify_partition_subscriber
+            data
+
+          _remaining_events ->
+            # Events remain, restart the timer for next flush
+            maybe_start_partition_timer(data, partition_key)
+        end
+    end
+  end
 end

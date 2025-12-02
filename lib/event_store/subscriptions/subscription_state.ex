@@ -24,6 +24,8 @@ defmodule EventStore.Subscriptions.SubscriptionState do
     last_ack: 0,
     queue_size: 0,
     buffer_size: 1,
+    buffer_flush_after: 0,
+    buffer_timers: %{},
     checkpoint_after: 0,
     checkpoint_threshold: 1,
     checkpoint_timer_ref: nil,
@@ -36,10 +38,18 @@ defmodule EventStore.Subscriptions.SubscriptionState do
   ]
 
   def reset_event_tracking(%SubscriptionState{} = state) do
+    %SubscriptionState{buffer_timers: buffer_timers} = state
+
+    # Cancel all buffer flush timers
+    Enum.each(buffer_timers, fn {_partition_key, timer_ref} ->
+      Process.cancel_timer(timer_ref)
+    end)
+
     %SubscriptionState{
       state
       | queue_size: 0,
         partitions: %{},
+        buffer_timers: %{},
         acknowledged_event_numbers: MapSet.new(),
         in_flight_event_numbers: [],
         checkpoints_pending: 0
