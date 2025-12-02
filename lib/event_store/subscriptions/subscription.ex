@@ -138,6 +138,18 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @impl GenServer
+  def handle_info({:flush_buffer, partition_key}, %Subscription{} = state) do
+    %Subscription{subscription: subscription} = state
+
+    state =
+      subscription
+      |> SubscriptionFsm.flush_buffer(partition_key)
+      |> apply_subscription_to_state(state)
+
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_info(
         {EventStore.AdvisoryLocks, :lock_released, lock_ref, reason},
         %Subscription{} = state
