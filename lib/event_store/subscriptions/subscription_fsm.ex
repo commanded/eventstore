@@ -212,7 +212,12 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       next_state(:subscribed, persist_checkpoint(data))
     end
 
-    # Handle flush_buffer in max_capacity - just clear the timer, events stay queued
+    # Handle flush_buffer in max_capacity state.
+    # When at max capacity, events cannot be sent to subscribers (they're at capacity),
+    # so we just clear the timer reference. Events remain queued and will be sent
+    # when capacity becomes available via notify_subscribers (called from ack handler).
+    # Timers for remaining events will be restarted by restart_timers_for_pending_partitions
+    # when an ack is received and capacity becomes available.
     defevent flush_buffer(partition_key), data: %SubscriptionState{} = data do
       data = clear_partition_timer(data, partition_key)
       next_state(:max_capacity, data)
@@ -322,8 +327,11 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   # Handle flush_buffer in any state where it's not explicitly handled.
-  # This can happen if a timer fires while catching up or in other transitional states.
-  # Just clear the timer reference - events will be sent when appropriate.
+  # This can happen if a timer fires while catching up or in other transitional states
+  # where flushing events isn't appropriate (e.g., during catch-up, events are being
+  # read from storage and will be sent via notify_subscribers when ready).
+  # Just clear the timer reference to prevent stale entries - events will be sent
+  # when the FSM transitions to an appropriate state (e.g., subscribed or max_capacity).
   defevent flush_buffer(partition_key), data: %SubscriptionState{} = data, state: state do
     data = clear_partition_timer(data, partition_key)
     next_state(state, data)
@@ -820,7 +828,9 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
   end
 
-  # Cancel and clear the timer for a specific partition
+  # Cancel and clear the timer for a specific partition.
+  # Note: Process.cancel_timer may return false if the timer already fired,
+  # which is harmless and can be safely ignored.
   defp cancel_partition_timer(%SubscriptionState{} = data, partition_key) do
     %SubscriptionState{buffer_timers: buffer_timers} = data
 
@@ -834,14 +844,19 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
   end
 
-  # Clear the timer reference without cancelling (timer already fired)
+  # Clear the timer reference without cancelling (timer already fired).
+  # Used when handling the flush_buffer message - the timer has already fired
+  # and sent the message, so we just need to clean up the reference.
   defp clear_partition_timer(%SubscriptionState{} = data, partition_key) do
     %SubscriptionState{buffer_timers: buffer_timers} = data
     %SubscriptionState{data | buffer_timers: Map.delete(buffer_timers, partition_key)}
   end
 
   # Restart timers for all partitions that have pending events but no active timer.
-  # This is needed after ack in max_capacity state when timers may have been cleared.
+  # This is needed after ack in max_capacity state when timers may have been cleared
+  # by flush_buffer events that fired while the subscription was at capacity.
+  # Restarting ensures events will be flushed with bounded latency even if they
+  # can't be sent immediately due to subscriber capacity constraints.
   defp restart_timers_for_pending_partitions(%SubscriptionState{} = data) do
     %SubscriptionState{partitions: partitions} = data
 
@@ -850,7 +865,9 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end)
   end
 
-  # Flush a partition when the buffer timeout fires
+  # Flush a partition when the buffer timeout fires.
+  # Attempts to send queued events to available subscribers. If events remain
+  # (e.g., subscriber at capacity), the timer is restarted to ensure bounded latency.
   defp flush_partition_on_timeout(%SubscriptionState{} = data, partition_key) do
     %SubscriptionState{partitions: partitions} = data
 
@@ -860,17 +877,21 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         data
 
       _pending_events ->
-        # Try to notify subscribers for this partition
+        # Try to notify subscribers for this partition.
+        # This may send some or all events, depending on subscriber capacity.
         data = notify_partition_subscriber(data, partition_key)
 
-        # Restart timer if partition still has events after flush
+        # Restart timer if partition still has events after flush attempt.
+        # This ensures events are flushed with bounded latency even if subscriber
+        # was at capacity and couldn't accept all events immediately.
         case Map.get(data.partitions, partition_key) do
           nil ->
             # Partition emptied, timer already cancelled in notify_partition_subscriber
             data
 
           _remaining_events ->
-            # Events remain, restart the timer for next flush
+            # Events remain (subscriber may have been at capacity), restart timer
+            # to ensure they're flushed with bounded latency.
             maybe_start_partition_timer(data, partition_key)
         end
     end

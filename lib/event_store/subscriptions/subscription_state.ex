@@ -40,7 +40,9 @@ defmodule EventStore.Subscriptions.SubscriptionState do
   def reset_event_tracking(%SubscriptionState{} = state) do
     %SubscriptionState{buffer_timers: buffer_timers} = state
 
-    # Cancel all buffer flush timers
+    # Cancel all buffer flush timers.
+    # Note: Process.cancel_timer may return false if the timer already fired,
+    # which is harmless and can be safely ignored.
     Enum.each(buffer_timers, fn {_partition_key, timer_ref} ->
       Process.cancel_timer(timer_ref)
     end)
