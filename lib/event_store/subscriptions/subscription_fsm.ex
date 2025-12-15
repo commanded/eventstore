@@ -881,9 +881,10 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         # This may send some or all events, depending on subscriber capacity.
         data = notify_partition_subscriber(data, partition_key)
 
-        # Restart timer if partition still has events after flush attempt.
-        # This ensures events are flushed with bounded latency even if subscriber
-        # was at capacity and couldn't accept all events immediately.
+        # Check if partition still has events after flush attempt.
+        # If partition emptied, timer was already cancelled in notify_partition_subscriber.
+        # If events remain (subscriber may have been at capacity), restart timer
+        # to ensure they're flushed with bounded latency.
         case Map.get(data.partitions, partition_key) do
           nil ->
             # Partition emptied, timer already cancelled in notify_partition_subscriber

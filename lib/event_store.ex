@@ -1152,7 +1152,9 @@ defmodule EventStore do
         been reached. This ensures events are delivered with bounded latency
         during less busy periods. When set to 0 (default), no time-based
         flushing is performed and events are only sent when the buffer_size is
-        reached. Each partition has its own independent timer.
+        reached. Each partition has its own independent timer. If a subscriber
+        is at capacity when the timer fires, events remain queued and the timer
+        is automatically restarted to ensure eventual delivery with bounded latency.
 
       - `checkpoint_threshold` determines how frequently a checkpoint is written
         to the database for the subscription after events are acknowledged.
