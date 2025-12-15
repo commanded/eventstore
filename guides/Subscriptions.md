@@ -269,6 +269,8 @@ By default a subscription will only allow a single subscriber but you can opt-in
 
 - `buffer_size` limits how many in-flight events will be sent to the subscriber process before acknowledgement of successful processing. This limits the number of messages sent to the subscriber and stops their message queue from getting filled with events. Defaults to one in-flight event.
 
+- `buffer_flush_after` (milliseconds) ensures events are flushed to the subscriber after a period of time even if the buffer size has not been reached. This ensures events are delivered with bounded latency during less busy periods. When set to 0 (default), no time-based flushing is performed and events are only sent when the buffer_size is reached. Each partition has its own independent timer. If a subscriber is at capacity when the timer fires, events remain queued and the timer is automatically restarted to ensure eventual delivery with bounded latency.
+
 - `partition_by` is an optional function used to partition events to subscribers. It can be used to guarantee processing order when multiple subscribers have subscribed to a single subscription as described in [Ordering guarantee](#ordering-guarantee) below. The function is passed a single argument (an `EventStore.RecordedEvent` struct) and must return the partition key. As an example to guarantee events for a single stream are processed serially, but different streams are processed concurrently, you could use the `stream_uuid` as the partition key.
 
 ### Ordering guarantee
