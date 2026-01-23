@@ -192,6 +192,42 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defstate max_capacity do
+    # While at max capacity, still accept and queue new events from storage.
+    # Events cannot be sent to subscribers yet (they're at capacity), but we must
+    # queue them to avoid losing events. When the subscriber ACKs pending events,
+    # capacity becomes available and queued events are sent via notify_subscribers
+    # (called from ack handler).
+    defevent notify_events(events), data: %SubscriptionState{} = data do
+      %SubscriptionState{last_received: last_received} = data
+
+      expected_event = last_received + 1
+
+      case first_event_number(events) do
+        past when past < expected_event ->
+          Logger.debug(describe(data) <> " received past event(s), ignoring")
+
+          # Ignore already seen events
+          next_state(:max_capacity, data)
+
+        future when future > expected_event ->
+          Logger.debug(describe(data) <> " received unexpected event(s), requesting catch up")
+
+          # Missed event(s), request catch-up with any unseen events from storage
+          next_state(:request_catch_up, data)
+
+        ^expected_event ->
+          Logger.debug(describe(data) <> " is enqueueing #{length(events)} event(s) while at max capacity")
+
+          # Queue events but don't try to send them (subscriber at capacity).
+          # When subscriber ACKs pending events, ack handler calls notify_subscribers
+          # to send these queued events.
+          data = enqueue_events(data, events)
+
+          # Remain in max_capacity, queued events will be sent after next ACK
+          next_state(:max_capacity, data)
+      end
+    end
+
     defevent ack(ack, subscriber), data: %SubscriptionState{} = data do
       with {:ok, data} <- ack_events(data, ack, subscriber) do
         if empty_queue?(data) do
@@ -213,13 +249,28 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
 
     # Handle flush_buffer in max_capacity state.
-    # When at max capacity, events cannot be sent to subscribers (they're at capacity),
-    # so we just clear the timer reference. Events remain queued and will be sent
-    # when capacity becomes available via notify_subscribers (called from ack handler).
-    # Timers for remaining events will be restarted by restart_timers_for_pending_partitions
-    # when an ack is received and capacity becomes available.
+    # When at max capacity, attempt to send queued events to subscribers.
+    # If subscriber is still at capacity, no events are sent but the timer
+    # is restarted to ensure bounded latency delivery.
     defevent flush_buffer(partition_key), data: %SubscriptionState{} = data do
-      data = clear_partition_timer(data, partition_key)
+      data =
+        data
+        |> clear_partition_timer(partition_key)
+        |> flush_partition_on_timeout(partition_key)
+
+      # After attempting to flush, check if events remain in this partition.
+      # If so, restart the timer to ensure they're eventually delivered.
+      data =
+        case Map.get(data.partitions, partition_key) do
+          nil ->
+            # Partition emptied, timer already cancelled
+            data
+
+          _remaining_events ->
+            # Events remain (subscriber may still be at capacity), restart timer
+            maybe_start_partition_timer(data, partition_key)
+        end
+
       next_state(:max_capacity, data)
     end
   end
