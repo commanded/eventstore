@@ -139,7 +139,7 @@ defmodule EventStore.Mixfile do
       "event_store.setup": ["event_store.create", "event_store.init"],
       "es.reset": ["event_store.reset"],
       "es.setup": ["event_store.setup"],
-      "test.all": ["test --exclude slow", "test.jsonb", "test.migration", "test --only slow"],
+      "test.all": ["test", "test.jsonb", "test.migration", "test --only slow"],
       "test.jsonb": &test_jsonb/1,
       "test.migration": &test_migration/1
     ]
