@@ -40,9 +40,10 @@ defmodule EventStore.Subscriptions.SubscriptionBufferLargeScaleTest do
       # Verify each stream appears and has 2 events
       by_stream = Enum.group_by(events, & &1.stream_uuid)
       assert Enum.count(by_stream) == 50
+
       assert Enum.all?(by_stream, fn {_stream, stream_events} ->
-        length(stream_events) == 2
-      end)
+               length(stream_events) == 2
+             end)
     end
 
     test "100 partitions with 1 event each" do
@@ -155,9 +156,10 @@ defmodule EventStore.Subscriptions.SubscriptionBufferLargeScaleTest do
 
       # Verify distribution
       by_stream = Enum.group_by(events, & &1.stream_uuid)
+
       assert Enum.all?(by_stream, fn {_stream, stream_events} ->
-        length(stream_events) == 100
-      end)
+               length(stream_events) == 100
+             end)
     end
   end
 
@@ -170,13 +172,14 @@ defmodule EventStore.Subscriptions.SubscriptionBufferLargeScaleTest do
         )
 
       # Append in phases, subscribe concurrently
-      all_events = Enum.flat_map(1..5, fn phase ->
-        # Append 50 events per phase
-        append_to_stream("stream1", 50, (phase - 1) * 50)
+      all_events =
+        Enum.flat_map(1..5, fn phase ->
+          # Append 50 events per phase
+          append_to_stream("stream1", 50, (phase - 1) * 50)
 
-        # Collect events for this phase
-        collect_and_ack_events(subscription, timeout: 1000)
-      end)
+          # Collect events for this phase
+          collect_and_ack_events(subscription, timeout: 1000)
+        end)
 
       assert length(all_events) == 250
 
@@ -206,9 +209,10 @@ defmodule EventStore.Subscriptions.SubscriptionBufferLargeScaleTest do
 
       # Verify each stream has 50 events
       by_stream = Enum.group_by(events, & &1.stream_uuid)
+
       assert Enum.all?(by_stream, fn {_stream, stream_events} ->
-        length(stream_events) == 50
-      end)
+               length(stream_events) == 50
+             end)
     end
 
     test "long-running subscription with periodic appends" do
@@ -219,14 +223,15 @@ defmodule EventStore.Subscriptions.SubscriptionBufferLargeScaleTest do
         )
 
       # Run multiple cycles of append and collect
-      all_events = Enum.flat_map(1..10, fn cycle ->
-        append_to_stream("stream1", 20, (cycle - 1) * 20)
+      all_events =
+        Enum.flat_map(1..10, fn cycle ->
+          append_to_stream("stream1", 20, (cycle - 1) * 20)
 
-        # Wait to simulate processing time
-        Process.sleep(50)
+          # Wait to simulate processing time
+          Process.sleep(50)
 
-        collect_and_ack_events(subscription, timeout: 500)
-      end)
+          collect_and_ack_events(subscription, timeout: 500)
+        end)
 
       assert length(all_events) == 200
       nums = Enum.map(all_events, & &1.event_number)
@@ -444,7 +449,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferLargeScaleTest do
     collect_and_ack_with_timeout(subscription_pid, [], timeout)
   end
 
-  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
+  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout)
+       when remaining_timeout <= 0 do
     acc
   end
 

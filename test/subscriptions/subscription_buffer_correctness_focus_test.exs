@@ -29,6 +29,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCorrectnessTest do
       assert length(events) == 7, "Should receive all 7 events, got #{length(events)}"
 
       event_numbers = Enum.map(events, & &1.event_number)
+
       assert event_numbers == [1, 2, 3, 4, 5, 6, 7],
              "All events should be in order with no gaps or duplicates"
     end
@@ -59,6 +60,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCorrectnessTest do
 
       # Verify total count
       total_expected = Enum.sum(Enum.map(streams_and_counts, &elem(&1, 1)))
+
       assert length(all_events) == total_expected,
              "Should receive all #{total_expected} events, got #{length(all_events)}"
 
@@ -67,11 +69,13 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCorrectnessTest do
 
       Enum.each(streams_and_counts, fn {stream, count} ->
         stream_events = Map.get(by_stream, stream, [])
+
         assert length(stream_events) == count,
                "Stream #{stream} should have #{count} events, got #{length(stream_events)}"
 
         # Verify ordering
         numbers = Enum.map(stream_events, & &1.event_number)
+
         assert numbers == Enum.sort(numbers),
                "Events in #{stream} should be ordered by event_number"
       end)
@@ -121,9 +125,10 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCorrectnessTest do
       Subscription.ack(subscription, batch3)
 
       # Verify all events delivered in order
-      all_numbers = Enum.flat_map([batch1, batch2, batch3], fn batch ->
-        Enum.map(batch, & &1.event_number)
-      end)
+      all_numbers =
+        Enum.flat_map([batch1, batch2, batch3], fn batch ->
+          Enum.map(batch, & &1.event_number)
+        end)
 
       assert all_numbers == [1, 2, 3, 4, 5, 6],
              "Events should be delivered in order across multiple timeout flushes"
@@ -289,7 +294,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCorrectnessTest do
     collect_and_ack_with_timeout(subscription_pid, [], timeout)
   end
 
-  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
+  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout)
+       when remaining_timeout <= 0 do
     acc
   end
 

@@ -207,17 +207,18 @@ defmodule EventStore.Subscriptions.SubscriptionBufferSelectorCompletenessTest do
         )
 
       # Rapid append/ack cycles (10 events total, 5 pass selector)
-      all_events = Enum.flat_map(1..5, fn i ->
-        append_to_stream("stream1", 2, (i - 1) * 2)
+      all_events =
+        Enum.flat_map(1..5, fn i ->
+          append_to_stream("stream1", 2, (i - 1) * 2)
 
-        receive do
-          {:events, events} ->
-            Subscription.ack(subscription, events)
-            events
-        after
-          1000 -> []
-        end
-      end)
+          receive do
+            {:events, events} ->
+              Subscription.ack(subscription, events)
+              events
+          after
+            1000 -> []
+          end
+        end)
 
       assert length(all_events) == 5
       nums = Enum.map(all_events, & &1.event_number)
@@ -368,7 +369,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferSelectorCompletenessTest do
     collect_and_ack_with_timeout(subscription_pid, [], timeout)
   end
 
-  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
+  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout)
+       when remaining_timeout <= 0 do
     acc
   end
 

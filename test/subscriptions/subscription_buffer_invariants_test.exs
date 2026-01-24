@@ -57,6 +57,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferInvariantsTest do
 
       # Verify global event number sequence
       event_nums = Enum.map(events, & &1.event_number)
+
       assert event_nums == Enum.to_list(1..15),
              "Global event numbers should be [1..15], got #{inspect(event_nums)}"
 
@@ -87,6 +88,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferInvariantsTest do
 
       # Stream versions should be sequential
       versions = Enum.map(events, & &1.stream_version)
+
       assert versions == Enum.to_list(1..15),
              "Stream versions should be sequential [1..15], got #{inspect(versions)}"
     end
@@ -161,6 +163,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferInvariantsTest do
 
     test "all events accounted for (count consistency)" do
       total_events = 25
+
       {:ok, subscription} =
         subscribe_to_all_streams(buffer_size: 3, buffer_flush_after: 80)
 
@@ -283,17 +286,18 @@ defmodule EventStore.Subscriptions.SubscriptionBufferInvariantsTest do
         subscribe_to_all_streams(buffer_size: 2, buffer_flush_after: 50)
 
       # Rapidly append and ack 30 times
-      all_events = Enum.flat_map(1..30, fn i ->
-        append_to_stream("stream1", 1, i - 1)
+      all_events =
+        Enum.flat_map(1..30, fn i ->
+          append_to_stream("stream1", 1, i - 1)
 
-        receive do
-          {:events, events} ->
-            Subscription.ack(subscription, events)
-            events
-        after
-          1000 -> []
-        end
-      end)
+          receive do
+            {:events, events} ->
+              Subscription.ack(subscription, events)
+              events
+          after
+            1000 -> []
+          end
+        end)
 
       assert length(all_events) == 30
       nums = Enum.map(all_events, & &1.event_number)
@@ -310,16 +314,17 @@ defmodule EventStore.Subscriptions.SubscriptionBufferInvariantsTest do
         subscribe_to_all_streams(buffer_size: 10, buffer_flush_after: timeout)
 
       # Run multiple cycles and track timing
-      timings = Enum.map(1..5, fn i ->
-        append_to_stream("stream1", 2, (i - 1) * 2)
+      timings =
+        Enum.map(1..5, fn i ->
+          append_to_stream("stream1", 2, (i - 1) * 2)
 
-        start = System.monotonic_time(:millisecond)
-        assert_receive {:events, events}, 500
-        elapsed = System.monotonic_time(:millisecond) - start
+          start = System.monotonic_time(:millisecond)
+          assert_receive {:events, events}, 500
+          elapsed = System.monotonic_time(:millisecond) - start
 
-        Subscription.ack(subscription, events)
-        elapsed
-      end)
+          Subscription.ack(subscription, events)
+          elapsed
+        end)
 
       # All should be under 2x timeout + slack
       assert Enum.all?(timings, &(&1 < timeout * 2 + 100)),
@@ -472,7 +477,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferInvariantsTest do
     collect_and_ack_with_timeout(subscription_pid, [], timeout)
   end
 
-  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
+  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout)
+       when remaining_timeout <= 0 do
     acc
   end
 

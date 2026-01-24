@@ -27,7 +27,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferComprehensiveTest do
       all_events = collect_and_ack_events(subscription, timeout: 2000)
 
       # Count occurrences of each event number
-      event_counts = all_events
+      event_counts =
+        all_events
         |> Enum.map(& &1.event_number)
         |> Enum.reduce(%{}, fn num, acc ->
           Map.update(acc, num, 1, &(&1 + 1))
@@ -44,17 +45,18 @@ defmodule EventStore.Subscriptions.SubscriptionBufferComprehensiveTest do
         subscribe_to_all_streams(buffer_size: 1, buffer_flush_after: 50)
 
       # Rapid cycles - append 1, ack, repeat 10 times
-      all_events = Enum.flat_map(1..10, fn i ->
-        append_to_stream("stream1", 1, (i - 1))
+      all_events =
+        Enum.flat_map(1..10, fn i ->
+          append_to_stream("stream1", 1, i - 1)
 
-        receive do
-          {:events, events} ->
-            Subscription.ack(subscription, events)
-            events
-        after
-          1000 -> []
-        end
-      end)
+          receive do
+            {:events, events} ->
+              Subscription.ack(subscription, events)
+              events
+          after
+            1000 -> []
+          end
+        end)
 
       # Verify all 10 events received, no duplicates
       assert length(all_events) == 10
@@ -114,16 +116,17 @@ defmodule EventStore.Subscriptions.SubscriptionBufferComprehensiveTest do
         subscribe_to_all_streams(buffer_size: 20, buffer_flush_after: 100)
 
       # Run 3 cycles, each should complete within timeout window
-      timings = Enum.map(1..3, fn i ->
-        append_to_stream("stream1", 3, (i - 1) * 3)
+      timings =
+        Enum.map(1..3, fn i ->
+          append_to_stream("stream1", 3, (i - 1) * 3)
 
-        start = System.monotonic_time(:millisecond)
-        assert_receive {:events, events}, 500
-        elapsed = System.monotonic_time(:millisecond) - start
+          start = System.monotonic_time(:millisecond)
+          assert_receive {:events, events}, 500
+          elapsed = System.monotonic_time(:millisecond) - start
 
-        Subscription.ack(subscription, events)
-        elapsed
-      end)
+          Subscription.ack(subscription, events)
+          elapsed
+        end)
 
       # All should be within ~200ms (2x timeout)
       assert Enum.all?(timings, &(&1 < 200)),
@@ -317,17 +320,18 @@ defmodule EventStore.Subscriptions.SubscriptionBufferComprehensiveTest do
       {:ok, subscription} =
         subscribe_to_all_streams(buffer_size: 1, buffer_flush_after: 30)
 
-      all_events = Enum.flat_map(1..20, fn i ->
-        append_to_stream("stream1", 1, i - 1)
+      all_events =
+        Enum.flat_map(1..20, fn i ->
+          append_to_stream("stream1", 1, i - 1)
 
-        receive do
-          {:events, events} ->
-            Subscription.ack(subscription, events)
-            events
-        after
-          1000 -> []
-        end
-      end)
+          receive do
+            {:events, events} ->
+              Subscription.ack(subscription, events)
+              events
+          after
+            1000 -> []
+          end
+        end)
 
       assert length(all_events) == 20
       nums = Enum.map(all_events, & &1.event_number)
@@ -402,19 +406,20 @@ defmodule EventStore.Subscriptions.SubscriptionBufferComprehensiveTest do
         subscribe_to_all_streams(buffer_size: 10, buffer_flush_after: 80)
 
       # Append in 3 phases, allowing timeouts to fire between each
-      batches = Enum.map(1..3, fn phase ->
-        offset = (phase - 1) * 3
-        append_to_stream("stream1", 3, offset)
+      batches =
+        Enum.map(1..3, fn phase ->
+          offset = (phase - 1) * 3
+          append_to_stream("stream1", 3, offset)
 
-        assert_receive {:events, events}, 500
-        Subscription.ack(subscription, events)
+          assert_receive {:events, events}, 500
+          Subscription.ack(subscription, events)
 
-        if phase < 3 do
-          Process.sleep(100)
-        end
+          if phase < 3 do
+            Process.sleep(100)
+          end
 
-        events
-      end)
+          events
+        end)
 
       all_events = Enum.concat(batches)
 
@@ -467,9 +472,10 @@ defmodule EventStore.Subscriptions.SubscriptionBufferComprehensiveTest do
       Subscription.ack(subscription, batch3)
 
       # Total 6 events received in order
-      all_nums = Enum.flat_map([batch1, batch2, batch3], fn batch ->
-        Enum.map(batch, & &1.event_number)
-      end)
+      all_nums =
+        Enum.flat_map([batch1, batch2, batch3], fn batch ->
+          Enum.map(batch, & &1.event_number)
+        end)
 
       assert all_nums == [1, 2, 3, 4, 5, 6]
     end
@@ -535,7 +541,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferComprehensiveTest do
     collect_and_ack_with_timeout(subscription_pid, [], timeout)
   end
 
-  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
+  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout)
+       when remaining_timeout <= 0 do
     acc
   end
 

@@ -130,8 +130,10 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
 
       # Should only receive new events (3, 4, 5)
       nums = Enum.map(batch2, & &1.event_number)
+
       assert 1 not in nums and 2 not in nums,
              "Catch-up should not replay already-delivered events"
+
       assert nums == [3, 4, 5]
     end
 
@@ -146,18 +148,20 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
       append_to_stream("stream1", 10)
 
       # Simulate rapid ACK cycles
-      all_events = Enum.flat_map(1..10, fn _ ->
-        receive do
-          {:events, events} ->
-            Subscription.ack(subscription, events)
-            events
-        after
-          1000 -> []
-        end
-      end)
+      all_events =
+        Enum.flat_map(1..10, fn _ ->
+          receive do
+            {:events, events} ->
+              Subscription.ack(subscription, events)
+              events
+          after
+            1000 -> []
+          end
+        end)
 
       assert length(all_events) == 10
       nums = Enum.map(all_events, & &1.event_number)
+
       assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
              "Ordering must be maintained across catch-up cycles"
     end
@@ -419,7 +423,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
     collect_and_ack_with_timeout(subscription_pid, [], timeout)
   end
 
-  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
+  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout)
+       when remaining_timeout <= 0 do
     acc
   end
 
@@ -444,7 +449,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
     collect_batches_with_timeout(subscription_pid, [], timeout)
   end
 
-  defp collect_batches_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
+  defp collect_batches_with_timeout(_subscription_pid, acc, remaining_timeout)
+       when remaining_timeout <= 0 do
     Enum.reverse(acc)
   end
 
@@ -469,11 +475,23 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
     collect_timings_with_limit(subscription_pid, [], timeout, max)
   end
 
-  defp collect_timings_with_limit(_subscription_pid, acc, _remaining_timeout, remaining_deliveries) when remaining_deliveries <= 0 do
+  defp collect_timings_with_limit(
+         _subscription_pid,
+         acc,
+         _remaining_timeout,
+         remaining_deliveries
+       )
+       when remaining_deliveries <= 0 do
     Enum.reverse(acc)
   end
 
-  defp collect_timings_with_limit(_subscription_pid, acc, remaining_timeout, _remaining_deliveries) when remaining_timeout <= 0 do
+  defp collect_timings_with_limit(
+         _subscription_pid,
+         acc,
+         remaining_timeout,
+         _remaining_deliveries
+       )
+       when remaining_timeout <= 0 do
     Enum.reverse(acc)
   end
 
@@ -485,7 +503,13 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
         elapsed = System.monotonic_time(:millisecond) - start
         :ok = Subscription.ack(subscription_pid, events)
         new_timeout = remaining_timeout - elapsed
-        collect_timings_with_limit(subscription_pid, [elapsed | acc], new_timeout, remaining_deliveries - 1)
+
+        collect_timings_with_limit(
+          subscription_pid,
+          [elapsed | acc],
+          new_timeout,
+          remaining_deliveries - 1
+        )
     after
       min(remaining_timeout, 200) ->
         elapsed = System.monotonic_time(:millisecond) - start

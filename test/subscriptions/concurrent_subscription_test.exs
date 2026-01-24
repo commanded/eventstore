@@ -840,12 +840,24 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
     collect_events_and_ack(subscription, [], expected_count, buffer_size, timeout)
   end
 
-  defp collect_events_and_ack(_subscription, acc, expected_count, _buffer_size, _remaining_timeout)
+  defp collect_events_and_ack(
+         _subscription,
+         acc,
+         expected_count,
+         _buffer_size,
+         _remaining_timeout
+       )
        when length(acc) >= expected_count do
     acc
   end
 
-  defp collect_events_and_ack(_subscription, acc, _expected_count, _buffer_size, remaining_timeout)
+  defp collect_events_and_ack(
+         _subscription,
+         acc,
+         _expected_count,
+         _buffer_size,
+         remaining_timeout
+       )
        when remaining_timeout <= 0 do
     acc
   end
@@ -862,7 +874,14 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
 
         elapsed = System.monotonic_time(:millisecond) - start
         new_timeout = remaining_timeout - elapsed
-        collect_events_and_ack(subscription, acc ++ events, expected_count, buffer_size, new_timeout)
+
+        collect_events_and_ack(
+          subscription,
+          acc ++ events,
+          expected_count,
+          buffer_size,
+          new_timeout
+        )
     after
       min(remaining_timeout, 200) ->
         elapsed = System.monotonic_time(:millisecond) - start

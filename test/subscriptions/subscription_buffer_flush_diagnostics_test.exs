@@ -108,7 +108,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushDiagnosticsTest do
     end
   end
 
-  defp collect_with_logging(_subscription_pid, acc, remaining_timeout: remaining) when remaining <= 0 do
+  defp collect_with_logging(_subscription_pid, acc, remaining_timeout: remaining)
+       when remaining <= 0 do
     IO.puts("Timeout expired, stopping collection")
     acc
   end

@@ -73,7 +73,14 @@ defmodule EventStore.Storage.Snapshot do
     end
   end
 
-  defp to_snapshot_from_row([source_uuid, source_version, source_type, data, metadata, created_at]) do
+  defp to_snapshot_from_row([
+         source_uuid,
+         source_version,
+         source_type,
+         data,
+         metadata,
+         created_at
+       ]) do
     %SnapshotData{
       source_uuid: source_uuid,
       source_version: source_version,

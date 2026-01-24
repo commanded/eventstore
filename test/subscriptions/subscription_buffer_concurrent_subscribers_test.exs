@@ -43,10 +43,11 @@ defmodule EventStore.Subscriptions.SubscriptionBufferConcurrentSubscribersTest d
         )
 
       # Multiple cycles of append and receive
-      all_events = Enum.flat_map(1..5, fn cycle ->
-        append_to_stream("stream1", 4, (cycle - 1) * 4)
-        collect_and_ack_events(subscription, timeout: 500)
-      end)
+      all_events =
+        Enum.flat_map(1..5, fn cycle ->
+          append_to_stream("stream1", 4, (cycle - 1) * 4)
+          collect_and_ack_events(subscription, timeout: 500)
+        end)
 
       assert length(all_events) == 20
       nums = Enum.map(all_events, & &1.event_number)
@@ -117,7 +118,10 @@ defmodule EventStore.Subscriptions.SubscriptionBufferConcurrentSubscribersTest d
 
       # First subscription
       {:ok, sub1} =
-        EventStore.subscribe_to_all_streams(sub_name1, self(), buffer_size: 2, buffer_flush_after: 100)
+        EventStore.subscribe_to_all_streams(sub_name1, self(),
+          buffer_size: 2,
+          buffer_flush_after: 100
+        )
 
       assert_receive {:subscribed, ^sub1}
 
@@ -132,7 +136,10 @@ defmodule EventStore.Subscriptions.SubscriptionBufferConcurrentSubscribersTest d
       sub_name2 = UUID.uuid4()
 
       {:ok, sub2} =
-        EventStore.subscribe_to_all_streams(sub_name2, self(), buffer_size: 2, buffer_flush_after: 100)
+        EventStore.subscribe_to_all_streams(sub_name2, self(),
+          buffer_size: 2,
+          buffer_flush_after: 100
+        )
 
       assert_receive {:subscribed, ^sub2}
 
@@ -204,7 +211,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferConcurrentSubscribersTest d
     collect_and_ack_with_timeout(subscription_pid, [], timeout)
   end
 
-  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
+  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout)
+       when remaining_timeout <= 0 do
     acc
   end
 

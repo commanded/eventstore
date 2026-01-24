@@ -85,7 +85,9 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCheckpointResumeTest do
 
       assert length(batch2) == 5
       nums = Enum.map(batch2, & &1.event_number)
-      assert nums == Enum.to_list(6..10), "Should receive only new events, not replay from checkpoint"
+
+      assert nums == Enum.to_list(6..10),
+             "Should receive only new events, not replay from checkpoint"
     end
 
     test "no duplicate events across checkpoint boundary" do
@@ -364,7 +366,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCheckpointResumeTest do
     collect_and_ack_with_timeout(subscription_pid, [], timeout)
   end
 
-  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
+  defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout)
+       when remaining_timeout <= 0 do
     acc
   end
 
@@ -382,5 +385,4 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCheckpointResumeTest do
         acc
     end
   end
-
 end

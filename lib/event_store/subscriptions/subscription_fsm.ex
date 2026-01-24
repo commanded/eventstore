@@ -232,7 +232,9 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
           next_state(:request_catch_up, data)
 
         ^expected_event ->
-          Logger.debug(describe(data) <> " is enqueueing #{length(events)} event(s) while at max capacity")
+          Logger.debug(
+            describe(data) <> " is enqueueing #{length(events)} event(s) while at max capacity"
+          )
 
           # Queue events but don't try to send them (subscriber at capacity).
           # When subscriber ACKs pending events, ack handler calls notify_subscribers
