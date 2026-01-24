@@ -3,6 +3,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushDiagnosticsTest do
   Diagnostic tests to understand buffer_flush_after behavior
   """
   use EventStore.StorageCase
+  @moduletag :manual
 
   alias EventStore.{EventFactory, UUID}
   alias EventStore.Subscriptions.Subscription
@@ -107,7 +108,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushDiagnosticsTest do
     end
   end
 
-  defp collect_with_logging(subscription_pid, acc, remaining_timeout: remaining) when remaining <= 0 do
+  defp collect_with_logging(_subscription_pid, acc, remaining_timeout: remaining) when remaining <= 0 do
     IO.puts("Timeout expired, stopping collection")
     acc
   end

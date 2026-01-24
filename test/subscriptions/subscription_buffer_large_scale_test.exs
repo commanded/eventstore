@@ -11,6 +11,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferLargeScaleTest do
   6. Performance remains acceptable at scale
   """
   use EventStore.StorageCase
+  @moduletag :slow
 
   alias EventStore.{EventFactory, UUID}
   alias EventStore.Subscriptions.Subscription

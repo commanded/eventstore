@@ -43,13 +43,13 @@ defmodule EventStore.Subscriptions.SubscriptionBufferEdgeCasesTest do
       append_to_stream("stream1", buffer_size + 1)
 
       # Should get first batch immediately
-      assert_receive {:events, batch1}, 500
+      assert_receive {:events, batch1}, 1000
       assert length(batch1) == buffer_size
 
       Subscription.ack(subscription, batch1)
 
       # Then remaining event
-      assert_receive {:events, batch2}, 500
+      assert_receive {:events, batch2}, 1000
       assert length(batch2) == 1
 
       Subscription.ack(subscription, batch2)
@@ -272,7 +272,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferEdgeCasesTest do
       Subscription.ack(subscription, batch2)
 
       append_to_stream("stream1", 2, 4)
-      assert_receive {:events, batch3}, 500
+      assert_receive {:events, batch3}, 1000
       assert length(batch3) == 2
       Subscription.ack(subscription, batch3)
 

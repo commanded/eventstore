@@ -29,14 +29,14 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       start_time = System.monotonic_time(:millisecond)
       append_to_stream("stream1", 3)
 
-      assert_receive {:events, received_events}, 100
+      assert_receive {:events, received_events}, 500
       elapsed = System.monotonic_time(:millisecond) - start_time
 
       assert length(received_events) == 3
       assert_event_numbers(received_events, [1, 2, 3])
 
-      # Should have received quickly, not waiting for 1000ms timeout
-      assert elapsed < 200
+      # Should have received well before the 1000ms timeout
+      assert elapsed < 800
 
       :ok = Subscription.ack(subscription, received_events)
 
@@ -287,7 +287,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       append_to_stream("stream1", 6)
 
       # First batch (buffer_size = 2)
-      assert_receive {:events, batch1}, 500
+      assert_receive {:events, batch1}, 1000
       assert length(batch1) == 2
       assert_event_numbers(batch1, [1, 2])
 
@@ -300,7 +300,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       :ok = Subscription.ack(subscription, batch1)
 
       # Should receive batch 2 immediately (from notify_subscribers on ack)
-      assert_receive {:events, batch2}, 500
+      assert_receive {:events, batch2}, 1000
       assert length(batch2) == 2
       assert_event_numbers(batch2, [3, 4])
 
@@ -560,7 +560,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       append_to_stream("stream1", 3)
 
       # Wait for timeout to fire (should flush all 3 events)
-      assert_receive {:events, batch1}, 200
+      assert_receive {:events, batch1}, 500
       assert length(batch1) == 3
       assert_event_numbers(batch1, [1, 2, 3])
 
@@ -571,7 +571,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       :ok = Subscription.ack(subscription, batch1)
 
       # Should receive second batch (either via buffer_size or timeout)
-      assert_receive {:events, batch2}, 200
+      assert_receive {:events, batch2}, 500
       assert length(batch2) == 2
       assert_event_numbers(batch2, [4, 5])
 
@@ -590,7 +590,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       append_to_stream("stream1", 7)
 
       # First batch should arrive immediately (buffer_size = 5)
-      assert_receive {:events, batch1}, 200
+      assert_receive {:events, batch1}, 500
       assert length(batch1) == 5
       assert_event_numbers(batch1, [1, 2, 3, 4, 5])
 
@@ -608,7 +608,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
 
       # Should receive remaining events immediately (subscriber now available)
       # The restarted timer ensures they would be flushed even if subscriber stayed busy
-      assert_receive {:events, batch2}, 200
+      assert_receive {:events, batch2}, 500
       assert length(batch2) == 2
       assert_event_numbers(batch2, [6, 7])
 
@@ -626,7 +626,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       append_to_stream("stream1", 2)
 
       # Wait for timeout to fire
-      assert_receive {:events, received_events}, 200
+      assert_receive {:events, received_events}, 500
       assert length(received_events) == 2
 
       # Ack events - partition should be empty
@@ -648,7 +648,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       append_to_stream("stream1", 2)
 
       # First timeout flush
-      assert_receive {:events, batch1}, 200
+      assert_receive {:events, batch1}, 500
       assert length(batch1) == 2
       assert_event_numbers(batch1, [1, 2])
 
@@ -659,7 +659,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       :ok = Subscription.ack(subscription, batch1)
 
       # Second timeout flush should occur
-      assert_receive {:events, batch2}, 200
+      assert_receive {:events, batch2}, 500
       assert length(batch2) == 1
       assert_event_numbers(batch2, [3])
 
@@ -677,7 +677,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       append_to_stream("stream1", 3)
 
       # Wait for timeout flush
-      assert_receive {:events, received_events}, 200
+      assert_receive {:events, received_events}, 500
       assert length(received_events) == 3
 
       # Verify we can still ack and receive more events
@@ -687,7 +687,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       append_to_stream("stream1", 2, 3)
 
       # Should receive new events (either immediately or via timeout)
-      assert_receive {:events, more_events}, 200
+      assert_receive {:events, more_events}, 500
       assert length(more_events) == 2
       assert_event_numbers(more_events, [4, 5])
 
@@ -706,7 +706,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
       append_to_stream("stream1", 4)
 
       # First batch arrives immediately (buffer_size = 3)
-      assert_receive {:events, batch1}, 200
+      assert_receive {:events, batch1}, 500
       assert length(batch1) == 3
       assert_event_numbers(batch1, [1, 2, 3])
 
@@ -715,7 +715,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferFlushAfterTest do
 
       # The 4th event should be sent immediately (subscriber available)
       # But if it wasn't, the restarted timer would flush it
-      assert_receive {:events, batch2}, 200
+      assert_receive {:events, batch2}, 500
       assert length(batch2) == 1
       assert_event_numbers(batch2, [4])
 

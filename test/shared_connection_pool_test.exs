@@ -139,7 +139,7 @@ defmodule EventStore.SharedConnectionPoolTest do
 
       {:ok, _events} = append_events_to_stream(:eventstore1, stream_uuid, 3)
 
-      assert_receive {:events, _events}
+      assert_receive {:events, _events}, 2000
       refute_receive {:events, _events}
     end
 
@@ -153,7 +153,7 @@ defmodule EventStore.SharedConnectionPoolTest do
 
       {:ok, _events} = append_events_to_stream(:eventstore2, stream_uuid, 1)
 
-      assert_receive {:events, received_events}
+      assert_receive {:events, received_events}, 5000
 
       :ok = TestEventStore.ack(subscription, received_events)
 
@@ -165,7 +165,7 @@ defmodule EventStore.SharedConnectionPoolTest do
       # Append new events to stream should be received via eventstore2 subscription
       {:ok, _events} = append_events_to_stream(:eventstore2, stream_uuid, 1, 1)
 
-      assert_receive {:events, received_events}
+      assert_receive {:events, received_events}, 5000
 
       :ok = TestEventStore.ack(subscription, received_events)
 

@@ -44,7 +44,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferSelectorCompletenessTest do
     end
 
     test "selector filtering all events times out correctly" do
-      {:ok, subscription} =
+      {:ok, _subscription} =
         subscribe_to_all_streams(
           buffer_size: 10,
           buffer_flush_after: 100,
@@ -108,7 +108,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferSelectorCompletenessTest do
     end
 
     test "selector filtering everything from small stream" do
-      {:ok, subscription} =
+      {:ok, _subscription} =
         subscribe_to_all_streams(
           buffer_size: 10,
           buffer_flush_after: 100,

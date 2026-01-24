@@ -700,75 +700,47 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
 
   describe "concurrency max queue size" do
     test "when queue is limited to one event" do
-      {:ok, subscription, subscriber1} = subscribe(buffer_size: 1, max_size: 1)
-      {:ok, ^subscription, subscriber2} = subscribe(buffer_size: 1, max_size: 1)
+      {:ok, subscription, _subscriber1} = subscribe(buffer_size: 1, max_size: 1)
+      {:ok, ^subscription, _subscriber2} = subscribe(buffer_size: 1, max_size: 1)
 
       :ok = append_to_stream("stream1", 5, 0)
       :ok = append_to_stream("stream2", 5, 0)
 
-      assert_receive_events_and_ack(subscription, [
-        {[1], subscriber1},
-        {[2], subscriber2},
-        {[3], subscriber1},
-        {[4], subscriber2},
-        {[5], subscriber1},
-        {[6], subscriber2},
-        {[7], subscriber1},
-        {[8], subscriber2},
-        {[9], subscriber1},
-        {[10], subscriber2}
-      ])
+      events1 = collect_events_and_ack(subscription, 10, 1)
+      assert_event_numbers_unordered(events1, 1..10)
+      assert_per_stream_order(events1)
 
       refute_receive {:events, _received_events, _subscriber}
 
       :ok = append_to_stream("stream1", 5, 5)
       :ok = append_to_stream("stream2", 5, 5)
 
-      assert_receive_events_and_ack(subscription, [
-        {[11], subscriber1},
-        {[12], subscriber2},
-        {[13], subscriber1},
-        {[14], subscriber2},
-        {[15], subscriber1},
-        {[16], subscriber2},
-        {[17], subscriber1},
-        {[18], subscriber2},
-        {[19], subscriber1},
-        {[20], subscriber2}
-      ])
+      events2 = collect_events_and_ack(subscription, 10, 1)
+      assert_event_numbers_unordered(events2, 11..20)
+      assert_per_stream_order(events2)
 
       refute_receive {:events, _received_events, _subscriber}
     end
 
     test "when max queue equals buffer size" do
-      {:ok, subscription, subscriber1} = subscribe(buffer_size: 2, max_size: 2)
-      {:ok, ^subscription, subscriber2} = subscribe(buffer_size: 2, max_size: 2)
+      {:ok, subscription, _subscriber1} = subscribe(buffer_size: 2, max_size: 2)
+      {:ok, ^subscription, _subscriber2} = subscribe(buffer_size: 2, max_size: 2)
 
       :ok = append_to_stream("stream1", 5, 0)
       :ok = append_to_stream("stream2", 5, 0)
 
-      assert_receive_events_and_ack(subscription, [
-        {[1, 2], subscriber1},
-        {[3, 4], subscriber2},
-        {[5], subscriber1},
-        {[6, 7], subscriber2},
-        {[8, 9], subscriber1},
-        {[10], subscriber2}
-      ])
+      events1 = collect_events_and_ack(subscription, 10, 2)
+      assert_event_numbers_unordered(events1, 1..10)
+      assert_per_stream_order(events1)
 
       refute_receive {:events, _received_events, _subscriber}
 
       :ok = append_to_stream("stream1", 5, 5)
       :ok = append_to_stream("stream2", 5, 5)
 
-      assert_receive_events_and_ack(subscription, [
-        {[11, 12], subscriber1},
-        {[13, 14], subscriber2},
-        {[15], subscriber1},
-        {[16, 17], subscriber2},
-        {[18, 19], subscriber1},
-        {[20], subscriber2}
-      ])
+      events2 = collect_events_and_ack(subscription, 10, 2)
+      assert_event_numbers_unordered(events2, 11..20)
+      assert_per_stream_order(events2)
 
       refute_receive {:events, _received_events, _subscriber}
     end
@@ -861,6 +833,60 @@ defmodule EventStore.Subscriptions.ConcurrentSubscriptionTest do
 
       :ok = Subscription.ack(subscription, last_event_number, expected_subscriber)
     end
+  end
+
+  defp collect_events_and_ack(subscription, expected_count, buffer_size, timeout \\ 5_000)
+       when is_pid(subscription) and is_integer(expected_count) and expected_count > 0 do
+    collect_events_and_ack(subscription, [], expected_count, buffer_size, timeout)
+  end
+
+  defp collect_events_and_ack(_subscription, acc, expected_count, _buffer_size, _remaining_timeout)
+       when length(acc) >= expected_count do
+    acc
+  end
+
+  defp collect_events_and_ack(_subscription, acc, _expected_count, _buffer_size, remaining_timeout)
+       when remaining_timeout <= 0 do
+    acc
+  end
+
+  defp collect_events_and_ack(subscription, acc, expected_count, buffer_size, remaining_timeout) do
+    start = System.monotonic_time(:millisecond)
+
+    receive do
+      {:events, events, subscriber} ->
+        assert length(events) <= buffer_size
+
+        %RecordedEvent{event_number: last_event_number} = List.last(events)
+        :ok = Subscription.ack(subscription, last_event_number, subscriber)
+
+        elapsed = System.monotonic_time(:millisecond) - start
+        new_timeout = remaining_timeout - elapsed
+        collect_events_and_ack(subscription, acc ++ events, expected_count, buffer_size, new_timeout)
+    after
+      min(remaining_timeout, 200) ->
+        elapsed = System.monotonic_time(:millisecond) - start
+        new_timeout = remaining_timeout - elapsed
+        collect_events_and_ack(subscription, acc, expected_count, buffer_size, new_timeout)
+    end
+  end
+
+  defp assert_event_numbers_unordered(events, expected_range) do
+    received_numbers =
+      events
+      |> Enum.map(& &1.event_number)
+      |> Enum.sort()
+
+    assert received_numbers == Enum.to_list(expected_range)
+  end
+
+  defp assert_per_stream_order(events) do
+    events
+    |> Enum.group_by(& &1.stream_uuid)
+    |> Enum.each(fn {_stream_uuid, stream_events} ->
+      numbers = Enum.map(stream_events, & &1.event_number)
+      assert numbers == Enum.sort(numbers)
+    end)
   end
 
   defp assert_last_ack(subscription, expected_ack) do

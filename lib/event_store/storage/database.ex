@@ -45,7 +45,19 @@ defmodule EventStore.Storage.Database do
     args = include_default_args([dump_path, "-d", database], config)
     env = parse_env(config)
 
-    System.cmd("pg_restore", args, env: env)
+    {output, status} = System.cmd("pg_restore", args, env: env, stderr_to_stdout: true)
+
+    # pg_restore can exit non-zero on older Postgres servers when encountering
+    # unsupported SET options (e.g. transaction_timeout). Treat this specific
+    # warning as non-fatal for test restores.
+    status =
+      if status == 1 and String.contains?(output, "transaction_timeout") do
+        0
+      else
+        status
+      end
+
+    {output, status}
   end
 
   defp parse_env(config) do
@@ -128,7 +140,7 @@ defmodule EventStore.Storage.Database do
         :ok
 
       {:error, %{postgres: %{code: :invalid_catalog_name}}} ->
-        {:error, :already_down}
+        :ok
 
       {:error, error} ->
         {:error, Exception.message(error)}

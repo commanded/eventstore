@@ -110,6 +110,13 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     defevent checkpoint(), data: %SubscriptionState{} = data do
       next_state(:subscribed, persist_checkpoint(data))
     end
+
+    # Handle flush_buffer in request_catch_up state.
+    # Simply clear the timer since the catch-up process will handle event delivery.
+    defevent flush_buffer(partition_key), data: %SubscriptionState{} = data do
+      data = clear_partition_timer(data, partition_key)
+      next_state(:request_catch_up, data)
+    end
   end
 
   defstate catching_up do
@@ -123,6 +130,15 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
     defevent checkpoint(), data: %SubscriptionState{} = data do
       next_state(:subscribed, persist_checkpoint(data))
+    end
+
+    # Handle flush_buffer in catching_up state.
+    # When catching up from storage, we simply clear the timer since the catch-up
+    # process will handle event delivery. The timer will be restarted when needed
+    # after transitioning back to subscribed state.
+    defevent flush_buffer(partition_key), data: %SubscriptionState{} = data do
+      data = clear_partition_timer(data, partition_key)
+      next_state(:catching_up, data)
     end
   end
 
@@ -344,6 +360,13 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   end
 
   defevent catch_up, data: %SubscriptionState{} = data, state: state do
+    next_state(state, data)
+  end
+
+  # Catch-all for flush_buffer in any unhandled state.
+  # Clear the timer and remain in the current state.
+  defevent flush_buffer(partition_key), data: %SubscriptionState{} = data, state: state do
+    data = clear_partition_timer(data, partition_key)
     next_state(state, data)
   end
 
@@ -705,7 +728,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       end
 
     subscribers
-    |> Enum.sort_by(fn {_pid, %Subscriber{last_sent: last_sent}} -> last_sent end)
+    |> Enum.sort_by(fn {pid, %Subscriber{last_sent: last_sent}} -> {last_sent, pid} end)
     |> Enum.find(fn {_pid, subscriber} -> Subscriber.available?(subscriber) end)
     |> case do
       nil -> {:error, :no_available_subscriber}

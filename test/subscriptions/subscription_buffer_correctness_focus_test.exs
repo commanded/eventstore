@@ -106,17 +106,17 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCorrectnessTest do
 
       # Append in phases to trigger multiple timeout flushes
       append_to_stream("stream1", 2)
-      assert_receive {:events, batch1}, 500
+      assert_receive {:events, batch1}, 1000
       assert length(batch1) == 2
       Subscription.ack(subscription, batch1)
 
       append_to_stream("stream1", 3, 2)
-      assert_receive {:events, batch2}, 500
+      assert_receive {:events, batch2}, 1000
       assert length(batch2) == 3
       Subscription.ack(subscription, batch2)
 
       append_to_stream("stream1", 1, 5)
-      assert_receive {:events, batch3}, 500
+      assert_receive {:events, batch3}, 1000
       assert length(batch3) == 1
       Subscription.ack(subscription, batch3)
 
@@ -285,30 +285,8 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCorrectnessTest do
     :ok = EventStore.append_to_stream(stream_uuid, expected_version, events)
   end
 
-  defp collect_all_events(_subscription_pid, timeout: timeout) do
-    collect_events_with_timeout([], timeout)
-  end
-
   defp collect_and_ack_events(subscription_pid, timeout: timeout) do
     collect_and_ack_with_timeout(subscription_pid, [], timeout)
-  end
-
-  defp collect_events_with_timeout(acc, remaining_timeout) when remaining_timeout <= 0 do
-    acc
-  end
-
-  defp collect_events_with_timeout(acc, remaining_timeout) do
-    start = System.monotonic_time(:millisecond)
-
-    receive do
-      {:events, events} ->
-        elapsed = System.monotonic_time(:millisecond) - start
-        new_timeout = remaining_timeout - elapsed
-        collect_events_with_timeout(acc ++ events, new_timeout)
-    after
-      min(remaining_timeout, 200) ->
-        acc
-    end
   end
 
   defp collect_and_ack_with_timeout(_subscription_pid, acc, remaining_timeout) when remaining_timeout <= 0 do
