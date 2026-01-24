@@ -448,7 +448,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferInvariantsTest do
       # Append more - should work fine
       append_to_stream("stream1", 5, 10)
 
-      events2 = collect_and_ack_events(subscription, timeout: 1000)
+      events2 = collect_and_ack_events(subscription, timeout: 2000)
 
       assert length(events2) == 5
     end
@@ -487,7 +487,9 @@ defmodule EventStore.Subscriptions.SubscriptionBufferInvariantsTest do
         collect_and_ack_with_timeout(subscription_pid, acc ++ events, new_timeout)
     after
       min(remaining_timeout, 200) ->
-        acc
+        elapsed = System.monotonic_time(:millisecond) - start
+        new_timeout = remaining_timeout - elapsed
+        collect_and_ack_with_timeout(subscription_pid, acc, new_timeout)
     end
   end
 

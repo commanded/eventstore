@@ -61,10 +61,6 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCheckpointResumeTest do
       batch1 = collect_and_ack_events(subscription1, timeout: 1000)
       assert length(batch1) == 5
 
-      # Get checkpoint
-      initial_checkpoint = get_subscription_checkpoint(subscription_name)
-      assert initial_checkpoint > 0, "Should have checkpoint after receiving events"
-
       # Unsubscribe
       :ok = Subscription.unsubscribe(subscription1)
       Process.sleep(100)
@@ -359,13 +355,6 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCheckpointResumeTest do
 
   # Helpers
 
-  defp subscribe_to_all_streams(opts) do
-    subscription_name = UUID.uuid4()
-    {:ok, subscription} = EventStore.subscribe_to_all_streams(subscription_name, self(), opts)
-    assert_receive {:subscribed, ^subscription}
-    {:ok, subscription}
-  end
-
   defp append_to_stream(stream_uuid, event_count, expected_version \\ 0) do
     events = EventFactory.create_events(event_count, expected_version + 1)
     :ok = EventStore.append_to_stream(stream_uuid, expected_version, events)
@@ -394,9 +383,4 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCheckpointResumeTest do
     end
   end
 
-  defp get_subscription_checkpoint(subscription_name) do
-    # This would query the checkpoint storage to verify checkpoint was written
-    # For now, return a dummy value - in real implementation would read from storage
-    1
-  end
 end

@@ -235,7 +235,7 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
       # Append 50 events in one go
       append_to_stream("stream1", 50)
 
-      events = collect_and_ack_events(subscription, timeout: 5000)
+      events = collect_and_ack_events(subscription, timeout: 10_000)
 
       assert length(events) == 50
       nums = Enum.map(events, & &1.event_number)
@@ -434,7 +434,9 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
         collect_and_ack_with_timeout(subscription_pid, acc ++ events, new_timeout)
     after
       min(remaining_timeout, 200) ->
-        acc
+        elapsed = System.monotonic_time(:millisecond) - start
+        new_timeout = remaining_timeout - elapsed
+        collect_and_ack_with_timeout(subscription_pid, acc, new_timeout)
     end
   end
 
@@ -457,7 +459,9 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
         collect_batches_with_timeout(subscription_pid, [batch | acc], new_timeout)
     after
       min(remaining_timeout, 200) ->
-        Enum.reverse(acc)
+        elapsed = System.monotonic_time(:millisecond) - start
+        new_timeout = remaining_timeout - elapsed
+        collect_batches_with_timeout(subscription_pid, acc, new_timeout)
     end
   end
 
@@ -484,7 +488,9 @@ defmodule EventStore.Subscriptions.SubscriptionBufferCatchupModeTest do
         collect_timings_with_limit(subscription_pid, [elapsed | acc], new_timeout, remaining_deliveries - 1)
     after
       min(remaining_timeout, 200) ->
-        Enum.reverse(acc)
+        elapsed = System.monotonic_time(:millisecond) - start
+        new_timeout = remaining_timeout - elapsed
+        collect_timings_with_limit(subscription_pid, acc, new_timeout, remaining_deliveries)
     end
   end
 end

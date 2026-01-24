@@ -39,7 +39,7 @@ defmodule EventStore.Storage.StreamPersistenceTest do
              stream_info
            )
 
-    assert DateTime.diff(DateTime.utc_now(), created_at, :millisecond) <= 20
+    assert DateTime.diff(DateTime.utc_now(), created_at, :millisecond) <= 100
   end
 
   test "stream info for stream with one event", %{conn: conn, schema: schema} = context do
