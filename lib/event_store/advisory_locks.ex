@@ -142,6 +142,14 @@ defmodule EventStore.AdvisoryLocks do
     {:noreply, state}
   end
 
+  def handle_info({:EXIT, _, :normal}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:EXIT, _from, reason}, state) do
+    {:stop, reason, state}
+  end
+
   defp notify_lost_locks(locks, reason) do
     for {_ref, %Lock{} = lock} <- locks do
       %Lock{owner: owner, ref: ref} = lock
