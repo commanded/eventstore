@@ -52,6 +52,8 @@ defmodule EventStore.AdvisoryLocks do
   end
 
   def init(%State{} = state) do
+    Process.flag(:trap_exit, true)
+
     %State{conn: conn} = state
 
     {:ok, ref} = MonitoredServer.monitor(conn)
