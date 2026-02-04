@@ -52,6 +52,8 @@ defmodule EventStore.AdvisoryLocks do
   end
 
   def init(%State{} = state) do
+    Process.flag(:trap_exit, true)
+
     %State{conn: conn} = state
 
     {:ok, ref} = MonitoredServer.monitor(conn)
@@ -138,6 +140,14 @@ defmodule EventStore.AdvisoryLocks do
       end
 
     {:noreply, state}
+  end
+
+  def handle_info({:EXIT, _, :normal}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:EXIT, _from, reason}, state) do
+    {:stop, reason, state}
   end
 
   defp notify_lost_locks(locks, reason) do
