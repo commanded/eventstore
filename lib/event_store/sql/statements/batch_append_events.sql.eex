@@ -1,0 +1,132 @@
+<%!--
+  PG 18+ batch multi-stream append with optional stream linking.
+
+  Elixir template variables:
+    schema           - string (Postgres schema name)
+    column_data_type - "bytea" | "jsonb"
+
+  Bind parameters (11 total, regardless of event count):
+    $1  - event_ids        uuid[]
+    $2  - event_types      text[]
+    $3  - causation_ids    uuid[]
+    $4  - correlation_ids  uuid[]
+    $5  - data_array       column_data_type[]
+    $6  - metadata_array   column_data_type[]
+    $7  - created_at_array timestamptz[]
+    $8  - map_batch_indexes  bigint[]
+    $9  - map_stream_uuids   text[]
+    $10 - map_is_source      boolean[]
+    $11 - total_event_count  bigint
+--%>
+WITH
+  input_events AS (
+    SELECT *
+    FROM UNNEST(
+      $1::uuid[],
+      $2::text[],
+      $3::uuid[],
+      $4::uuid[],
+      $5::<%= column_data_type %>[],
+      $6::<%= column_data_type %>[],
+      $7::timestamptz[]
+    ) WITH ORDINALITY AS t(
+      event_id,
+      event_type,
+      causation_id,
+      correlation_id,
+      data,
+      metadata,
+      created_at,
+      batch_index
+    )
+  ),
+  event_stream_map AS (
+    SELECT *
+    FROM UNNEST(
+      $8::bigint[],
+      $9::text[],
+      $10::boolean[]
+    ) AS t(batch_index, stream_uuid, is_source)
+  ),
+  stream_event_counts AS (
+    SELECT stream_uuid, COUNT(*)::bigint AS event_count
+    FROM event_stream_map
+    GROUP BY stream_uuid
+  ),
+  streams_upsert AS (
+    MERGE INTO "<%= schema %>".streams AS t
+    USING stream_event_counts AS s
+    ON t.stream_uuid = s.stream_uuid
+    WHEN MATCHED THEN
+      UPDATE SET stream_version = t.stream_version + s.event_count
+    WHEN NOT MATCHED THEN
+      INSERT (stream_uuid, stream_version) VALUES (s.stream_uuid, s.event_count)
+    RETURNING NEW.stream_id, s.stream_uuid, COALESCE(OLD.stream_version, 0) AS old_version
+  ),
+  events_insert AS (
+    INSERT INTO "<%= schema %>".events
+      (event_id, event_type, causation_id, correlation_id, data, metadata, created_at)
+    SELECT
+      ie.event_id,
+      ie.event_type,
+      ie.causation_id,
+      ie.correlation_id,
+      ie.data,
+      ie.metadata,
+      ie.created_at
+    FROM input_events ie
+  ),
+  stream_positions AS (
+    SELECT
+      esm.batch_index,
+      esm.stream_uuid,
+      esm.is_source,
+      su.stream_id,
+      su.old_version + ROW_NUMBER() OVER (
+        PARTITION BY esm.stream_uuid
+        ORDER BY esm.batch_index
+      ) AS stream_version
+    FROM event_stream_map esm
+    JOIN streams_upsert su ON su.stream_uuid = esm.stream_uuid
+  ),
+  source_info AS (
+    SELECT
+      batch_index,
+      stream_id AS original_stream_id,
+      stream_version AS original_stream_version
+    FROM stream_positions
+    WHERE is_source = true
+  ),
+  stream_events_insert AS (
+    INSERT INTO "<%= schema %>".stream_events
+      (event_id, stream_id, stream_version, original_stream_id, original_stream_version)
+    SELECT
+      ie.event_id,
+      sp.stream_id,
+      sp.stream_version,
+      si.original_stream_id,
+      si.original_stream_version
+    FROM stream_positions sp
+    JOIN input_events ie ON ie.batch_index = sp.batch_index
+    JOIN source_info si ON si.batch_index = sp.batch_index
+  ),
+  all_stream_update AS (
+    UPDATE "<%= schema %>".streams
+    SET stream_version = stream_version + $11::bigint
+    WHERE stream_id = 0
+    RETURNING stream_version - $11::bigint AS initial_stream_version
+  ),
+  all_stream_events_insert AS (
+    INSERT INTO "<%= schema %>".stream_events
+      (event_id, stream_id, stream_version, original_stream_id, original_stream_version)
+    SELECT
+      ie.event_id,
+      0,
+      asu.initial_stream_version + ie.batch_index,
+      si.original_stream_id,
+      si.original_stream_version
+    FROM input_events ie
+    CROSS JOIN all_stream_update asu
+    JOIN source_info si ON si.batch_index = ie.batch_index
+  )
+SELECT stream_id, stream_uuid, old_version FROM streams_upsert;

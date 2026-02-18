@@ -248,6 +248,9 @@ defmodule EventStore do
   @type persistent_subscription_options :: [persistent_subscription_option]
   @type expected_version :: :any_version | :no_stream | :stream_exists | non_neg_integer
   @type start_from :: :origin | :current | non_neg_integer
+  @type append_entry ::
+          {String.t(), expected_version, list(EventData.t())}
+          | {String.t(), expected_version, list(EventData.t()), Keyword.t()}
 
   @doc false
   defmacro __using__(opts) do
@@ -307,6 +310,12 @@ defmodule EventStore do
         opts = Keyword.merge(opts, overrides)
 
         Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
+      end
+
+      def append_to_streams(appends, opts \\ []) do
+        {conn, opts} = parse_opts(opts)
+
+        Stream.append_to_streams(conn, appends, opts)
       end
 
       def link_to_stream(
@@ -670,6 +679,40 @@ defmodule EventStore do
               | {:error, :stream_not_found}
               | {:error, :wrong_expected_version}
               | {:error, :stream_deleted}
+              | {:error, reason :: term}
+
+  @doc """
+  Append events to multiple streams atomically in a single batch.
+
+  Requires PostgreSQL 18+ for MERGE in writable CTEs.
+
+  The `$all` stream linking is automatic. Link targets use `:any_version`
+  semantics and are created if they don't exist.
+
+    - `appends` is a list of append entry tuples.
+
+    - `opts` an optional keyword list containing:
+      - `name` the name of the event store if provided to `start_link/1`.
+      - `timeout` an optional timeout for the database transaction, in
+        milliseconds. Defaults to 15,000ms.
+
+  The operation is atomic — all appends succeed or none do. On per-stream
+  validation failure, the error identifies which stream caused the rollback,
+  e.g. `{:error, {:wrong_expected_version, "stream-uuid"}}`.
+
+  Returns `:ok` on success, or an `{:error, reason}` tagged tuple.
+  """
+  @callback append_to_streams(
+              appends :: list(append_entry),
+              opts :: options
+            ) ::
+              :ok
+              | {:error, {:cannot_append_to_all_stream, String.t()}}
+              | {:error, {:stream_exists, String.t()}}
+              | {:error, {:stream_not_found, String.t()}}
+              | {:error, {:wrong_expected_version, String.t()}}
+              | {:error, {:stream_deleted, String.t()}}
+              | {:error, :pg18_required}
               | {:error, reason :: term}
 
   @doc """

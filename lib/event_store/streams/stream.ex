@@ -41,6 +41,31 @@ defmodule EventStore.Streams.Stream do
     |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
   end
 
+  @all_stream "$all"
+
+  def append_to_streams(conn, appends, opts) do
+    {serializer, new_opts} = Keyword.pop(opts, :serializer)
+
+    with :ok <- validate_appends(appends) do
+      transaction(
+        conn,
+        fn transaction ->
+          query_opts = query_opts(new_opts)
+
+          with :ok <- validate_expected_versions(transaction, appends, query_opts),
+               prepared_batch <- prepare_batch(appends, serializer, new_opts),
+               {:ok, _rows} <- Storage.append_to_streams(transaction, prepared_batch, new_opts) do
+            :ok
+          else
+            {:error, error} -> Postgrex.rollback(transaction, error)
+          end
+        end,
+        new_opts
+      )
+    end
+    |> maybe_retry_once_batch(conn, appends, opts)
+  end
+
   def link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts) do
     transaction(
       conn,
@@ -356,6 +381,154 @@ defmodule EventStore.Streams.Stream do
       {:error, _error} = reply -> reply
     end
   end
+
+  defp validate_appends(appends) do
+    validate_no_all_stream(appends)
+  end
+
+  defp validate_no_all_stream(appends) do
+    Enum.reduce_while(appends, :ok, fn append, :ok ->
+      {source_uuid, _expected_version, _events} = extract_append(append)
+
+      link_uuids =
+        case append do
+          {_, _, _, append_opts} -> Keyword.get(append_opts, :link_to, [])
+          {_, _, _} -> []
+        end
+
+      cond do
+        source_uuid == @all_stream ->
+          {:halt, {:error, {:cannot_append_to_all_stream, source_uuid}}}
+
+        @all_stream in link_uuids ->
+          {:halt, {:error, {:cannot_append_to_all_stream, source_uuid}}}
+
+        true ->
+          {:cont, :ok}
+      end
+    end)
+  end
+
+  defp validate_expected_versions(conn, appends, opts) do
+    Enum.reduce_while(appends, %{}, fn append, running_versions ->
+      {stream_uuid, expected_version, events} = extract_append(append)
+      event_count = length(events)
+
+      case Map.fetch(running_versions, stream_uuid) do
+        :error ->
+          validate_first_occurrence(
+            conn,
+            stream_uuid,
+            expected_version,
+            event_count,
+            running_versions,
+            opts
+          )
+
+        {:ok, running_version} ->
+          validate_subsequent_occurrence(
+            stream_uuid,
+            expected_version,
+            event_count,
+            running_version,
+            running_versions
+          )
+      end
+    end)
+    |> case do
+      %{} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_first_occurrence(
+         conn,
+         stream_uuid,
+         expected_version,
+         event_count,
+         running_versions,
+         opts
+       ) do
+    if expected_version == :any_version do
+      case Storage.stream_info(conn, stream_uuid, query_opts(opts)) do
+        {:ok, %StreamInfo{stream_version: current}} ->
+          {:cont, Map.put(running_versions, stream_uuid, current + event_count)}
+
+        {:error, _reason} ->
+          # Stream doesn't exist yet — starts at 0
+          {:cont, Map.put(running_versions, stream_uuid, event_count)}
+      end
+    else
+      case stream_info(conn, stream_uuid, expected_version, opts) do
+        {:ok, %StreamInfo{stream_version: current}} ->
+          {:cont, Map.put(running_versions, stream_uuid, current + event_count)}
+
+        {:error, reason} ->
+          {:halt, {:error, {reason, stream_uuid}}}
+      end
+    end
+  end
+
+  defp validate_subsequent_occurrence(
+         stream_uuid,
+         expected_version,
+         event_count,
+         running_version,
+         running_versions
+       ) do
+    cond do
+      expected_version == :any_version ->
+        {:cont, Map.put(running_versions, stream_uuid, running_version + event_count)}
+
+      expected_version == running_version ->
+        {:cont, Map.put(running_versions, stream_uuid, running_version + event_count)}
+
+      true ->
+        {:halt, {:error, {:wrong_expected_version, stream_uuid}}}
+    end
+  end
+
+  defp extract_append({stream_uuid, expected_version, events, _opts}),
+    do: {stream_uuid, expected_version, events}
+
+  defp extract_append({stream_uuid, expected_version, events}),
+    do: {stream_uuid, expected_version, events}
+
+  defp prepare_batch(appends, serializer, opts) do
+    created_at = opts[:created_at_override] || utc_now()
+
+    Enum.map(appends, fn append ->
+      {stream_uuid, _expected_version, events} = extract_append(append)
+
+      link_to =
+        case append do
+          {_, _, _, append_opts} -> Keyword.get(append_opts, :link_to, [])
+          {_, _, _} -> []
+        end
+
+      recorded_events =
+        Enum.map(events, &map_to_recorded_event(&1, created_at, serializer))
+
+      {stream_uuid, recorded_events, link_to}
+    end)
+  end
+
+  defp maybe_retry_once_batch(
+         {:error, :duplicate_stream_uuid},
+         conn,
+         appends,
+         opts
+       ) do
+    unless Keyword.has_key?(opts, :retried_once) do
+      opts = Keyword.put(opts, :retried_once, true)
+
+      append_to_streams(conn, appends, opts)
+    else
+      {:error, {:already_retried_once, :duplicate_stream_uuid}}
+    end
+  end
+
+  defp maybe_retry_once_batch(result, _conn, _appends, _opts), do: result
 
   defp query_opts(opts), do: Keyword.take(opts, [:schema, :timeout])
 

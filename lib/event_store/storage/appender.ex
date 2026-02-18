@@ -85,6 +85,108 @@ defmodule EventStore.Storage.Appender do
     end
   end
 
+  @doc """
+  Append events to multiple streams in a single CTE. Requires PostgreSQL 18+.
+  """
+  def append_batch(conn, prepared_batch, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
+    {column_data_type, opts} = Keyword.pop(opts, :column_data_type)
+
+    column_data_type = column_data_type || "bytea"
+
+    statement = Statements.batch_append_events(schema, column_data_type)
+
+    {event_arrays, stream_map_arrays, total_event_count} =
+      build_batch_parameters(prepared_batch, opts)
+
+    params = event_arrays ++ stream_map_arrays ++ [total_event_count]
+
+    case Postgrex.query(conn, statement, params, opts) do
+      {:ok, %Postgrex.Result{num_rows: 0}} ->
+        {:error, :not_found}
+
+      {:ok, %Postgrex.Result{rows: rows}} ->
+        stream_count = length(prepared_batch)
+
+        Logger.debug(
+          "Batch appended #{total_event_count} event(s) across #{stream_count} stream(s)"
+        )
+
+        {:ok, rows}
+
+      {:error, %Postgrex.Error{postgres: %{code: :syntax_error}}} ->
+        {:error, :pg18_required}
+
+      {:error, error} ->
+        handle_error(error)
+    end
+  end
+
+  defp build_batch_parameters(prepared_batch, opts) do
+    {correlation_id_type, opts} = Keyword.pop(opts, :correlation_id_type, "uuid")
+    {causation_id_type, opts} = Keyword.pop(opts, :causation_id_type, "uuid")
+
+    all_events =
+      prepared_batch
+      |> Enum.flat_map(fn {_stream_uuid, events, _link_to} -> events end)
+      |> Enum.map(&encode_uuids(&1, correlation_id_type, causation_id_type))
+
+    total = length(all_events)
+
+    # Build event arrays ($1-$7)
+    event_ids = Enum.map(all_events, & &1.event_id)
+    event_types = Enum.map(all_events, & &1.event_type)
+    causation_ids = Enum.map(all_events, & &1.causation_id)
+    correlation_ids = Enum.map(all_events, & &1.correlation_id)
+    data_list = Enum.map(all_events, & &1.data)
+    metadata_list = Enum.map(all_events, & &1.metadata)
+    created_at_list = Enum.map(all_events, & &1.created_at)
+
+    # Build event_stream_map arrays ($8-$10)
+    {map_indexes, map_uuids, map_sources} = build_stream_map(prepared_batch)
+
+    event_arrays = [
+      event_ids,
+      event_types,
+      causation_ids,
+      correlation_ids,
+      data_list,
+      metadata_list,
+      created_at_list
+    ]
+
+    stream_map_arrays = [map_indexes, map_uuids, map_sources]
+
+    {event_arrays, stream_map_arrays, total}
+  end
+
+  defp build_stream_map(prepared_batch) do
+    {indexes, uuids, sources, _offset} =
+      Enum.reduce(prepared_batch, {[], [], [], 0}, fn
+        {stream_uuid, events, link_to_uuids}, {idxs, uuids, srcs, offset} ->
+          event_count = length(events)
+
+          mappings =
+            for i <- 1..event_count do
+              batch_index = offset + i
+
+              source = {batch_index, stream_uuid, true}
+              links = Enum.map(link_to_uuids, fn link_uuid -> {batch_index, link_uuid, false} end)
+
+              [source | links]
+            end
+            |> List.flatten()
+
+          new_idxs = idxs ++ Enum.map(mappings, &elem(&1, 0))
+          new_uuids = uuids ++ Enum.map(mappings, &elem(&1, 1))
+          new_srcs = srcs ++ Enum.map(mappings, &elem(&1, 2))
+
+          {new_idxs, new_uuids, new_srcs, offset + event_count}
+      end)
+
+    {indexes, uuids, sources}
+  end
+
   defp encode_uuids(%RecordedEvent{} = event, correlation_id_type, causation_id_type) do
     %RecordedEvent{event_id: event_id, causation_id: causation_id, correlation_id: correlation_id} =
       event
