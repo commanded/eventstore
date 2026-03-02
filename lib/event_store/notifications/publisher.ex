@@ -1,8 +1,10 @@
 defmodule EventStore.Notifications.Publisher do
-  @moduledoc false
-
-  # Reads events from storage by each event number range received and publishes
-  # them.
+  @moduledoc """
+  A GenStage consumer which subscribes to a `EventStore.Notifications.Listener` and receives
+  `EventStore.Notifications.Notification` events, reading the corresponding range of events from
+  storage, deserializing them, and broadcasting them to PubSub subscribers for the relevant storage
+  stream.
+  """
 
   use GenStage
 
@@ -43,7 +45,7 @@ defmodule EventStore.Notifications.Publisher do
     {:consumer, state, [subscribe_to: [{subscribe_to, max_demand: 1}]]}
   end
 
-  # Fetch events from storage and pass onwards to subscibers
+  # Fetch events from storage and pass onwards to subscribers
   def handle_events(events, _from, state) do
     %State{event_store: event_store} = state
 

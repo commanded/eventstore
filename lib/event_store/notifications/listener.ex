@@ -1,11 +1,11 @@
 defmodule EventStore.Notifications.Listener do
-  @moduledoc false
+  @moduledoc """
+  A GenStage producer which listens for event stream notifications from PostgreSQL using the
+  PostgreSQL `LISTEN/NOTIFY` mechanism and emits `EventStore.Notifications.Notification` events
+  for subscribed `EventStore.Notifications.Publisher` processes.
 
-  # Listener subscribes to event notifications using PostgreSQL's `LISTEN`
-  # command. Whenever events are appended to storage a `NOTIFY` command is
-  # executed by a trigger. The notification payload contains the first and last
-  # event number of the appended events. These events are then read from storage
-  # and published to interested subscribers.
+  The notification payload contains the first and last event number of the appended events.
+  """
 
   use GenStage
 
