@@ -294,7 +294,7 @@ defmodule EventStore do
         Supervisor.stop(supervisor, :normal, timeout)
       end
 
-      @accepted_overrides_append_to_stream [:created_at_override]
+      @accepted_overrides_append_to_stream [:created_at_override, :trim]
 
       def append_to_stream(stream_uuid, expected_version, events, opts \\ [])
 
@@ -641,7 +641,11 @@ defmodule EventStore do
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
       - `timeout` an optional timeout for the database transaction, in
-        milliseconds. Defaults to 15,000ms.
+      milliseconds. Defaults to 15,000ms.
+      - `trim` a boolean defaulting to false. If true, then the stream will be "trimmed",
+      which means that the stream's origin will be set to the first event in this call. In other
+      words, new subscriptions starting from `:origin` will start with the events passed into
+      this call.
 
   Returns `:ok` on success, or an `{:error, reason}` tagged tuple. The returned
   error may be due to one of the following reasons:
@@ -729,7 +733,7 @@ defmodule EventStore do
     - `stream_uuid` is used to uniquely identify a stream.
 
     - `start_version` optionally, the stream version of the first event to read.
-      Defaults to the beginning of the stream if not set.
+      Defaults to the origin of the stream if not set.
 
     - `count` optionally, the maximum number of events to read.
       Defaults to to returning 1,000 events from the stream.
@@ -754,7 +758,7 @@ defmodule EventStore do
   they were originally written.
 
     - `start_version` optionally, the stream version of the first event to read.
-      Defaults to the beginning of the stream if not set.
+      Defaults to the origin of the stream if not set.
 
     - `count` optionally, the maximum number of events to read.
       Defaults to returning 1,000 events from all streams.
@@ -825,7 +829,7 @@ defmodule EventStore do
   originally written.
 
     - `start_version` optionally, the stream version of the first event to read.
-      Defaults to the beginning of the stream if not set.
+      Defaults to the origin of the stream if not set.
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.
@@ -845,7 +849,7 @@ defmodule EventStore do
   written.
 
     - `start_version` optionally, the stream version of the first event to read.
-      Defaults to the beginning of the stream if not set.
+      Defaults to the origin of the stream if not set.
 
     - `opts` an optional keyword list containing:
       - `name` the name of the event store if provided to `start_link/1`.

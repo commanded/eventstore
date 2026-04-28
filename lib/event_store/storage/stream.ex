@@ -98,15 +98,17 @@ defmodule EventStore.Storage.Stream do
   end
 
   defp to_stream_info(row) do
-    [stream_id, stream_uuid, stream_version, created_at, deleted_at] = row
+    [stream_id, stream_uuid, stream_version, stream_origin, created_at, deleted_at] = row
 
     stream_version = if is_nil(stream_version), do: 0, else: stream_version
+    stream_origin = if is_nil(stream_origin), do: 0, else: stream_origin
     status = if is_nil(deleted_at), do: :created, else: :deleted
 
     %StreamInfo{
       stream_uuid: stream_uuid,
       stream_id: stream_id,
       stream_version: stream_version,
+      stream_origin: stream_origin,
       created_at: created_at,
       deleted_at: deleted_at,
       status: status

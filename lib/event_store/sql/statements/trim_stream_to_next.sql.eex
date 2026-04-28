@@ -1,0 +1,3 @@
+UPDATE "<%= schema %>".streams
+SET stream_origin = stream_version + 1
+WHERE stream_uuid = $1;

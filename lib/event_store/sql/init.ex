@@ -39,6 +39,7 @@ defmodule EventStore.Sql.Init do
         stream_id bigserial PRIMARY KEY NOT NULL,
         stream_uuid text NOT NULL,
         stream_version bigint default 0 NOT NULL,
+        stream_origin bigint default 0 NOT NULL,
         created_at timestamp with time zone DEFAULT NOW() NOT NULL,
         deleted_at timestamp with time zone
     );
@@ -54,7 +55,7 @@ defmodule EventStore.Sql.Init do
   # Create `$all` stream
   defp seed_all_stream do
     """
-    INSERT INTO streams (stream_id, stream_uuid, stream_version) VALUES (0, '$all', 0);
+    INSERT INTO streams (stream_id, stream_uuid, stream_version, stream_origin) VALUES (0, '$all', 0, 0);
     """
   end
 

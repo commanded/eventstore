@@ -4,40 +4,38 @@ defmodule EventStore.Streams.Stream do
   alias EventStore.{EventData, RecordedEvent, Storage, UUID}
   alias EventStore.Streams.StreamInfo
 
-  def append_to_stream(conn, stream_uuid, expected_version, events, opts)
-      when length(events) < 1000 do
-    {serializer, new_opts} = Keyword.pop(opts, :serializer)
-
-    with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, new_opts),
-         :ok <- do_append_to_storage(conn, stream, events, expected_version, serializer, new_opts) do
-      :ok
-    end
-    |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
-  end
-
   def append_to_stream(conn, stream_uuid, expected_version, events, opts) do
     {serializer, new_opts} = Keyword.pop(opts, :serializer)
 
-    transaction(
-      conn,
-      fn transaction ->
-        with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, new_opts),
-             :ok <-
-               do_append_to_storage(
-                 transaction,
-                 stream,
-                 events,
-                 expected_version,
-                 serializer,
-                 new_opts
-               ) do
-          :ok
-        else
-          {:error, error} -> Postgrex.rollback(transaction, error)
-        end
-      end,
-      new_opts
-    )
+    if length(events) < 1000 and not Keyword.has_key?(opts, :trim) do
+      # This will be written as a single batch, so we don't need a db call to initiate a transaction.
+      with {:ok, stream} <- stream_info(conn, stream_uuid, expected_version, new_opts),
+           :ok <-
+             do_append_to_storage(conn, stream, events, expected_version, serializer, new_opts) do
+        :ok
+      end
+    else
+      transaction(
+        conn,
+        fn transaction ->
+          with {:ok, stream} <- stream_info(transaction, stream_uuid, expected_version, new_opts),
+               :ok <-
+                 do_append_to_storage(
+                   transaction,
+                   stream,
+                   events,
+                   expected_version,
+                   serializer,
+                   new_opts
+                 ) do
+            :ok
+          else
+            {:error, error} -> Postgrex.rollback(transaction, error)
+          end
+        end,
+        new_opts
+      )
+    end
     |> maybe_retry_once(conn, stream_uuid, expected_version, events, opts)
   end
 
@@ -59,27 +57,27 @@ defmodule EventStore.Streams.Stream do
 
   def paginate_streams(conn, opts), do: Storage.paginate_streams(conn, opts)
 
-  def read_stream_forward(conn, stream_uuid, start_version, count, opts) do
+  def read_stream_forward(conn, stream_uuid, stream_origin, count, opts) do
     with {:ok, stream} <- stream_info(conn, stream_uuid, :stream_exists, opts) do
-      read_storage_forward(conn, stream, start_version, count, opts)
+      read_storage_forward(conn, stream, stream_origin, count, opts)
     end
   end
 
-  def read_stream_backward(conn, stream_uuid, start_version, count, opts) do
+  def read_stream_backward(conn, stream_uuid, stream_origin, count, opts) do
     with {:ok, stream} <- stream_info(conn, stream_uuid, :stream_exists, opts) do
-      read_storage_backward(conn, stream, start_version, count, opts)
+      read_storage_backward(conn, stream, stream_origin, count, opts)
     end
   end
 
-  def stream_forward(conn, stream_uuid, start_version, opts) do
+  def stream_forward(conn, stream_uuid, stream_origin, opts) do
     with {:ok, stream} <- stream_info(conn, stream_uuid, :stream_exists, opts) do
-      stream_storage_forward(conn, stream, start_version, opts)
+      stream_storage_forward(conn, stream, stream_origin, opts)
     end
   end
 
-  def stream_backward(conn, stream_uuid, start_version, opts) do
+  def stream_backward(conn, stream_uuid, stream_origin, opts) do
     with {:ok, stream} <- stream_info(conn, stream_uuid, :stream_exists, opts) do
-      stream_storage_backward(conn, stream, start_version, opts)
+      stream_storage_backward(conn, stream, stream_origin, opts)
     end
   end
 
@@ -218,26 +216,26 @@ defmodule EventStore.Streams.Stream do
     Storage.append_to_stream(conn, stream_id, prepared_events, opts)
   end
 
-  defp read_storage_forward(conn, %StreamInfo{} = stream, start_version, count, opts) do
+  defp read_storage_forward(conn, %StreamInfo{} = stream, stream_origin, count, opts) do
     %StreamInfo{stream_id: stream_id} = stream
 
     {serializer, opts} = Keyword.pop(opts, :serializer)
 
     with {:ok, recorded_events} <-
-           Storage.read_stream_forward(conn, stream_id, start_version, count, opts) do
+           Storage.read_stream_forward(conn, stream_id, stream_origin, count, opts) do
       deserialized_events = deserialize_recorded_events(recorded_events, serializer)
 
       {:ok, deserialized_events}
     end
   end
 
-  defp read_storage_backward(conn, %StreamInfo{} = stream, start_version, count, opts) do
+  defp read_storage_backward(conn, %StreamInfo{} = stream, stream_origin, count, opts) do
     %StreamInfo{stream_id: stream_id} = stream
 
     {serializer, opts} = Keyword.pop(opts, :serializer)
 
     with {:ok, recorded_events} <-
-           Storage.read_stream_backward(conn, stream_id, start_version, count, opts) do
+           Storage.read_stream_backward(conn, stream_id, stream_origin, count, opts) do
       deserialized_events = deserialize_recorded_events(recorded_events, serializer)
 
       {:ok, deserialized_events}
@@ -248,11 +246,11 @@ defmodule EventStore.Streams.Stream do
   defp stream_storage_forward(conn, stream, 0, opts),
     do: stream_storage_forward(conn, stream, 1, opts)
 
-  defp stream_storage_forward(conn, stream, start_version, opts) do
+  defp stream_storage_forward(conn, stream, stream_origin, opts) do
     read_batch_size = Keyword.fetch!(opts, :read_batch_size)
 
     Elixir.Stream.resource(
-      fn -> start_version end,
+      fn -> stream_origin end,
       fn next_version ->
         case read_storage_forward(conn, stream, next_version, read_batch_size, opts) do
           {:ok, []} -> {:halt, next_version}
@@ -270,11 +268,11 @@ defmodule EventStore.Streams.Stream do
     stream_storage_backward(conn, stream, stream_version, opts)
   end
 
-  defp stream_storage_backward(conn, stream, start_version, opts) do
+  defp stream_storage_backward(conn, stream, stream_origin, opts) do
     read_batch_size = Keyword.fetch!(opts, :read_batch_size)
 
     Elixir.Stream.resource(
-      fn -> start_version end,
+      fn -> stream_origin end,
       fn
         next_version when next_version <= 0 ->
           {:halt, 0}

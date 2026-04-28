@@ -168,16 +168,16 @@ defmodule EventStore.Storage.ReadEventsTest do
     end
   end
 
-  defp read_all_stream_forward(context, start_version, count) do
+  defp read_all_stream_forward(context, stream_origin, count) do
     %{conn: conn, schema: schema} = context
 
-    Storage.read_stream_forward(conn, 0, start_version, count, schema: schema)
+    Storage.read_stream_forward(conn, 0, stream_origin, count, schema: schema)
   end
 
-  defp read_stream_forward(context, stream_id, start_version, count) do
+  defp read_stream_forward(context, stream_id, stream_origin, count) do
     %{conn: conn, schema: schema} = context
 
-    Storage.read_stream_forward(conn, stream_id, start_version, count, schema: schema)
+    Storage.read_stream_forward(conn, stream_id, stream_origin, count, schema: schema)
   end
 
   defp pluck(enumerable, field), do: Enum.map(enumerable, &Map.get(&1, field))

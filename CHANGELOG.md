@@ -205,10 +205,10 @@ Previous usage:
 ```elixir
 EventStore.append_to_stream(stream_uuid, expected_version, events, timeout)
 EventStore.link_to_stream(stream_uuid, expected_version, events_or_event_ids, timeout)
-EventStore.read_stream_forward(stream_uuid, start_version, count, timeout)
-EventStore.read_all_streams_forward(start_version, count, timeout)
-EventStore.stream_forward(stream_uuid, start_version, read_batch_size, timeout)
-EventStore.stream_all_forward(start_version, read_batch_size, timeout)
+EventStore.read_stream_forward(stream_uuid, stream_origin, count, timeout)
+EventStore.read_all_streams_forward(stream_origin, count, timeout)
+EventStore.stream_forward(stream_uuid, stream_origin, read_batch_size, timeout)
+EventStore.stream_all_forward(stream_origin, read_batch_size, timeout)
 ```
 
 Usage now:
@@ -216,10 +216,10 @@ Usage now:
 ```elixir
 EventStore.append_to_stream(stream_uuid, expected_version, events, timeout: timeout)
 EventStore.link_to_stream(stream_uuid, expected_version, events_or_event_ids, timeout: timeout)
-EventStore.read_stream_forward(stream_uuid, start_version, count, timeout: timeout)
-EventStore.read_all_streams_forward(start_version, count, timeout: timeout)
-EventStore.stream_forward(stream_uuid, start_version, read_batch_size: read_batch_size, timeout: timeout)
-EventStore.stream_all_forward(start_version, read_batch_size: read_batch_size, timeout: timeout)
+EventStore.read_stream_forward(stream_uuid, stream_origin, count, timeout: timeout)
+EventStore.read_all_streams_forward(stream_origin, count, timeout: timeout)
+EventStore.stream_forward(stream_uuid, stream_origin, read_batch_size: read_batch_size, timeout: timeout)
+EventStore.stream_all_forward(stream_origin, read_batch_size: read_batch_size, timeout: timeout)
 ```
 
 ### Upgrading

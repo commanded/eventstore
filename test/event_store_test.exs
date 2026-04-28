@@ -167,7 +167,7 @@ defmodule EventStore.EventStoreTest do
 
       {:ok, recorded_events} = EventStore.read_stream_backward(stream_uuid)
 
-      assert_recorded_events(stream_uuid, 10..1, Enum.reverse(events), recorded_events)
+      assert_recorded_events(stream_uuid, 10..1//-1, Enum.reverse(events), recorded_events)
     end
 
     test "stream backward", %{stream_uuid: stream_uuid, events: events} do
@@ -176,7 +176,7 @@ defmodule EventStore.EventStoreTest do
       recorded_events =
         EventStore.stream_backward(stream_uuid, -1, batch_size: 5) |> Enum.to_list()
 
-      assert_recorded_events(stream_uuid, 10..1, Enum.reverse(events), recorded_events)
+      assert_recorded_events(stream_uuid, 10..1//-1, Enum.reverse(events), recorded_events)
     end
 
     test "stream all backward", %{stream_uuid: stream_uuid, events: events} do
@@ -184,7 +184,45 @@ defmodule EventStore.EventStoreTest do
 
       recorded_events = EventStore.stream_all_backward(-1, batch_size: 5) |> Enum.to_list()
 
-      assert_recorded_events(stream_uuid, 10..1, Enum.reverse(events), recorded_events)
+      assert_recorded_events(stream_uuid, 10..1//-1, Enum.reverse(events), recorded_events)
+    end
+  end
+
+  describe "read events with non-zero origin" do
+    setup do
+      stream_uuid = UUID.uuid4()
+      old_events = EventFactory.create_events(5)
+      new_events = EventFactory.create_events(10)
+
+      [stream_uuid: stream_uuid, old_events: old_events, new_events: new_events]
+    end
+
+    # Not testing the streaming versions again, as they end up doing the same query anyway.
+
+    test "read stream forward", %{
+      stream_uuid: stream_uuid,
+      old_events: old_events,
+      new_events: new_events
+    } do
+      :ok = EventStore.append_to_stream(stream_uuid, 0, old_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 5, new_events, trim: true)
+
+      {:ok, recorded_events} = EventStore.read_stream_forward(stream_uuid, 0)
+
+      assert_recorded_events(stream_uuid, 6..15, new_events, recorded_events)
+    end
+
+    test "read stream backward", %{
+      stream_uuid: stream_uuid,
+      old_events: old_events,
+      new_events: new_events
+    } do
+      :ok = EventStore.append_to_stream(stream_uuid, 0, old_events)
+      :ok = EventStore.append_to_stream(stream_uuid, 5, new_events, trim: true)
+
+      {:ok, recorded_events} = EventStore.read_stream_backward(stream_uuid)
+
+      assert_recorded_events(stream_uuid, 15..6//-1, Enum.reverse(new_events), recorded_events)
     end
   end
 
@@ -482,10 +520,6 @@ defmodule EventStore.EventStoreTest do
   defmodule ExampleData do
     @derive Jason.Encoder
     defstruct([:data])
-  end
-
-  test "record snapshot" do
-    assert record_snapshot() != nil
   end
 
   test "read a snapshot" do

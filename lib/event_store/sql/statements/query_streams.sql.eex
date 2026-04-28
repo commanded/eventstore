@@ -2,6 +2,7 @@ SELECT
   stream_id,
   stream_uuid,
   stream_version,
+  stream_origin,
   created_at,
   deleted_at
 FROM "<%= schema %>".streams

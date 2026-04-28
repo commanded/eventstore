@@ -30,7 +30,7 @@ defmodule EventStore.Storage do
   Read events for the given stream forward from the starting version, use zero
   for all events for the stream.
   """
-  defdelegate read_stream_forward(conn, stream_id, start_version, count, opts),
+  defdelegate read_stream_forward(conn, stream_id, stream_origin, count, opts),
     to: Reader,
     as: :read_forward
 
@@ -38,7 +38,7 @@ defmodule EventStore.Storage do
   Read events for the given stream backward from the starting version, use -1
   for all events for the stream.
   """
-  defdelegate read_stream_backward(conn, stream_id, start_version, count, opts),
+  defdelegate read_stream_backward(conn, stream_id, stream_origin, count, opts),
     to: Reader,
     as: :read_backward
 

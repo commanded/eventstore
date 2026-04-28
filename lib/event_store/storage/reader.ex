@@ -10,8 +10,8 @@ defmodule EventStore.Storage.Reader do
   @doc """
   Read events from a single stream forwards from the given starting version.
   """
-  def read_forward(conn, stream_id, start_version, count, opts) do
-    case Reader.Query.read_events_forward(conn, stream_id, start_version, count, opts) do
+  def read_forward(conn, stream_id, stream_origin, count, opts) do
+    case Reader.Query.read_events_forward(conn, stream_id, stream_origin, count, opts) do
       {:ok, []} = reply -> reply
       {:ok, rows} -> map_rows_to_event_data(rows)
       {:error, reason} -> failed_to_read(stream_id, reason)
@@ -21,8 +21,8 @@ defmodule EventStore.Storage.Reader do
   @doc """
   Read events from a single stream backwards from the given starting version.
   """
-  def read_backward(conn, stream_id, start_version, count, opts) do
-    case Reader.Query.read_events_backward(conn, stream_id, start_version, count, opts) do
+  def read_backward(conn, stream_id, stream_origin, count, opts) do
+    case Reader.Query.read_events_backward(conn, stream_id, stream_origin, count, opts) do
       {:ok, []} = reply -> reply
       {:ok, rows} -> map_rows_to_event_data(rows)
       {:error, reason} -> failed_to_read(stream_id, reason)
@@ -106,20 +106,20 @@ defmodule EventStore.Storage.Reader do
   defmodule Query do
     @moduledoc false
 
-    def read_events_forward(conn, stream_id, start_version, count, opts) do
+    def read_events_forward(conn, stream_id, stream_origin, count, opts) do
       {schema, opts} = Keyword.pop(opts, :schema)
 
       query = Statements.query_stream_events_forward(schema)
 
-      do_query(conn, query, [stream_id, start_version, count], opts)
+      do_query(conn, query, [stream_id, stream_origin, count], opts)
     end
 
-    def read_events_backward(conn, stream_id, start_version, count, opts) do
+    def read_events_backward(conn, stream_id, stream_origin, count, opts) do
       {schema, opts} = Keyword.pop(opts, :schema)
 
       query = Statements.query_stream_events_backward(schema)
 
-      do_query(conn, query, [stream_id, start_version, count], opts)
+      do_query(conn, query, [stream_id, stream_origin, count], opts)
     end
 
     defp do_query(conn, query, params, opts) do

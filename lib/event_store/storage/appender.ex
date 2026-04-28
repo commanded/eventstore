@@ -16,6 +16,15 @@ defmodule EventStore.Storage.Appender do
   def append(conn, stream_id, events, opts) do
     [%RecordedEvent{stream_uuid: stream_uuid} | _] = events
 
+    {trim, opts} = Keyword.pop(opts, :trim, false)
+
+    if trim do
+      # We could probably do this by being really smart in the insert query, but
+      # these queries are already somewhat unwieldy. We don't trim all the time, so
+      # the extra db roundtrip is unlikely to be noticeable.
+      :ok = trim_stream_to_next(conn, stream_uuid, opts)
+    end
+
     try do
       events
       |> Stream.map(&encode_uuids/1)
@@ -125,6 +134,22 @@ defmodule EventStore.Storage.Appender do
 
       {:ok, %Postgrex.Result{rows: [[stream_id]]}} ->
         {:ok, stream_id}
+
+      {:error, error} ->
+        handle_error(error)
+    end
+  end
+
+  defp trim_stream_to_next(conn, stream_uuid, opts) do
+    {schema, opts} = Keyword.pop(opts, :schema)
+    statement = Statements.trim_stream_to_next(schema)
+
+    case Postgrex.query(conn, statement, [stream_uuid], opts) do
+      {:ok, %Postgrex.Result{num_rows: 0}} ->
+        {:error, :not_found}
+
+      {:ok, _} ->
+        :ok
 
       {:error, error} ->
         handle_error(error)

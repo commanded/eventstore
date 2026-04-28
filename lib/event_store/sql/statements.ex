@@ -14,6 +14,7 @@ defmodule EventStore.Sql.Statements do
         {:insert_events, [:schema, :stream_id, :number_of_events, :created_at]},
         {:insert_events_any_version, [:schema, :stream_id, :number_of_events, :created_at]},
         {:insert_link_events, [:schema, :number_of_events]},
+        {:trim_stream_to_next, [:schema]},
         {:soft_delete_stream, [:schema]},
         {:hard_delete_stream, [:schema]},
         {:insert_subscription, [:schema]},

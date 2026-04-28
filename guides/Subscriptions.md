@@ -97,6 +97,12 @@ By default subscriptions are created from the stream origin; they will receive a
 - `:current` - subscribe to events from the current version.
 - `event_number` (integer) - specify an exact event number to subscribe from. This will be the same as the stream version for single stream subscriptions.
 
+Note that in all cases the streaming will never go "past" the stream's origin, wich
+can be set with `EventStore.trim/2`. This functionality allows garbage collection of
+events that are not part of any stream. The current origin is returned in the `stream_origin`
+field of the `EventStore.stream_info/1` result. If the event number passed in is
+smaller than the stream's origin, the stream will still start at the origin.
+
 ### Acknowledge received events
 
 Receipt of each event by the subscriber must be acknowledged. This allows the subscription to resume on failure without missing an event and to indicate the subscription is ready to receive the next event.

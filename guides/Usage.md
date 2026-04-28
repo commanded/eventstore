@@ -217,3 +217,23 @@ Hard delete a stream that should exist:
 ```elixir
 :ok = MyApp.EventStore.delete_stream("stream2", :stream_exists, :hard)
 ```
+
+## Stream origin and garbage collection
+
+By default, a stream starts at the first event added to it. But this means
+that the event store will grow without bounds, as there is no way to remove
+events from a stream.
+
+To alleviate this problem, streams have variable origins: if you pass
+`trim: true` to a `MyApp.EventStore.append_to_stream` call, then the origin
+of the stream will be set to the first event passed into that call. This
+functionality currently allows you to pass in a "fresh start" event, which
+in CQRS/ES is used for various purposes like "closing the books". In effect,
+all events that were in the stream before are now invisible: subscriptions
+will start at this new origin, meaning that they won't need to traverse
+all of the event history on start (or, alternatively, see incomplete
+data when starting at the end or somewhere in the middle of a stream).
+
+In the (hopefully near) future, this will allow EventStore to implement garbage
+collection: any events that are not visible in any streams can be safely deleted. This
+way, by judiciously trimming streams, database sizes can be kept under control.
