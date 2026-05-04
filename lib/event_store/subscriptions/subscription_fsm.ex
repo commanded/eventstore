@@ -536,7 +536,11 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
   end
 
-  defp notify_partition_subscriber(data, partition_key, events_to_send \\ []) do
+  defp notify_partition_subscriber(
+         %SubscriptionState{} = data,
+         partition_key,
+         events_to_send \\ []
+       ) do
     %SubscriptionState{
       partitions: partitions,
       subscribers: subscribers,

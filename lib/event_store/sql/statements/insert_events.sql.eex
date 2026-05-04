@@ -1,4 +1,4 @@
-<%
+<%!--
   # Elixir template variables:
   #   schema - string
   #   stream_id - integer
@@ -18,15 +18,15 @@
   #  9 - created_at - timestamp
   # 10 - index - integer
   # 11 - stream_version - integer
-%>
+--%>
 
 WITH
-  <%
+  <%!--
     # create a table variable with:
     #  event_id - uuid - the id for the new event
     #  index - integer - the increase in the stream version for any stream it is linked to
     #  stream_version - integer - the final stream version after all of the events have been inserted
-  %>
+  --%>
   new_events_indexes (event_id, index, stream_version) AS (
     VALUES
     <%= for i <- 0..(number_of_events - 1) do %>

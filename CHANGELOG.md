@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.9
+
+### Enhancements
+
+* Set the minimum version of Elixir to 1.15
+* Use Elixir 1.19 as a compilation target
+* Upgrade postgrex, ex_doc, dialyxir, gen_stage, jason
+* Fix EventStore warnings
+
 ## v1.4.8
 
 ### Bug fixes
