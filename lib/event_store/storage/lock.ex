@@ -1,8 +1,6 @@
 defmodule EventStore.Storage.Lock do
   @moduledoc false
 
-  require Logger
-
   alias EventStore.Sql.Statements
 
   @doc """
