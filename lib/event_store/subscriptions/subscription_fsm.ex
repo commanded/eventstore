@@ -107,7 +107,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
 
     defevent checkpoint(), data: %SubscriptionState{} = data do
-      next_state(:subscribed, persist_checkpoint(data))
+      next_state(:request_catch_up, persist_checkpoint(data))
     end
   end
 
@@ -121,7 +121,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
 
     defevent checkpoint(), data: %SubscriptionState{} = data do
-      next_state(:subscribed, persist_checkpoint(data))
+      next_state(:catching_up, persist_checkpoint(data))
     end
   end
 
@@ -197,7 +197,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     end
 
     defevent checkpoint(), data: %SubscriptionState{} = data do
-      next_state(:subscribed, persist_checkpoint(data))
+      next_state(:max_capacity, persist_checkpoint(data))
     end
   end
 
