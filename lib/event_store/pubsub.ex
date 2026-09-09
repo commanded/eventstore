@@ -54,6 +54,13 @@ defmodule EventStore.PubSub do
     end)
   end
 
+  @doc """
+  Returns whether the topic has any local subscribers.
+  """
+  @spec subscribed?(EventStore.t(), binary) :: boolean
+  def subscribed?(event_store, topic),
+    do: Registry.lookup(registry_name(event_store), topic) != []
+
   defp notify_subscriber(_pid, {:events, []}, _), do: nil
 
   defp notify_subscriber(pid, {:events, events}, opts) do
