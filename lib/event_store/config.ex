@@ -115,6 +115,7 @@ defmodule EventStore.Config do
     :backoff_max,
     :backoff_min,
     :backoff_type,
+    :checkout_retries,
     :configure,
     :connect_timeout,
     :connection_listeners,
@@ -124,6 +125,7 @@ defmodule EventStore.Config do
     :handshake_timeout,
     :hostname,
     :idle_interval,
+    :idle_limit,
     :max_restarts,
     :max_seconds,
     :parameters,
@@ -148,6 +150,18 @@ defmodule EventStore.Config do
     :username
   ]
 
+  # Options that are safe only for the main connection pool and must not be
+  # forwarded to the advisory locks or notifications pools.
+  #
+  # - `:max_lifetime` recycles connections after a configurable age. Advisory
+  #   lock connections use `backoff_type: :stop`, so recycling them would
+  #   terminate the process without reconnecting, breaking distributed
+  #   subscription assignment. Notification connections would also lose their
+  #   LISTEN registrations on each recycle cycle.
+  @main_pool_only_opts [
+    :max_lifetime
+  ]
+
   def default_postgrex_opts(config) do
     Keyword.take(config, @postgrex_connection_opts)
   end
@@ -159,7 +173,7 @@ defmodule EventStore.Config do
       queue_interval: 1_000
     ]
     |> Keyword.merge(config)
-    |> Keyword.take(@postgrex_connection_opts)
+    |> Keyword.take(@postgrex_connection_opts ++ @main_pool_only_opts)
     |> Keyword.put(:backoff_type, :exp)
     |> Keyword.put(:name, name)
   end
