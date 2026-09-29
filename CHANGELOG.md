@@ -11,6 +11,9 @@
 * Use Elixir 1.20 as a compilation target
 * Support OTP 28 and 29
 * Upgrade postgrex, ex_doc, dialyxir, gen_stage
+* Support `:max_lifetime` DBConnection option for the main connection pool to enable native per-connection recycling. This option is intentionally excluded from the advisory locks and notifications pools: advisory lock connections use `backoff_type: :stop` (recycling would terminate the process without reconnecting, breaking distributed subscription assignment), and notification connections would lose their LISTEN registrations on each cycle.
+* Support `:idle_limit` DBConnection option (added in DBConnection v2.4.3) to cap the number of connections disconnected during a single idle ping interval, avoiding thundering-herd reconnects on large pools.
+* Support `:checkout_retries` DBConnection option (added in DBConnection v2.9.0) to retry pool checkout on transient queue timeouts instead of immediately returning an error.
 
 ### Bug fixes
 
