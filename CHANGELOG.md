@@ -4,10 +4,26 @@
 
 ### Enhancements
 
+* Add per-field config for corr_id and cau_id column types by @yordis in https://github.com/commanded/eventstore/pull/322
+* Notification Documentation by @TylerPachal in https://github.com/commanded/eventstore/pull/320
+* Remove unused require Logger by @wimwian in https://github.com/commanded/eventstore/pull/326
 * Set the minimum version of Elixir to 1.16
 * Use Elixir 1.20 as a compilation target
 * Support OTP 28 and 29
 * Upgrade postgrex, ex_doc, dialyxir, gen_stage
+
+### Bug fixes
+
+* Keep catching up when the checkpoint timer fires by @pirvudoru in https://github.com/commanded/eventstore/pull/327
+* Fix warnings over deprecated comment syntax by @joeljuca in https://github.com/commanded/eventstore/pull/311
+* Fix documentation type in EventStore Usage Guide by @san650 in https://github.com/commanded/eventstore/pull/310
+
+## New Contributors
+* @joeljuca made their first contribution in https://github.com/commanded/eventstore/pull/311
+* @san650 made their first contribution in https://github.com/commanded/eventstore/pull/310
+* @TylerPachal made their first contribution in https://github.com/commanded/eventstore/pull/320
+* @wimwian made their first contribution in https://github.com/commanded/eventstore/pull/326
+* @pirvudoru made their first contribution in https://github.com/commanded/eventstore/pull/327
 
 ## v1.4.8
 
