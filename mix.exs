@@ -10,6 +10,10 @@ defmodule EventStore.Mixfile do
       version: @version,
       elixir: "~> 1.16",
       elixirc_paths: elixirc_paths(Mix.env()),
+      test_ignore_filters: [
+        &String.starts_with?(&1, "test/support/"),
+        &String.starts_with?(&1, "test/manual/")
+      ],
       deps: deps(),
       description: description(),
       package: package(),
