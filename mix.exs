@@ -42,7 +42,7 @@ defmodule EventStore.Mixfile do
 
   defp deps do
     [
-      {:fsm, "~> 0.3"},
+      {:fsm, github: "commanded/fsm"},
       {:gen_stage, "~> 1.2"},
       {:postgrex, "~> 0.17"},
 
