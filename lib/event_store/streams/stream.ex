@@ -156,7 +156,7 @@ defmodule EventStore.Streams.Stream do
     events
     |> Enum.map(&map_to_recorded_event(&1, opts[:created_at_override] || utc_now(), serializer))
     |> Enum.with_index(1)
-    |> Enum.map(fn {recorded_event, index} ->
+    |> Enum.map(fn {%RecordedEvent{} = recorded_event, index} ->
       %RecordedEvent{
         recorded_event
         | stream_uuid: stream_uuid,
