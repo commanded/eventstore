@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.4.10
+
+### Bug fixes
+
+* Revert to fsm from hex.pm
+
 ## v1.4.9
 
 ### Enhancements
