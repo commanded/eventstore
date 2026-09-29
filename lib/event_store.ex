@@ -684,7 +684,7 @@ defmodule EventStore do
   @doc """
   Append events to multiple streams atomically in a single batch.
 
-  Requires PostgreSQL 18+ for MERGE in writable CTEs.
+  Requires PostgreSQL 17+ for MERGE ... RETURNING in writable CTEs.
 
   The `$all` stream linking is automatic. Link targets use `:any_version`
   semantics and are created if they don't exist.
@@ -712,7 +712,7 @@ defmodule EventStore do
               | {:error, {:stream_not_found, String.t()}}
               | {:error, {:wrong_expected_version, String.t()}}
               | {:error, {:stream_deleted, String.t()}}
-              | {:error, :pg18_required}
+              | {:error, :pg17_required}
               | {:error, reason :: term}
 
   @doc """

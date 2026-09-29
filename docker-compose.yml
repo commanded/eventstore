@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18
+    image: postgres:17
     environment:
       PGDATA: /pgtmpfs
       POSTGRES_USER: postgres

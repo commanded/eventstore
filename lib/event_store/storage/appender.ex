@@ -86,7 +86,7 @@ defmodule EventStore.Storage.Appender do
   end
 
   @doc """
-  Append events to multiple streams in a single CTE. Requires PostgreSQL 18+.
+  Append events to multiple streams in a single CTE. Requires PostgreSQL 17+.
   """
   def append_batch(conn, prepared_batch, opts) do
     {schema, opts} = Keyword.pop(opts, :schema)
@@ -115,7 +115,7 @@ defmodule EventStore.Storage.Appender do
         {:ok, rows}
 
       {:error, %Postgrex.Error{postgres: %{code: :syntax_error}}} ->
-        {:error, :pg18_required}
+        {:error, :pg17_required}
 
       {:error, error} ->
         handle_error(error)
@@ -124,7 +124,7 @@ defmodule EventStore.Storage.Appender do
 
   defp build_batch_parameters(prepared_batch, opts) do
     {correlation_id_type, opts} = Keyword.pop(opts, :correlation_id_type, "uuid")
-    {causation_id_type, opts} = Keyword.pop(opts, :causation_id_type, "uuid")
+    {causation_id_type, _opts} = Keyword.pop(opts, :causation_id_type, "uuid")
 
     all_events =
       prepared_batch

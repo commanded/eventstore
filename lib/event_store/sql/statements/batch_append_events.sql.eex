@@ -1,5 +1,5 @@
 <%!--
-  PG 18+ batch multi-stream append with optional stream linking.
+  PG 17+ batch multi-stream append with optional stream linking.
 
   Elixir template variables:
     schema           - string (Postgres schema name)
@@ -61,7 +61,7 @@ WITH
       UPDATE SET stream_version = t.stream_version + s.event_count
     WHEN NOT MATCHED THEN
       INSERT (stream_uuid, stream_version) VALUES (s.stream_uuid, s.event_count)
-    RETURNING NEW.stream_id, s.stream_uuid, COALESCE(OLD.stream_version, 0) AS old_version
+    RETURNING t.stream_id, s.stream_uuid, t.stream_version - s.event_count AS old_version
   ),
   events_insert AS (
     INSERT INTO "<%= schema %>".events

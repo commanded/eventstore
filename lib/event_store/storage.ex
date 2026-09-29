@@ -27,7 +27,7 @@ defmodule EventStore.Storage do
   defdelegate link_to_stream(conn, stream_id, event_ids, opts), to: Appender, as: :link
 
   @doc """
-  Append events to multiple streams in a single batch. Requires PostgreSQL 18+.
+  Append events to multiple streams in a single batch. Requires PostgreSQL 17+.
   """
   defdelegate append_to_streams(conn, prepared_batch, opts), to: Appender, as: :append_batch
 
