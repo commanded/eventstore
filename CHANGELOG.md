@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.9
+
+### Enhancements
+
+* Set the minimum version of Elixir to 1.16
+* Use Elixir 1.20 as a compilation target
+* Support OTP 28 and 29
+* Upgrade postgrex, ex_doc, dialyxir, gen_stage
+
 ## v1.4.8
 
 ### Bug fixes
