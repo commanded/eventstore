@@ -48,7 +48,11 @@ defmodule EventStore.Notifications.NotificationsSupervisorTest do
   end
 
   defp assert_hibernated(pid) do
-    assert Process.info(pid, :current_function) == {:current_function, {:erlang, :hibernate, 3}}
+    # OTP 28+ hibernates gen_servers in place via `gen_server:loop_hibernate/4`
+    assert Process.info(pid, :current_function) in [
+             {:current_function, {:erlang, :hibernate, 3}},
+             {:current_function, {:gen_server, :loop_hibernate, 4}}
+           ]
   end
 
   defp append_events(stream_uuid, count, expected_version \\ 0) do
