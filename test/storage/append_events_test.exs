@@ -189,8 +189,8 @@ defmodule EventStore.Storage.AppendEventsTest do
     events = EventFactory.create_recorded_events(3, stream_uuid)
     :ok = Appender.append(conn, stream_id, events, append_opts(context))
 
-    for event <- events do
-      events = [%RecordedEvent{event | stream_version: 4}]
+    for %RecordedEvent{} = event <- events do
+      events = [%{event | stream_version: 4}]
 
       assert {:error, :duplicate_event} =
                Appender.append(conn, stream_id, events, append_opts(context))
@@ -205,10 +205,8 @@ defmodule EventStore.Storage.AppendEventsTest do
     events = EventFactory.create_recorded_events(3, stream1_uuid)
     :ok = Appender.append(conn, stream1_id, events, append_opts(context))
 
-    for event <- events do
-      events = [
-        %RecordedEvent{event | stream_uuid: stream2_uuid, stream_version: 1}
-      ]
+    for %RecordedEvent{} = event <- events do
+      events = [%{event | stream_uuid: stream2_uuid, stream_version: 1}]
 
       assert {:error, :duplicate_event} =
                Appender.append(conn, stream2_id, events, append_opts(context))

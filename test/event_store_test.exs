@@ -167,7 +167,7 @@ defmodule EventStore.EventStoreTest do
 
       {:ok, recorded_events} = EventStore.read_stream_backward(stream_uuid)
 
-      assert_recorded_events(stream_uuid, 10..1, Enum.reverse(events), recorded_events)
+      assert_recorded_events(stream_uuid, 10..1//-1, Enum.reverse(events), recorded_events)
     end
 
     test "stream backward", %{stream_uuid: stream_uuid, events: events} do
@@ -176,7 +176,7 @@ defmodule EventStore.EventStoreTest do
       recorded_events =
         EventStore.stream_backward(stream_uuid, -1, batch_size: 5) |> Enum.to_list()
 
-      assert_recorded_events(stream_uuid, 10..1, Enum.reverse(events), recorded_events)
+      assert_recorded_events(stream_uuid, 10..1//-1, Enum.reverse(events), recorded_events)
     end
 
     test "stream all backward", %{stream_uuid: stream_uuid, events: events} do
@@ -184,7 +184,7 @@ defmodule EventStore.EventStoreTest do
 
       recorded_events = EventStore.stream_all_backward(-1, batch_size: 5) |> Enum.to_list()
 
-      assert_recorded_events(stream_uuid, 10..1, Enum.reverse(events), recorded_events)
+      assert_recorded_events(stream_uuid, 10..1//-1, Enum.reverse(events), recorded_events)
     end
   end
 
@@ -485,7 +485,7 @@ defmodule EventStore.EventStoreTest do
   end
 
   test "record snapshot" do
-    assert record_snapshot() != nil
+    assert record_snapshot()
   end
 
   test "read a snapshot" do

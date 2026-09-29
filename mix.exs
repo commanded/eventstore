@@ -2,14 +2,18 @@ defmodule EventStore.Mixfile do
   use Mix.Project
 
   @source_url "https://github.com/commanded/eventstore"
-  @version "1.4.8"
+  @version "1.4.9"
 
   def project do
     [
       app: :eventstore,
       version: @version,
-      elixir: "~> 1.11",
+      elixir: "~> 1.16",
       elixirc_paths: elixirc_paths(Mix.env()),
+      test_ignore_filters: [
+        &String.starts_with?(&1, "test/support/"),
+        &String.starts_with?(&1, "test/manual/")
+      ],
       deps: deps(),
       description: description(),
       package: package(),
@@ -18,7 +22,6 @@ defmodule EventStore.Mixfile do
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() == :prod,
       aliases: aliases(),
-      preferred_cli_env: preferred_cli_env(),
       dialyzer: dialyzer(),
       name: "EventStore",
       source_url: @source_url
@@ -39,7 +42,7 @@ defmodule EventStore.Mixfile do
 
   defp deps do
     [
-      {:fsm, "~> 0.3"},
+      {:fsm, github: "commanded/fsm"},
       {:gen_stage, "~> 1.2"},
       {:postgrex, "~> 0.17"},
 
@@ -146,12 +149,14 @@ defmodule EventStore.Mixfile do
     ]
   end
 
-  defp preferred_cli_env do
+  def cli do
     [
-      "test.all": :test,
-      "test.jsonb": :test,
-      "test.text_ids": :test,
-      "test.migration": :test
+      preferred_envs: [
+        "test.all": :test,
+        "test.jsonb": :test,
+        "test.text_ids": :test,
+        "test.migration": :test
+      ]
     ]
   end
 

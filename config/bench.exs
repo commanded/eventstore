@@ -1,7 +1,7 @@
 import Config
 
 # no logging for benchmarking
-config :logger, backends: []
+config :logger, :default_handler, false
 
 config :ex_unit,
   assert_receive_timeout: 2_000,

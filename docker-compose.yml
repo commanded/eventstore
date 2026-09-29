@@ -1,5 +1,3 @@
-version: "3.3"
-
 services:
   db:
     image: postgres
@@ -11,4 +9,3 @@ services:
       - "5432:5432"
     tmpfs:
       - "/pgtmpfs"
-

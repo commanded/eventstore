@@ -43,6 +43,51 @@ defmodule EventStore.Subscriptions.SubscriptionCatchUpTest do
       refute_receive {:events, _events}
     end
 
+    test "should keep catching up when the checkpoint timer fires with events in-flight" do
+      subscription_name = UUID.uuid4()
+
+      stream1_uuid = UUID.uuid4()
+      stream2_uuid = UUID.uuid4()
+      stream3_uuid = UUID.uuid4()
+      stream4_uuid = UUID.uuid4()
+
+      append_to_stream(stream1_uuid, 10)
+      append_to_stream(stream2_uuid, 10)
+      append_to_stream(stream3_uuid, 10)
+
+      {:ok, subscription} =
+        subscribe_to_all_streams(subscription_name, self(),
+          buffer_size: 1,
+          max_size: 10,
+          checkpoint_after: 25,
+          checkpoint_threshold: 100
+        )
+
+      # Acknowledging the first event arms the checkpoint timer
+      receive_and_ack_one(subscription, stream1_uuid, 1)
+
+      # An event appended while catching up is tracked as received, but not sent
+      append_to_stream(stream4_uuid, 1)
+
+      # Let the checkpoint timer fire while the read batch is still being drained
+      Process.sleep(100)
+
+      for event_number <- 2..10, do: receive_and_ack_one(subscription, stream1_uuid, event_number)
+
+      append_to_stream(stream4_uuid, 1, 1)
+
+      for event_number <- 11..20,
+          do: receive_and_ack_one(subscription, stream2_uuid, event_number)
+
+      for event_number <- 21..30,
+          do: receive_and_ack_one(subscription, stream3_uuid, event_number)
+
+      for event_number <- 31..32,
+          do: receive_and_ack_one(subscription, stream4_uuid, event_number)
+
+      refute_receive {:events, _events}
+    end
+
     test "should receive events from soft deleted streams" do
       restart_event_store_with_config(enable_hard_deletes: false)
 
@@ -159,6 +204,15 @@ defmodule EventStore.Subscriptions.SubscriptionCatchUpTest do
     :ok = Subscription.ack(subscription, received_events)
 
     assert_last_ack(subscription, expected_intial_event_number + 9)
+  end
+
+  defp receive_and_ack_one(subscription, expected_stream_uuid, expected_event_number) do
+    assert_receive {:events, [%RecordedEvent{} = event]}
+
+    assert event.event_number == expected_event_number
+    assert event.stream_uuid == expected_stream_uuid
+
+    :ok = Subscription.ack(subscription, event)
   end
 
   defp restart_event_store_with_config(config) do

@@ -1,6 +1,6 @@
 import Config
 
-config :logger, backends: []
+config :logger, :default_handler, false
 
 config :ex_unit,
   capture_log: true,
