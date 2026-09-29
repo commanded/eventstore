@@ -18,7 +18,6 @@ defmodule EventStore.Mixfile do
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() == :prod,
       aliases: aliases(),
-      preferred_cli_env: preferred_cli_env(),
       dialyzer: dialyzer(),
       name: "EventStore",
       source_url: @source_url
@@ -146,12 +145,14 @@ defmodule EventStore.Mixfile do
     ]
   end
 
-  defp preferred_cli_env do
+  def cli do
     [
-      "test.all": :test,
-      "test.jsonb": :test,
-      "test.text_ids": :test,
-      "test.migration": :test
+      preferred_envs: [
+        "test.all": :test,
+        "test.jsonb": :test,
+        "test.text_ids": :test,
+        "test.migration": :test
+      ]
     ]
   end
 
