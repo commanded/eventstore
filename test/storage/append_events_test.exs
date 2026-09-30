@@ -223,10 +223,12 @@ defmodule EventStore.Storage.AppendEventsTest do
   test "append single event with a db connection error", %{conn: conn, schema: schema} do
     recorded_events = EventFactory.create_recorded_events(100, UUID.uuid4())
 
-    # Using Postgrex query timeout value of zero will cause a `DBConnection.ConnectionError` error
-    # to be returned.
-    assert {:error, %DBConnection.ConnectionError{}} =
+    # A zero timeout can surface either as a DBConnection timeout or as a PostgreSQL
+    # query cancellation, depending on the driver/runtime timing.
+    assert {:error, error} =
              Appender.append(conn, 1, recorded_events, schema: schema, timeout: 0)
+
+    assert match?(%DBConnection.ConnectionError{}, error) or error == :query_canceled
   end
 
   defp create_stream(context) do

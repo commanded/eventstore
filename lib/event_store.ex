@@ -254,7 +254,7 @@ defmodule EventStore do
     quote bind_quoted: [opts: opts] do
       @behaviour EventStore
 
-      alias EventStore.{Config, EventData, PubSub, Subscriptions}
+      alias EventStore.{Config, EventData, PubSub, Subscriptions, Telemetry}
       alias EventStore.Snapshots.{SnapshotData, Snapshotter}
       alias EventStore.Subscriptions.Subscription
       alias EventStore.Streams.Stream
@@ -298,15 +298,25 @@ defmodule EventStore do
 
       def append_to_stream(stream_uuid, expected_version, events, opts \\ [])
 
-      def append_to_stream(@all_stream, _expected_version, _events, _opts),
-        do: {:error, :cannot_append_to_all_stream}
-
       def append_to_stream(stream_uuid, expected_version, events, opts) do
-        overrides = Keyword.take(opts, @accepted_overrides_append_to_stream)
-        {conn, opts} = parse_opts(opts)
-        opts = Keyword.merge(opts, overrides)
+        telemetry_span(
+          :append_to_stream,
+          opts,
+          stream_metadata(stream_uuid, expected_version, events),
+          fn ->
+            case stream_uuid do
+              @all_stream ->
+                {:error, :cannot_append_to_all_stream}
 
-        Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
+              _ ->
+                overrides = Keyword.take(opts, @accepted_overrides_append_to_stream)
+                {conn, opts} = parse_opts(opts)
+                opts = Keyword.merge(opts, overrides)
+
+                Stream.append_to_stream(conn, stream_uuid, expected_version, events, opts)
+            end
+          end
+        )
       end
 
       def link_to_stream(
@@ -316,13 +326,29 @@ defmodule EventStore do
             opts \\ []
           )
 
-      def link_to_stream(@all_stream, _expected_version, _events_or_event_ids, _opts),
-        do: {:error, :cannot_append_to_all_stream}
-
       def link_to_stream(stream_uuid, expected_version, events_or_event_ids, opts) do
-        {conn, opts} = parse_opts(opts)
+        telemetry_span(
+          :link_to_stream,
+          opts,
+          stream_metadata(stream_uuid, expected_version, events_or_event_ids),
+          fn ->
+            case stream_uuid do
+              @all_stream ->
+                {:error, :cannot_append_to_all_stream}
 
-        Stream.link_to_stream(conn, stream_uuid, expected_version, events_or_event_ids, opts)
+              _ ->
+                {conn, opts} = parse_opts(opts)
+
+                Stream.link_to_stream(
+                  conn,
+                  stream_uuid,
+                  expected_version,
+                  events_or_event_ids,
+                  opts
+                )
+            end
+          end
+        )
       end
 
       def read_stream_forward(
@@ -333,9 +359,16 @@ defmodule EventStore do
           )
 
       def read_stream_forward(stream_uuid, start_version, count, opts) do
-        {conn, opts} = parse_opts(opts)
+        telemetry_span(
+          :read_stream_forward,
+          opts,
+          %{count: count, start_version: start_version, stream_uuid: stream_uuid},
+          fn ->
+            {conn, opts} = parse_opts(opts)
 
-        Stream.read_stream_forward(conn, stream_uuid, start_version, count, opts)
+            Stream.read_stream_forward(conn, stream_uuid, start_version, count, opts)
+          end
+        )
       end
 
       def read_all_streams_forward(
@@ -355,9 +388,16 @@ defmodule EventStore do
           )
 
       def read_stream_backward(stream_uuid, start_version, count, opts) do
-        {conn, opts} = parse_opts(opts)
+        telemetry_span(
+          :read_stream_backward,
+          opts,
+          %{count: count, start_version: start_version, stream_uuid: stream_uuid},
+          fn ->
+            {conn, opts} = parse_opts(opts)
 
-        Stream.read_stream_backward(conn, stream_uuid, start_version, count, opts)
+            Stream.read_stream_backward(conn, stream_uuid, start_version, count, opts)
+          end
+        )
       end
 
       def read_all_streams_backward(
@@ -377,9 +417,13 @@ defmodule EventStore do
       end
 
       def stream_forward(stream_uuid, start_version, opts) do
+        event_store_name = Keyword.get(opts, :name)
         {conn, opts} = parse_opts(opts)
 
-        opts = Keyword.put_new(opts, :read_batch_size, @default_batch_size)
+        opts =
+          opts
+          |> annotate_stream_telemetry_opts(event_store_name)
+          |> Keyword.put_new(:read_batch_size, @default_batch_size)
 
         Stream.stream_forward(conn, stream_uuid, start_version, opts)
       end
@@ -397,9 +441,13 @@ defmodule EventStore do
       end
 
       def stream_backward(stream_uuid, start_version, opts) do
+        event_store_name = Keyword.get(opts, :name)
         {conn, opts} = parse_opts(opts)
 
-        opts = Keyword.put_new(opts, :read_batch_size, @default_batch_size)
+        opts =
+          opts
+          |> annotate_stream_telemetry_opts(event_store_name)
+          |> Keyword.put_new(:read_batch_size, @default_batch_size)
 
         Stream.stream_backward(conn, stream_uuid, start_version, opts)
       end
@@ -411,24 +459,36 @@ defmodule EventStore do
 
       def delete_stream(stream_uuid, expected_version, type \\ :soft, opts \\ [])
 
-      def delete_stream(@all_stream, _expected_version, _type, _opts),
-        do: {:error, :cannot_delete_all_stream}
-
       def delete_stream(stream_uuid, expected_version, type, opts) when type in [:soft, :hard] do
-        {conn, opts} = parse_opts(opts)
+        telemetry_span(
+          :delete_stream,
+          opts,
+          %{delete_type: type, expected_version: expected_version, stream_uuid: stream_uuid},
+          fn ->
+            case stream_uuid do
+              @all_stream ->
+                {:error, :cannot_delete_all_stream}
 
-        Stream.delete(conn, stream_uuid, expected_version, type, opts)
+              _ ->
+                {conn, opts} = parse_opts(opts)
+
+                Stream.delete(conn, stream_uuid, expected_version, type, opts)
+            end
+          end
+        )
       end
 
       def paginate_streams(opts \\ []) do
-        pagination_opts =
-          Keyword.take(opts, [:page_size, :page_number, :search, :sort_by, :sort_dir])
+        telemetry_span(:paginate_streams, opts, pagination_metadata(opts), fn ->
+          pagination_opts =
+            Keyword.take(opts, [:page_size, :page_number, :search, :sort_by, :sort_dir])
 
-        {conn, opts} = parse_opts(opts)
+          {conn, opts} = parse_opts(opts)
 
-        opts = Keyword.merge(opts, pagination_opts)
+          opts = Keyword.merge(opts, pagination_opts)
 
-        Stream.paginate_streams(conn, opts)
+          Stream.paginate_streams(conn, opts)
+        end)
       end
 
       def stream_info(stream_uuid, opts \\ [])
@@ -447,47 +507,54 @@ defmodule EventStore do
       end
 
       def subscribe_to_stream(stream_uuid, subscription_name, subscriber, opts \\ []) do
-        name = name(opts)
-        config = Config.lookup(name)
-        conn = Keyword.fetch!(config, :conn)
-        schema = Keyword.fetch!(config, :schema)
-        serializer = Keyword.fetch!(config, :serializer)
-        correlation_id_type = Keyword.get(config, :correlation_id_type, "uuid")
-        causation_id_type = Keyword.get(config, :causation_id_type, "uuid")
+        telemetry_span(
+          :subscribe_to_stream,
+          opts,
+          %{stream_uuid: stream_uuid, subscription_name: subscription_name},
+          fn ->
+            name = name(opts)
+            config = Config.lookup(name)
+            conn = Keyword.fetch!(config, :conn)
+            schema = Keyword.fetch!(config, :schema)
+            serializer = Keyword.fetch!(config, :serializer)
+            correlation_id_type = Keyword.get(config, :correlation_id_type, "uuid")
+            causation_id_type = Keyword.get(config, :causation_id_type, "uuid")
 
-        query_timeout = timeout(opts, config)
+            query_timeout = timeout(opts, config)
 
-        {start_from, opts} = Keyword.pop(opts, :start_from, :origin)
+            {start_from, opts} = Keyword.pop(opts, :start_from, :origin)
 
-        with {:ok, start_from} <-
-               Stream.start_from(conn, stream_uuid, start_from,
-                 schema: schema,
-                 timeout: query_timeout
-               ) do
-          opts =
-            opts
-            |> Keyword.delete(:timeout)
-            |> Keyword.merge(
-              conn: conn,
-              event_store: name,
-              query_timeout: query_timeout,
-              schema: schema,
-              serializer: serializer,
-              correlation_id_type: correlation_id_type,
-              causation_id_type: causation_id_type,
-              stream_uuid: stream_uuid,
-              subscription_name: subscription_name,
-              start_from: start_from
-            )
-            |> Keyword.put_new_lazy(:hibernate_after, fn ->
-              Keyword.fetch!(config, :subscription_hibernate_after)
-            end)
-            |> Keyword.put_new_lazy(:retry_interval, fn ->
-              Keyword.fetch!(config, :subscription_retry_interval)
-            end)
+            with {:ok, start_from} <-
+                   Stream.start_from(conn, stream_uuid, start_from,
+                     schema: schema,
+                     timeout: query_timeout
+                   ) do
+              opts =
+                opts
+                |> Keyword.delete(:timeout)
+                |> Keyword.merge(
+                  conn: conn,
+                  event_store: name,
+                  query_timeout: query_timeout,
+                  schema: schema,
+                  serializer: serializer,
+                  correlation_id_type: correlation_id_type,
+                  causation_id_type: causation_id_type,
+                  stream_uuid: stream_uuid,
+                  subscription_name: subscription_name,
+                  start_from: start_from
+                )
+                |> Keyword.put_new_lazy(:hibernate_after, fn ->
+                  Keyword.fetch!(config, :subscription_hibernate_after)
+                end)
+                |> Keyword.put_new_lazy(:retry_interval, fn ->
+                  Keyword.fetch!(config, :subscription_retry_interval)
+                end)
 
-          Subscriptions.subscribe_to_stream(subscriber, opts)
-        end
+              Subscriptions.subscribe_to_stream(subscriber, opts)
+            end
+          end
+        )
       end
 
       def subscribe_to_all_streams(subscription_name, subscriber, opts \\ []),
@@ -505,34 +572,85 @@ defmodule EventStore do
         do: unsubscribe_from_stream(@all_stream, subscription_name, opts)
 
       def delete_subscription(stream_uuid, subscription_name, opts \\ []) do
-        name = name(opts)
+        telemetry_span(
+          :delete_subscription,
+          opts,
+          %{stream_uuid: stream_uuid, subscription_name: subscription_name},
+          fn ->
+            name = name(opts)
 
-        with :ok <- Subscriptions.stop_subscription(name, stream_uuid, subscription_name) do
-          {conn, opts} = parse_opts(opts)
+            with :ok <- Subscriptions.stop_subscription(name, stream_uuid, subscription_name) do
+              {conn, opts} = parse_opts(opts)
 
-          Subscriptions.delete_subscription(conn, stream_uuid, subscription_name, opts)
-        end
+              Subscriptions.delete_subscription(conn, stream_uuid, subscription_name, opts)
+            end
+          end
+        )
       end
 
       def delete_all_streams_subscription(subscription_name, opts \\ []),
         do: delete_subscription(@all_stream, subscription_name, opts)
 
       def read_snapshot(source_uuid, opts \\ []) do
-        {conn, opts} = parse_opts(opts)
+        telemetry_span(:read_snapshot, opts, %{source_uuid: source_uuid}, fn ->
+          {conn, opts} = parse_opts(opts)
 
-        Snapshotter.read_snapshot(conn, source_uuid, opts)
+          Snapshotter.read_snapshot(conn, source_uuid, opts)
+        end)
       end
 
       def record_snapshot(%SnapshotData{} = snapshot, opts \\ []) do
-        {conn, opts} = parse_opts(opts)
+        telemetry_span(:record_snapshot, opts, snapshot_metadata(snapshot), fn ->
+          {conn, opts} = parse_opts(opts)
 
-        Snapshotter.record_snapshot(conn, snapshot, opts)
+          Snapshotter.record_snapshot(conn, snapshot, opts)
+        end)
       end
 
       def delete_snapshot(source_uuid, opts \\ []) do
-        {conn, opts} = parse_opts(opts)
+        telemetry_span(:delete_snapshot, opts, %{source_uuid: source_uuid}, fn ->
+          {conn, opts} = parse_opts(opts)
 
-        Snapshotter.delete_snapshot(conn, source_uuid, opts)
+          Snapshotter.delete_snapshot(conn, source_uuid, opts)
+        end)
+      end
+
+      defp snapshot_metadata(%SnapshotData{source_uuid: source_uuid}),
+        do: %{source_uuid: source_uuid}
+
+      defp stream_metadata(stream_uuid, expected_version, events_or_event_ids) do
+        %{expected_version: expected_version, stream_uuid: stream_uuid}
+        |> maybe_put_event_count(events_or_event_ids)
+      end
+
+      defp maybe_put_event_count(metadata, events_or_event_ids)
+           when is_list(events_or_event_ids) do
+        Map.put(metadata, :event_count, length(events_or_event_ids))
+      end
+
+      defp maybe_put_event_count(metadata, _events_or_event_ids), do: metadata
+
+      defp pagination_metadata(opts) when is_list(opts) do
+        opts
+        |> Keyword.take([:page_size, :page_number, :search, :sort_by, :sort_dir])
+        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+        |> Map.new()
+      end
+
+      defp pagination_metadata(_opts), do: %{}
+
+      defp telemetry_span(operation, opts, metadata, fun) do
+        Telemetry.span(operation, Telemetry.metadata(__MODULE__, opts, metadata), fun)
+      end
+
+      defp annotate_stream_telemetry_opts(opts, nil) do
+        Keyword.put(opts, :event_store, __MODULE__)
+      end
+
+      defp annotate_stream_telemetry_opts(opts, event_store_name) do
+        opts
+        |> Keyword.put(:event_store, __MODULE__)
+        |> Keyword.put(:name, event_store_name)
       end
 
       defp parse_opts(opts) do
