@@ -1,7 +1,7 @@
 defmodule EventStore.Streams.Stream do
   @moduledoc false
 
-  alias EventStore.{EventData, RecordedEvent, Storage, UUID}
+  alias EventStore.{EventData, RecordedEvent, Storage, Telemetry, UUID}
   alias EventStore.Streams.StreamInfo
 
   def append_to_stream(conn, stream_uuid, expected_version, events, opts)
@@ -254,7 +254,7 @@ defmodule EventStore.Streams.Stream do
     Elixir.Stream.resource(
       fn -> start_version end,
       fn next_version ->
-        case read_storage_forward(conn, stream, next_version, read_batch_size, opts) do
+        case read_stream_batch(:forward, conn, stream, next_version, read_batch_size, opts) do
           {:ok, []} -> {:halt, next_version}
           {:ok, events} -> {events, List.last(events).event_number + 1}
         end
@@ -280,13 +280,57 @@ defmodule EventStore.Streams.Stream do
           {:halt, 0}
 
         next_version ->
-          case read_storage_backward(conn, stream, next_version, read_batch_size, opts) do
+          case read_stream_batch(:backward, conn, stream, next_version, read_batch_size, opts) do
             {:ok, []} -> {:halt, next_version}
             {:ok, events} -> {events, List.last(events).event_number - 1}
           end
       end,
       fn _next_version -> :ok end
     )
+  end
+
+  defp read_stream_batch(
+         direction,
+         conn,
+         %StreamInfo{stream_uuid: stream_uuid} = stream,
+         start_version,
+         requested_batch_size,
+         opts
+       ) do
+    start_metadata =
+      Telemetry.metadata(
+        Keyword.get(opts, :event_store, EventStore),
+        opts,
+        %{
+          direction: direction,
+          requested_batch_size: requested_batch_size,
+          start_version: start_version,
+          stream_uuid: stream_uuid
+        }
+      )
+
+    Telemetry.span(
+      :stream_batch_read,
+      start_metadata,
+      fn ->
+        read_storage(direction, conn, stream, start_version, requested_batch_size, opts)
+      end,
+      fn
+        {:ok, events} ->
+          Map.merge(start_metadata, %{event_count: length(events), result: :ok})
+
+        {:error, reason} ->
+          Map.merge(start_metadata, %{event_count: 0, result: {:error, reason}})
+      end
+    )
+  end
+
+  defp read_storage(:forward, conn, stream, start_version, count, opts) do
+    read_storage_forward(conn, stream, start_version, count, opts)
+  end
+
+  defp read_storage(:backward, conn, stream, start_version, count, opts) do
+    read_storage_backward(conn, stream, start_version, count, opts)
   end
 
   defp deserialize_recorded_events(recorded_events, serializer),

@@ -275,3 +275,78 @@ Hard delete a stream that should exist:
 ```elixir
 :ok = MyApp.EventStore.delete_stream("stream2", :stream_exists, :hard)
 ```
+
+## Telemetry
+
+EventStore emits `:telemetry` events for public operations. Each instrumented
+operation publishes `:start`, `:stop`, and `:exception` events under the
+`[:eventstore, operation, suffix]` namespace.
+
+The first pass covers these operations:
+
+- `:append_to_stream`
+- `:link_to_stream`
+- `:read_stream_forward`
+- `:read_stream_backward`
+- `:delete_stream`
+- `:paginate_streams`
+- `:subscribe_to_stream`
+- `:delete_subscription`
+- `:read_snapshot`
+- `:record_snapshot`
+- `:delete_snapshot`
+- `:stream_batch_read`
+
+Alias operations reuse the same event names. For example,
+`read_all_streams_forward/3` emits `[:eventstore, :read_stream_forward, ...]`
+with `stream_uuid: "$all"` in the metadata, and
+`subscribe_to_all_streams/3` emits `[:eventstore, :subscribe_to_stream, ...]`
+with the same stream identifier.
+
+Stop metadata includes a normalized `:result` for all instrumented operations.
+Operations that return `:ok` emit `result: :ok`. Operations that return
+`{:ok, value}` also emit `result: :ok` so telemetry does not copy returned
+payloads such as event lists or subscription structs into metadata. When an
+operation returns `{:error, reason}`, stop metadata includes
+`result: {:error, reason}`.
+
+Lazy stream APIs do not emit `:stream_forward` or `:stream_backward` spans.
+Instead, `stream_forward/3`, `stream_backward/3`, `stream_all_forward/2`, and
+`stream_all_backward/2` emit `[:eventstore, :stream_batch_read, ...]` once per
+batch read performed during enumeration. These events include `:direction`,
+`:start_version`, and `:requested_batch_size` in start metadata, and add
+`:event_count` plus `:result` in stop metadata. Forward streaming may emit a
+final batch read with `event_count: 0` to detect completion.
+
+Measurements:
+
+- `:start` includes `%{system_time: System.system_time(), monotonic_time: native_time}`
+- `:stop` includes `%{duration: native_time, monotonic_time: native_time}`
+- `:exception` includes `%{duration: native_time, monotonic_time: native_time}`
+
+Metadata always includes `:event_store`. Depending on the operation it may also
+include fields such as `:name`, `:stream_uuid`, `:expected_version`,
+`:event_count`, `:count`, `:start_version`, `:delete_type`, `:result`,
+`:subscription_name`, `:source_uuid`, and pagination options. Because
+EventStore now uses `:telemetry.span/3`, emitted metadata also includes a
+`telemetry_span_context` key so handlers can correlate start/stop/exception
+events for the same operation execution.
+
+Example handler:
+
+```elixir
+events = [
+  [:eventstore, :append_to_stream, :start],
+  [:eventstore, :append_to_stream, :stop],
+  [:eventstore, :append_to_stream, :exception]
+]
+
+:telemetry.attach_many(
+  "my-app-eventstore",
+  events,
+  fn event_name, measurements, metadata, _config ->
+    IO.inspect({event_name, measurements, metadata}, label: "eventstore.telemetry")
+  end,
+  nil
+)
+```
