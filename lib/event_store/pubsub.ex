@@ -41,6 +41,16 @@ defmodule EventStore.PubSub do
   end
 
   @doc """
+  Returns whether the given topic has any subscribers.
+  """
+  @spec subscribed?(EventStore.t(), binary) :: boolean
+  def subscribed?(event_store, topic) do
+    registry_name = registry_name(event_store)
+
+    Registry.lookup(registry_name, topic) != []
+  end
+
+  @doc """
   Broadcasts message on given topic.
   """
   @spec broadcast(EventStore.t(), binary, term) :: :ok
