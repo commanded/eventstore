@@ -61,6 +61,7 @@ defmodule EventStore.Notifications.Publisher do
     %State{event_store: event_store} = state
 
     events
+    |> Stream.filter(&PubSub.subscribed?(event_store, &1.stream_uuid))
     |> Stream.map(&read_events(&1, state))
     |> Stream.reject(&is_nil/1)
     |> Enum.each(fn {stream_uuid, batch} -> broadcast(event_store, stream_uuid, batch) end)
