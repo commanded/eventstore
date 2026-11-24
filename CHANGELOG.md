@@ -54,7 +54,7 @@
 * Fix warnings over deprecated comment syntax by @joeljuca in https://github.com/commanded/eventstore/pull/311
 * Fix documentation type in EventStore Usage Guide by @san650 in https://github.com/commanded/eventstore/pull/310
 
-## New Contributors
+### New Contributors
 * @joeljuca made their first contribution in https://github.com/commanded/eventstore/pull/311
 * @san650 made their first contribution in https://github.com/commanded/eventstore/pull/310
 * @TylerPachal made their first contribution in https://github.com/commanded/eventstore/pull/320
