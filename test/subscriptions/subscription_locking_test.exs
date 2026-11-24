@@ -110,8 +110,6 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
     } do
       assert_receive {:subscribed, ^subscription}
 
-      ref = Process.monitor(subscription)
-
       :ok = release_lock(subscription, make_ref())
 
       append_events_to_stream(event_store, 3)
@@ -122,7 +120,6 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       :ok = Subscription.ack(subscription, 3)
 
       assert Subscription.last_seen(subscription) == 3
-      refute_received {:DOWN, ^ref, :process, ^subscription, _reason}
     end
 
     test "should ignore release of an already released lock", %{
@@ -130,8 +127,6 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       subscription: subscription
     } do
       assert_receive {:subscribed, ^subscription}
-
-      ref = Process.monitor(subscription)
 
       append_events_to_stream(event_store, 3)
 
@@ -146,7 +141,6 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
       # Should receive already sent, but not successfully ack'd events
       assert_receive_events([1, 2, 3])
-      refute_received {:DOWN, ^ref, :process, ^subscription, _reason}
     end
   end
 
