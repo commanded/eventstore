@@ -167,6 +167,84 @@ defmodule EventStore.Subscriptions.SubscriptionCatchUpTest do
     end
   end
 
+  describe "catch-up subscription read failure" do
+    test "should retry reading events after `retry_interval`", %{
+      postgrex_config: postgrex_config,
+      schema: schema
+    } do
+      subscription_name = UUID.uuid4()
+      stream_uuid = UUID.uuid4()
+
+      # Wait for the appended events to be published so that the publisher isn't
+      # left blocked, holding the only pooled connection, by the table lock.
+      :ok = EventStore.subscribe(stream_uuid)
+
+      append_to_stream(stream_uuid, 10)
+
+      assert_receive {:events, _events}
+
+      :ok = Registry.unregister(TestEventStore.EventStore.PubSub, stream_uuid)
+
+      # Block reads so the subscription's catch-up query times out
+      unlock = lock_events_table(postgrex_config, schema)
+
+      {:ok, subscription} =
+        subscribe_to_all_streams(subscription_name, self(),
+          buffer_size: 10,
+          timeout: 200,
+          retry_interval: 500
+        )
+
+      ref = Process.monitor(subscription)
+
+      refute_receive {:events, _events}, 500
+
+      unlock.()
+
+      assert_receive {:events, received_events}, 5_000
+      assert length(received_events) == 10
+
+      :ok = Subscription.ack(subscription, received_events)
+
+      assert_last_ack(subscription, 10)
+
+      refute_received {:DOWN, ^ref, :process, _pid, _reason}
+    end
+  end
+
+  # Take an exclusive lock on the events table, held until the returned function
+  # is called, preventing events from being read.
+  defp lock_events_table(postgrex_config, schema) do
+    conn = start_supervised!({Postgrex, postgrex_config}, id: :lock_conn)
+    test = self()
+
+    holder =
+      spawn_link(fn ->
+        Postgrex.transaction(
+          conn,
+          fn conn ->
+            Postgrex.query!(conn, "LOCK TABLE #{schema}.events IN ACCESS EXCLUSIVE MODE", [])
+
+            send(test, :locked)
+
+            receive do
+              :unlock -> :ok
+            end
+          end,
+          timeout: :infinity
+        )
+
+        send(test, :unlocked)
+      end)
+
+    assert_receive :locked
+
+    fn ->
+      send(holder, :unlock)
+      assert_receive :unlocked
+    end
+  end
+
   defp assert_last_ack(subscription, expected_ack) do
     last_seen = Subscription.last_seen(subscription)
 

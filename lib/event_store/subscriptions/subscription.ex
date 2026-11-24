@@ -155,6 +155,18 @@ defmodule EventStore.Subscriptions.Subscription do
   end
 
   @impl GenServer
+  def handle_info({:timeout, timer_ref, :retry_catch_up}, %Subscription{} = state) do
+    %Subscription{subscription: subscription} = state
+
+    state =
+      subscription
+      |> SubscriptionFsm.retry_catch_up(timer_ref)
+      |> apply_subscription_to_state(state)
+
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_info({:DOWN, _ref, :process, pid, reason}, %Subscription{} = state) do
     %Subscription{subscription: subscription} = state
 
