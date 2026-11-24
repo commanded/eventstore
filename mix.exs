@@ -2,7 +2,7 @@ defmodule EventStore.Mixfile do
   use Mix.Project
 
   @source_url "https://github.com/commanded/eventstore"
-  @version "1.4.10"
+  @version "1.4.11"
 
   def project do
     [
@@ -54,7 +54,8 @@ defmodule EventStore.Mixfile do
       # Development and test tooling
       {:benchfella, "~> 0.3", only: :bench},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false},
-      {:ex_doc, ">= 0.0.0", only: :dev}
+      {:ex_doc, ">= 0.0.0", only: :dev},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
   end
 

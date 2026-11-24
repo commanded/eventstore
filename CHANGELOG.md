@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.4.11
+
+### Enhancements
+
+* Add telemetry events for observability by @yordis in https://github.com/commanded/eventstore/pull/323
+* Use PostgreSQL 17 in CI
+* Add `mix_audit` for dependency security auditing (`mix deps.audit`)
+* Upgrade decimal to 3.2.0
+
+### Bug fixes
+
+* Stop subscription with `:normal` reason when the subscriber process goes down, so a crashing event handler no longer causes an abnormal shutdown in https://github.com/commanded/eventstore/pull/318
+
 ## v1.4.10
 
 ### Bug fixes
