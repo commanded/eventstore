@@ -637,8 +637,6 @@ defmodule EventStore do
         |> Map.new()
       end
 
-      defp pagination_metadata(_opts), do: %{}
-
       defp telemetry_span(operation, opts, metadata, fun) do
         Telemetry.span(operation, Telemetry.metadata(__MODULE__, opts, metadata), fun)
       end
