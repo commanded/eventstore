@@ -36,6 +36,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
         checkpoint_after: opts[:checkpoint_after] || 0,
         checkpoint_threshold: opts[:checkpoint_threshold] || 1,
         query_timeout: opts[:query_timeout] || 15_000,
+        retry_interval: opts[:retry_interval] || 1_000,
         max_size: opts[:max_size] || 1_000,
         transient: Keyword.get(opts, :transient, false)
       }
@@ -47,6 +48,9 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
   def subscribe(%SubscriptionFsm{} = fsm), do: apply_event(fsm, :subscribe)
 
   def catch_up(%SubscriptionFsm{} = fsm), do: apply_event(fsm, :catch_up)
+
+  def retry_catch_up(%SubscriptionFsm{} = fsm, timer_ref),
+    do: apply_event(fsm, {:retry_catch_up, timer_ref})
 
   def ack(%SubscriptionFsm{} = fsm, ack, subscriber),
     do: apply_event(fsm, {:ack, ack, subscriber})
@@ -249,6 +253,31 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     next_state(:max_capacity, persist_checkpoint(data))
   end
 
+  # State: catch_up_failed
+  #
+  # Reading events from storage failed, a retry is scheduled. Acknowledgements
+  # of in-flight events are still processed, but don't trigger another read.
+
+  defp handle_event(
+         {:retry_catch_up, timer_ref},
+         :catch_up_failed,
+         %SubscriptionState{catch_up_retry_ref: timer_ref} = data
+       ) do
+    catch_up_from_stream(%SubscriptionState{data | catch_up_retry_ref: nil})
+  end
+
+  defp handle_event({:ack, ack, subscriber}, :catch_up_failed, %SubscriptionState{} = data) do
+    with {:ok, data} <- ack_events(data, ack, subscriber) do
+      next_state(:catch_up_failed, data)
+    else
+      reply -> respond(reply)
+    end
+  end
+
+  defp handle_event(:checkpoint, :catch_up_failed, %SubscriptionState{} = data) do
+    next_state(:catch_up_failed, persist_checkpoint(data))
+  end
+
   # State: disconnected
 
   # Attempt to subscribe
@@ -325,6 +354,11 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     next_state(state, data)
   end
 
+  # Ignore a stale retry, such as one scheduled before the subscription was disconnected.
+  defp handle_event({:retry_catch_up, _timer_ref}, state, %SubscriptionState{} = data) do
+    next_state(state, data)
+  end
+
   defp handle_event(
          {:disconnect, lock_ref},
          _state,
@@ -334,6 +368,7 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       %SubscriptionState{data | lock_ref: nil}
       |> SubscriptionState.reset_event_tracking()
       |> purge_in_flight_events()
+      |> cancel_catch_up_retry()
 
     next_state(:disconnected, data)
   end
@@ -503,11 +538,33 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
       {:error, :stream_not_found} ->
         # Allow subscriptions to streams which don't yet exist, but might be created later
         next_state(:subscribed, data)
+
+      {:error, error} ->
+        # Failed to read events, such as a query timeout, retry after delay
+        %SubscriptionState{retry_interval: retry_interval} = data
+
+        Logger.warning(
+          describe(data) <>
+            " failed to catch up due to: " <>
+            inspect(error) <> ", retrying in #{retry_interval}ms"
+        )
+
+        timer_ref = :erlang.start_timer(retry_interval, self(), :retry_catch_up)
+
+        next_state(:catch_up_failed, %SubscriptionState{data | catch_up_retry_ref: timer_ref})
     end
   end
 
   defp catch_up_from_stream(%SubscriptionState{} = data) do
     next_state(:catching_up, data)
+  end
+
+  defp cancel_catch_up_retry(%SubscriptionState{catch_up_retry_ref: nil} = data), do: data
+
+  defp cancel_catch_up_retry(%SubscriptionState{catch_up_retry_ref: timer_ref} = data) do
+    :erlang.cancel_timer(timer_ref)
+
+    %SubscriptionState{data | catch_up_retry_ref: nil}
   end
 
   defp read_stream_forward(%SubscriptionState{} = data) do
