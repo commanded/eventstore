@@ -103,6 +103,51 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       # Should receive already sent, but not successfully ack'd events
       assert_receive_events([1, 2, 3])
     end
+
+    test "should ignore release of a lock which is not held", %{
+      event_store: event_store,
+      subscription: subscription
+    } do
+      assert_receive {:subscribed, ^subscription}
+
+      ref = Process.monitor(subscription)
+
+      :ok = release_lock(subscription, make_ref())
+
+      append_events_to_stream(event_store, 3)
+
+      # Should remain subscribed and continue to receive events
+      assert_receive_events([1, 2, 3])
+
+      :ok = Subscription.ack(subscription, 3)
+
+      assert Subscription.last_seen(subscription) == 3
+      refute_received {:DOWN, ^ref, :process, ^subscription, _reason}
+    end
+
+    test "should ignore release of an already released lock", %{
+      event_store: event_store,
+      subscription: subscription
+    } do
+      assert_receive {:subscribed, ^subscription}
+
+      ref = Process.monitor(subscription)
+
+      append_events_to_stream(event_store, 3)
+
+      assert_receive_events([1, 2, 3])
+
+      lock_ref = lock_ref(subscription)
+
+      :ok = release_lock(subscription, lock_ref)
+      :ok = release_lock(subscription, lock_ref)
+
+      :ok = reconnect(subscription)
+
+      # Should receive already sent, but not successfully ack'd events
+      assert_receive_events([1, 2, 3])
+      refute_received {:DOWN, ^ref, :process, ^subscription, _reason}
+    end
   end
 
   describe "duplicate subscriptions" do
@@ -190,8 +235,16 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   end
 
   defp disconnect(subscription) do
+    release_lock(subscription, lock_ref(subscription))
+  end
+
+  defp lock_ref(subscription) do
     %Subscription{subscription: %{data: %{lock_ref: lock_ref}}} = :sys.get_state(subscription)
 
+    lock_ref
+  end
+
+  defp release_lock(subscription, lock_ref) do
     Process.send(
       subscription,
       {EventStore.AdvisoryLocks, :lock_released, lock_ref, :shutdown},

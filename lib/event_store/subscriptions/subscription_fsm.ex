@@ -332,6 +332,14 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
     next_state(:disconnected, data)
   end
 
+  # Ignore the release of a lock which the subscription does not hold, such as
+  # a lock that has already been released.
+  defp handle_event({:disconnect, _lock_ref}, state, %SubscriptionState{} = data) do
+    Logger.debug(describe(data) <> " ignoring release of a lock it does not hold")
+
+    next_state(state, data)
+  end
+
   defp handle_event({:unsubscribe, pid}, state, %SubscriptionState{} = data) do
     data =
       data

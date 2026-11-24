@@ -430,6 +430,46 @@ defmodule EventStore.Subscriptions.StreamSubscriptionTestCase do
       end
     end
 
+    describe "lock released" do
+      test "should disconnect when the held lock is released", context do
+        subscription = create_subscription(context)
+
+        %{lock_ref: lock_ref} = subscription.data
+
+        assert is_reference(lock_ref)
+
+        subscription = SubscriptionFsm.disconnect(subscription, lock_ref)
+
+        assert subscription.state == :disconnected
+        assert subscription.data.lock_ref == nil
+      end
+
+      test "should ignore release of a lock which is not held", context do
+        subscription = create_subscription(context)
+
+        %{lock_ref: lock_ref} = subscription.data
+
+        subscription = SubscriptionFsm.disconnect(subscription, make_ref())
+
+        assert subscription.state == :request_catch_up
+        assert subscription.data.lock_ref == lock_ref
+      end
+
+      test "should ignore release of an already released lock", context do
+        subscription = create_subscription(context)
+
+        %{lock_ref: lock_ref} = subscription.data
+
+        subscription =
+          subscription
+          |> SubscriptionFsm.disconnect(lock_ref)
+          |> SubscriptionFsm.disconnect(lock_ref)
+
+        assert subscription.state == :disconnected
+        assert subscription.data.lock_ref == nil
+      end
+    end
+
     defp start_subscriber(_context) do
       subscriber = SubscriptionHelpers.start_subscriber()
 

@@ -6,6 +6,10 @@
 
 * Remove the unmaintained `fsm` dependency. The subscription state machine is now implemented with plain pattern matched functions, which also removes the compiler warnings it caused on recent Elixir versions.
 
+### Bug fixes
+
+* Ignore an advisory lock released notification for a lock the subscription does not hold, instead of crashing the subscription with a `FunctionClauseError`.
+
 ## v1.4.12
 
 ### Bug fixes
