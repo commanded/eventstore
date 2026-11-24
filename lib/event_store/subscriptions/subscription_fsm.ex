@@ -320,8 +320,22 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
   # Catch-all event handlers
 
-  defp handle_event({:ack, _ack, _subscriber}, state, %SubscriptionState{} = data) do
-    next_state(state, data)
+  # An ack can't be applied in this state, but if it is for an event sent before
+  # in-flight events were reset (e.g. on disconnect) it must be accounted for so
+  # it isn't mistaken for an ack of the event's redelivery.
+  defp handle_event({:ack, ack, subscriber_pid}, state, %SubscriptionState{} = data) do
+    %SubscriptionState{subscribers: subscribers} = data
+
+    case subscriber_by_pid(subscribers, subscriber_pid) do
+      {:ok, subscriber} ->
+        subscriber = Subscriber.discard_superseded(subscriber, ack)
+        subscribers = Map.put(subscribers, subscriber_pid, subscriber)
+
+        next_state(state, %SubscriptionState{data | subscribers: subscribers})
+
+      {:error, :unknown_subscriber} ->
+        next_state(state, data)
+    end
   end
 
   defp handle_event(:checkpoint, state, %SubscriptionState{} = data) do

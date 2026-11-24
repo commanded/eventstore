@@ -1,7 +1,7 @@
 defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   use EventStore.StorageCase
 
-  alias EventStore.{Config, EventFactory, Storage, UUID}
+  alias EventStore.{Config, EventFactory, Storage, UUID, Wait}
   alias EventStore.Subscriptions.Subscription
 
   @conn TestEventStore.Postgrex
@@ -186,6 +186,64 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
     end
   end
 
+  describe "acknowledgement sent before a disconnect" do
+    # Prevent the subscription automatically resubscribing, tests reconnect explicitly.
+    @describetag retry_interval: 60_000
+
+    setup context do
+      {:ok, subscription} = start_subscription(context)
+
+      [subscription: subscription]
+    end
+
+    test "should not cover events redelivered after reconnecting", %{
+      event_store: event_store,
+      subscription: subscription
+    } do
+      {departed, survivor} =
+        connect_departing_and_surviving_subscribers(subscription, event_store)
+
+      :ok = disconnect(subscription)
+
+      depart(subscription, departed)
+
+      :ok = reconnect(subscription)
+
+      Wait.until(5_000, fn -> assert in_flight(subscription, survivor) == [2, 1] end)
+
+      # The survivor acknowledges event 2 sent before the disconnect, which says
+      # nothing about event 1 which it has only just been sent.
+      :ok = Subscription.ack(subscription, 2, survivor)
+
+      assert Subscription.last_seen(subscription) == 0
+      assert in_flight(subscription, survivor) == [2, 1]
+
+      :ok = Subscription.ack(subscription, 2, survivor)
+
+      assert Subscription.last_seen(subscription) == 2
+    end
+
+    test "should not cover events redelivered after reconnecting when sent while disconnected",
+         %{event_store: event_store, subscription: subscription} do
+      {departed, survivor} =
+        connect_departing_and_surviving_subscribers(subscription, event_store)
+
+      :ok = disconnect(subscription)
+
+      depart(subscription, departed)
+
+      :ok = Subscription.ack(subscription, 2, survivor)
+
+      :ok = reconnect(subscription)
+
+      Wait.until(5_000, fn -> assert in_flight(subscription, survivor) == [2, 1] end)
+
+      :ok = Subscription.ack(subscription, 2, survivor)
+
+      assert Subscription.last_seen(subscription) == 2
+    end
+  end
+
   describe "duplicate subscriptions" do
     setup [:lock_subscription, :create_subscription]
 
@@ -236,6 +294,14 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
   end
 
   defp create_subscription(context) do
+    {:ok, subscription} = start_subscription(context)
+
+    {:ok, ^subscription} = Subscription.connect(subscription, self(), buffer_size: 3)
+
+    [subscription: subscription]
+  end
+
+  defp start_subscription(context) do
     %{
       conn: conn,
       schema: schema,
@@ -246,24 +312,71 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       causation_id_type: causation_id_type
     } = context
 
-    {:ok, subscription} =
-      Subscription.start_link(
-        event_store: event_store,
-        conn: conn,
-        schema: schema,
-        serializer: serializer,
-        correlation_id_type: correlation_id_type,
-        causation_id_type: causation_id_type,
-        retry_interval: 1_000,
-        stream_uuid: "$all",
-        subscription_name: subscription_name,
-        buffer_size: 3,
-        start_from: 0
-      )
+    Subscription.start_link(
+      event_store: event_store,
+      conn: conn,
+      schema: schema,
+      serializer: serializer,
+      correlation_id_type: correlation_id_type,
+      causation_id_type: causation_id_type,
+      retry_interval: Map.get(context, :retry_interval, 1_000),
+      stream_uuid: "$all",
+      subscription_name: subscription_name,
+      buffer_size: 3,
+      start_from: 0
+    )
+  end
 
-    {:ok, ^subscription} = Subscription.connect(subscription, self(), buffer_size: 3)
+  # Leaves the departing subscriber holding event 1 and the surviving one holding
+  # event 2, so the survivor is sent both once the departed subscriber is gone.
+  defp connect_departing_and_surviving_subscribers(subscription, event_store) do
+    departed = idle_subscriber()
+    survivor = idle_subscriber()
 
-    [subscription: subscription]
+    {:ok, ^subscription} =
+      Subscription.connect(subscription, departed, buffer_size: 1, concurrency_limit: 2)
+
+    Wait.until(5_000, fn -> assert subscription_state(subscription) == :subscribed end)
+
+    append_events_to_stream(event_store, 1)
+
+    Wait.until(5_000, fn -> assert in_flight(subscription, departed) == [1] end)
+
+    {:ok, ^subscription} =
+      Subscription.connect(subscription, survivor, buffer_size: 2, concurrency_limit: 2)
+
+    append_events_to_stream(event_store, 1)
+
+    Wait.until(5_000, fn -> assert in_flight(subscription, survivor) == [2] end)
+
+    {departed, survivor}
+  end
+
+  defp idle_subscriber do
+    subscriber = spawn(fn -> Process.sleep(:infinity) end)
+
+    on_exit(fn -> Process.exit(subscriber, :kill) end)
+
+    subscriber
+  end
+
+  defp depart(subscription, subscriber) do
+    Process.exit(subscriber, :kill)
+
+    Wait.until(5_000, fn -> refute Map.has_key?(subscribers(subscription), subscriber) end)
+  end
+
+  defp in_flight(subscription, subscriber) do
+    %{^subscriber => %{in_flight: in_flight}} = subscribers(subscription)
+
+    pluck(in_flight, :event_number)
+  end
+
+  defp subscribers(subscription) do
+    %Subscription{subscription: %{data: %{subscribers: subscribers}}} =
+      :sys.get_state(subscription)
+
+    subscribers
   end
 
   defp reconnect(subscription) do

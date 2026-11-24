@@ -7,7 +7,8 @@ defmodule EventStore.Subscriptions.Subscriber do
     :partition_key,
     last_sent: 0,
     buffer_size: 1,
-    in_flight: []
+    in_flight: [],
+    superseded: []
   ]
 
   alias EventStore.RecordedEvent
@@ -41,15 +42,43 @@ defmodule EventStore.Subscriptions.Subscriber do
     }
   end
 
+  # The subscriber still acknowledges what it was sent before the reset, and those events are
+  # sent again, so its acknowledgements must not be mistaken for ones of the new deliveries.
   def reset_in_flight(%Subscriber{} = subscriber) do
-    %Subscriber{subscriber | in_flight: [], partition_key: nil}
+    %Subscriber{in_flight: in_flight, superseded: superseded} = subscriber
+
+    %Subscriber{
+      subscriber
+      | in_flight: [],
+        superseded: in_flight ++ superseded,
+        partition_key: nil
+    }
   end
 
   @doc """
   Acknowledge the in-flight event by number and all events sent to the
   subscriber before the ack'd event.
   """
-  def acknowledge(%Subscriber{} = subscriber, ack) do
+  def acknowledge(%Subscriber{superseded: superseded} = subscriber, ack) do
+    # Earlier deliveries reach the subscriber before the ones sent after a reset, so acknowledging
+    # one of the later deliveries means none of the earlier ones will be acknowledged anymore.
+    case oldest_ack_event_index(superseded, ack) do
+      nil -> acknowledge_in_flight(%Subscriber{subscriber | superseded: []}, ack)
+      index -> {:ok, %Subscriber{subscriber | superseded: Enum.take(superseded, index)}, []}
+    end
+  end
+
+  @doc """
+  Discard an acknowledgement of an event sent before the in-flight events were reset.
+  """
+  def discard_superseded(%Subscriber{superseded: superseded} = subscriber, ack) do
+    case oldest_ack_event_index(superseded, ack) do
+      nil -> subscriber
+      index -> %Subscriber{subscriber | superseded: Enum.take(superseded, index)}
+    end
+  end
+
+  defp acknowledge_in_flight(%Subscriber{} = subscriber, ack) do
     %Subscriber{in_flight: in_flight} = subscriber
 
     case ack_event_index(in_flight, ack) do
@@ -70,6 +99,15 @@ defmodule EventStore.Subscriptions.Subscriber do
           end
 
         {:ok, subscriber, acknowledged_events}
+    end
+  end
+
+  # An event sent again before the subscriber caught up is superseded once per reset, and each
+  # acknowledgement of it accounts for the oldest delivery still unaccounted for.
+  defp oldest_ack_event_index(superseded, ack) do
+    case superseded |> Enum.reverse() |> ack_event_index(ack) do
+      nil -> nil
+      index -> length(superseded) - 1 - index
     end
   end
 
