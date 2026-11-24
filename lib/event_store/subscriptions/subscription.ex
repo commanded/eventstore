@@ -166,7 +166,7 @@ defmodule EventStore.Subscriptions.Subscription do
       |> apply_subscription_to_state(state)
 
     if unsubscribed?(state) do
-      {:stop, reason, state}
+      {:stop, :normal, state}
     else
       {:noreply, state}
     end
