@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.4.12
+
+### Bug fixes
+
+* Remove unreachable `pagination_metadata/1` clause that triggered an Elixir 1.20 type system warning
+* Fix documentation warnings
+
 ## v1.4.11
 
 ### Enhancements
