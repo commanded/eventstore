@@ -71,6 +71,11 @@ defmodule EventStore.Mixfile do
       canonical: "http://hexdocs.pm/eventstore",
       source_ref: "v#{@version}",
       extra_section: "GUIDES",
+      skip_code_autolink_to: [
+        "EventStore.MonitoredServer",
+        "EventStore.Notifications.Supervisor",
+        "EventStore.PostgresTypes"
+      ],
       extras: [
         "CHANGELOG.md",
         "guides/Getting Started.md",
