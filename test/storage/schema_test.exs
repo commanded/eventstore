@@ -1,7 +1,16 @@
 defmodule EventStore.Storage.SchemaTest do
   use ExUnit.Case
 
-  alias EventStore.Storage.Schema
+  alias EventStore.Storage.{Database, Schema}
+
+  # The migration test env has no pre-created database; ensure it exists
+  # regardless of which test module runs first.
+  setup_all do
+    case Database.create(SchemaEventStore.config()) do
+      :ok -> :ok
+      {:error, :already_up} -> :ok
+    end
+  end
 
   setup do
     config =
