@@ -220,15 +220,48 @@ defmodule EventStore.Storage.AppendEventsTest do
              Appender.append(conn, 1, recorded_events, schema: "doesnotexist")
   end
 
-  test "append single event with a db connection error", %{conn: conn, schema: schema} do
-    recorded_events = EventFactory.create_recorded_events(100, UUID.uuid4())
+  test "append single event with a db connection error", context do
+    %{conn: conn, schema: schema} = context
 
-    # A zero timeout can surface either as a DBConnection timeout or as a PostgreSQL
-    # query cancellation, depending on the driver/runtime timing.
-    assert {:error, error} =
-             Appender.append(conn, 1, recorded_events, schema: schema, timeout: 0)
+    recorded_events = EventFactory.create_recorded_events(1, UUID.uuid4())
 
-    assert match?(%DBConnection.ConnectionError{}, error) or error == :query_canceled
+    # Lock the events table so the append is guaranteed to block and exceed its query timeout.
+    with_events_table_locked(context, fn ->
+      # On timeout Postgrex cancels the blocked query, which usually surfaces as
+      # `:query_canceled` but may surface as a connection error if the socket closes first.
+      assert {:error, error} =
+               Appender.append(conn, 1, recorded_events, schema: schema, timeout: 100)
+
+      assert match?(%DBConnection.ConnectionError{}, error) or error == :query_canceled
+    end)
+  end
+
+  # Holds an exclusive lock on the events table from a separate connection while `work_fn` runs.
+  defp with_events_table_locked(%{schema: schema, postgrex_config: postgrex_config}, work_fn) do
+    lock_conn = start_supervised!({Postgrex, postgrex_config}, id: :lock_conn)
+    test = self()
+
+    locker =
+      Task.async(fn ->
+        Postgrex.transaction(lock_conn, fn tx ->
+          Postgrex.query!(tx, "LOCK TABLE #{schema}.events IN ACCESS EXCLUSIVE MODE", [])
+          send(test, :locked)
+
+          receive do
+            :release -> :ok
+          end
+        end)
+      end)
+
+    try do
+      assert_receive :locked
+
+      work_fn.()
+    after
+      # Always release the table lock, even if `work_fn` raises.
+      send(locker.pid, :release)
+      Task.await(locker)
+    end
   end
 
   defp create_stream(context) do
