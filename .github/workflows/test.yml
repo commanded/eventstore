@@ -61,14 +61,19 @@ jobs:
     - name: Check formatting
       run: mix format --check-formatted
 
+    - name: Compile
+      run: |
+        mix compile --warnings-as-errors
+        MIX_ENV=test mix compile --warnings-as-errors
+        MIX_ENV=jsonb mix compile --warnings-as-errors
+        MIX_ENV=text_ids mix compile --warnings-as-errors
+        MIX_ENV=migration mix compile --warnings-as-errors
+
     - name: Setup EventStore test databases
       run: |
         MIX_ENV=test mix event_store.setup
         MIX_ENV=jsonb mix event_store.setup
         MIX_ENV=text_ids mix event_store.setup
-
-    - name: Compile
-      run: mix compile --warnings-as-errors
 
     - name: Run tests
       run: mix test.all
