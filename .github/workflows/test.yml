@@ -68,7 +68,7 @@ jobs:
         MIX_ENV=text_ids mix event_store.setup
 
     - name: Compile
-      run: mix compile
+      run: mix compile --warnings-as-errors
 
     - name: Run tests
       run: mix test.all
