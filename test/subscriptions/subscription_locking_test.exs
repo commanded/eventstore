@@ -88,6 +88,48 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
       assert_receive_events([3])
     end
 
+    test "should become subscribed after another subscription ack'd unseen events during disconnect",
+         %{
+           event_store: event_store,
+           schema: schema,
+           subscription: subscription,
+           subscription_name: subscription_name
+         } do
+      assert_receive {:subscribed, ^subscription}
+
+      append_events_to_stream(event_store, 3)
+
+      assert_receive_events([1, 2, 3])
+
+      :ok = disconnect(subscription)
+
+      # Events appended and ack'd by another subscription which this subscription
+      # isn't notified about, such as during a database outage.
+      :ok = unsubscribe_from_notifications(subscription, event_store)
+
+      append_events_to_stream(event_store, 2)
+
+      # Wait until the events have been broadcast to subscribers.
+      assert_receive {:notified, [%{event_number: 4}, %{event_number: 5}]}
+
+      :ok =
+        Storage.Subscription.ack_last_seen_event(@conn, "$all", subscription_name, 5,
+          schema: schema
+        )
+
+      :ok = subscribe_to_notifications(subscription, event_store)
+
+      :ok = reconnect(subscription)
+
+      refute_receive {:events, _received_events}
+
+      assert subscription_state(subscription) == :subscribed
+
+      append_events_to_stream(event_store, 1)
+
+      assert_receive_events([6])
+    end
+
     test "should subscribe after waiting `retry_interval`", %{
       event_store: event_store,
       subscription: subscription
@@ -230,6 +272,55 @@ defmodule EventStore.Subscriptions.SubscriptionLockingTest do
 
   defp disconnect(subscription) do
     release_lock(subscription, lock_ref(subscription))
+  end
+
+  defp unsubscribe_from_notifications(subscription, event_store) do
+    registry = Module.concat([event_store, EventStore.PubSub])
+
+    :sys.replace_state(subscription, fn state ->
+      :ok = Registry.unregister(registry, "$all")
+      state
+    end)
+
+    # Forward notifications to the test process to know when they've been broadcast.
+    test = self()
+    ref = make_ref()
+
+    forwarder =
+      spawn_link(fn ->
+        :ok = EventStore.PubSub.subscribe(event_store, "$all")
+        send(test, {:forwarding, ref})
+        forward_notifications(test)
+      end)
+
+    assert_receive {:forwarding, ^ref}
+
+    on_exit(fn -> Process.exit(forwarder, :kill) end)
+
+    :ok
+  end
+
+  defp forward_notifications(test) do
+    receive do
+      {:events, events} -> send(test, {:notified, events})
+    end
+
+    forward_notifications(test)
+  end
+
+  defp subscribe_to_notifications(subscription, event_store) do
+    :sys.replace_state(subscription, fn state ->
+      :ok = EventStore.PubSub.subscribe(event_store, "$all")
+      state
+    end)
+
+    :ok
+  end
+
+  defp subscription_state(subscription) do
+    %Subscription{subscription: %{state: state}} = :sys.get_state(subscription)
+
+    state
   end
 
   defp lock_ref(subscription) do

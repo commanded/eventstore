@@ -262,10 +262,16 @@ defmodule EventStore.Subscriptions.SubscriptionFsm do
 
       last_ack = last_seen || 0
 
+      %SubscriptionState{last_received: last_received} = data
+
       data = %SubscriptionState{
         data
         | subscription_id: subscription_id,
           lock_ref: lock_ref,
+          # Another subscription may have ack'd events, while this one was
+          # disconnected, which it wasn't notified about. They must be counted
+          # as received, otherwise catch-up would never complete.
+          last_received: max(last_received, last_ack),
           last_sent: last_ack,
           last_ack: last_ack
       }
