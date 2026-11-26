@@ -805,7 +805,10 @@ defmodule EventStore.Subscriptions.SubscribeToStreamTest do
   end
 
   defp assert_hibernated(pid) do
-    assert Process.info(pid, :current_function) == {:current_function, {:erlang, :hibernate, 3}}
+    assert Process.info(pid, :current_function) in [
+             {:current_function, {:erlang, :hibernate, 3}},
+             {:current_function, {:gen_server, :loop_hibernate, 4}}
+           ]
   end
 
   # Append events to another stream so that for single stream subscription tests
