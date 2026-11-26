@@ -27,7 +27,8 @@ jobs:
             check_formatted: "ignore"
           - elixir: 1.13.x
             otp: 25
-            check_formatted: "ignore"
+- elixir: 1.18.x
+otp: 27
 
     services:
       postgres:
