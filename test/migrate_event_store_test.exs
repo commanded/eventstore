@@ -81,6 +81,9 @@ defmodule EventStore.MigrateEventStoreTest do
     )
     # Ignore comments
     |> Enum.reject(&String.starts_with?(&1, "--"))
+    # Newer pg_dump versions write a random token into every dump
+    |> Enum.reject(&String.starts_with?(&1, "\\restrict"))
+    |> Enum.reject(&String.starts_with?(&1, "\\unrestrict"))
     |> Enum.reject(fn
       "0\t17\t0\tNOW" -> true
       "1\t1\t0\tNOW" -> true
