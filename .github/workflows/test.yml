@@ -31,7 +31,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:12
+        image: postgres:18
         ports: ['5432:5432']
         env:
           POSTGRES_USER: postgres
@@ -44,6 +44,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    # The runner ships PostgreSQL 16 clients; pg_dump and pg_restore have to match the server
+    - name: Install the PostgreSQL 18 client
+      run: |
+        sudo install -d /usr/share/postgresql-common/pgdg
+        sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        . /etc/os-release
+        echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client-18
+        pg_dump --version
 
     - name: Set up Elixir
       id: beam
